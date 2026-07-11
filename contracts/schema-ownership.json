@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "services": {
+    "identity-service": { "owns": ["identity"], "reads": [] },
+    "journal-service": { "owns": ["journal"], "reads": [] },
+    "performance-service": { "owns": ["performance"], "reads": [] },
+    "discipline-service": { "owns": ["discipline"], "reads": [] },
+    "reminder-service": { "owns": ["reminder"], "reads": [] },
+    "market-data-service": { "owns": ["market", "market_data_public"], "reads": [] },
+    "price-alert-service": { "owns": ["price_alert"], "reads": ["market_data_public"] },
+    "rotation-service": { "owns": ["rotation"], "reads": ["market_data_public"] },
+    "stock-research-service": { "owns": ["stock_research"], "reads": [] },
+    "partner-service": { "owns": ["partner"], "reads": [] },
+    "content-service": { "owns": ["content"], "reads": [] },
+    "operations-service": { "owns": ["operations"], "reads": [] },
+    "tool-service": { "owns": [], "reads": [] }
+  }
+}
