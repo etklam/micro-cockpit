@@ -53,6 +53,8 @@ services:
       <<: *dotnet-env
       ConnectionStrings__Journal: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+      Services__Reminder: http://reminder:8080
+      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:-change-me-before-exposing}
     depends_on:
       identity: { condition: service_healthy }
 
@@ -90,6 +92,7 @@ services:
       ConnectionStrings__Reminder: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
       Services__Journal: http://journal:8080
+      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:-change-me-before-exposing}
     depends_on:
       identity: { condition: service_healthy }
       journal: { condition: service_healthy }

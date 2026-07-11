@@ -1,0 +1,26 @@
+<Solution>
+  <Folder Name="/gateway/">
+    <Project Path="gateway/TradeDiary.EdgeApi/TradeDiary.EdgeApi.csproj" />
+  </Folder>
+  <Folder Name="/services/" />
+  <Folder Name="/services/discipline-service/" />
+  <Folder Name="/services/discipline-service/src/">
+    <Project Path="services/discipline-service/src/TradeDiary.Discipline/TradeDiary.Discipline.csproj" />
+  </Folder>
+  <Folder Name="/services/identity-service/" />
+  <Folder Name="/services/identity-service/src/">
+    <Project Path="services/identity-service/src/TradeDiary.Identity/TradeDiary.Identity.csproj" />
+  </Folder>
+  <Folder Name="/services/journal-service/" />
+  <Folder Name="/services/journal-service/src/">
+    <Project Path="services/journal-service/src/TradeDiary.Journal/TradeDiary.Journal.csproj" />
+  </Folder>
+  <Folder Name="/services/performance-service/" />
+  <Folder Name="/services/performance-service/src/">
+    <Project Path="services/performance-service/src/TradeDiary.Performance/TradeDiary.Performance.csproj" />
+  </Folder>
+  <Folder Name="/services/reminder-service/" />
+  <Folder Name="/services/reminder-service/src/">
+    <Project Path="services/reminder-service/src/TradeDiary.Reminder/TradeDiary.Reminder.csproj" />
+  </Folder>
+</Solution>

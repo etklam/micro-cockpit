@@ -1,0 +1,188 @@
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Npgsql;
+using System.Security.Cryptography;
+using System.Text;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Reminder") ?? "Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
+builder.Services.AddHttpClient("journal", client => client.BaseAddress = new Uri(builder.Configuration["Services:Journal"] ?? "http://127.0.0.1:5101"));
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+{
+    options.MapInboundClaims = false;
+    options.MetadataAddress = builder.Configuration["Auth:MetadataAddress"] ?? "http://127.0.0.1:5100/.well-known/openid-configuration";
+    options.RequireHttpsMetadata = false; // ponytail: local compose only; production config must use HTTPS.
+    options.Audience = "trade-diary-services";
+});
+builder.Services.AddAuthorization(options => options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+var app = builder.Build(); app.UseAuthentication(); app.UseAuthorization();
+
+app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
+app.MapGet("/health/ready", async (NpgsqlDataSource db) => { try { await db.OpenConnectionAsync(); return Results.Ok(new { status = "ready" }); } catch { return Results.Json(new { status = "not_ready" }, statusCode: 503); } }).AllowAnonymous();
+app.MapGet("/version", () => Results.Ok(new { service = "reminder-service", version = "0.1.0" })).AllowAnonymous();
+
+app.MapPost("/internal/events/diary-deleted", async (DiaryDeletedEvent input, HttpRequest request, NpgsqlDataSource db, IConfiguration configuration) =>
+{
+    if (!ValidServiceKey(request.Headers["X-Service-Key"].ToString(), configuration["Internal:ServiceKey"] ?? "local-service-key")) return Results.Unauthorized();
+    if (input.EventId == Guid.Empty || input.EventType != "DiaryDeleted.v1" || input.Version != 1 || input.Payload.DiaryId == Guid.Empty || input.Payload.UserId == Guid.Empty)
+        return Results.BadRequest(new { error = "invalid_event" });
+    await using var connection = await db.OpenConnectionAsync(); await using var tx = await connection.BeginTransactionAsync();
+    await using var inbox = new NpgsqlCommand("INSERT INTO reminder.inbox_events(event_id,event_type,event_version,payload) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT DO NOTHING", connection, tx);
+    inbox.Parameters.AddWithValue(input.EventId); inbox.Parameters.AddWithValue(input.EventType); inbox.Parameters.AddWithValue(input.Version);
+    inbox.Parameters.AddWithValue(System.Text.Json.JsonSerializer.Serialize(input.Payload));
+    if (await inbox.ExecuteNonQueryAsync() == 0) { await tx.CommitAsync(); return Results.NoContent(); }
+    await using var expire = new NpgsqlCommand("UPDATE reminder.diary_alerts SET status='expired',next_local_date=NULL,next_trigger_at=NULL,updated_at=now() WHERE diary_id=$1 AND user_id=$2 AND status='active'", connection, tx);
+    expire.Parameters.AddWithValue(input.Payload.DiaryId); expire.Parameters.AddWithValue(input.Payload.UserId); await expire.ExecuteNonQueryAsync();
+    await using var processed = new NpgsqlCommand("UPDATE reminder.inbox_events SET processed_at=now() WHERE event_id=$1", connection, tx);
+    processed.Parameters.AddWithValue(input.EventId); await processed.ExecuteNonQueryAsync(); await tx.CommitAsync();
+    return Results.NoContent();
+}).AllowAnonymous();
+
+app.MapGet("/internal/diary-alerts", async (HttpRequest request, NpgsqlDataSource db) =>
+{
+    if (!TryUser(request, out var userId)) return Results.Unauthorized();
+    await using var command = db.CreateCommand("""
+        SELECT id,diary_id,start_local_date,next_local_date,local_time,timezone,repeat_mode,recurrence_end_local_date,next_trigger_at,status,created_at,updated_at
+        FROM reminder.diary_alerts WHERE user_id=$1 ORDER BY created_at DESC
+        """);
+    command.Parameters.AddWithValue(userId); await using var reader = await command.ExecuteReaderAsync();
+    var items = new List<AlertResponse>(); while (await reader.ReadAsync()) items.Add(Read(reader)); return Results.Ok(new { items });
+});
+
+app.MapPost("/internal/diary-alerts", async (AlertWrite input, HttpRequest request, NpgsqlDataSource db, IHttpClientFactory clients) =>
+{
+    if (!TryUser(request, out var userId)) return Results.Unauthorized();
+    var schedule = BuildSchedule(input); if (schedule.Error is not null) return Results.BadRequest(new { error = schedule.Error });
+    using var validation = new HttpRequestMessage(HttpMethod.Get, $"/internal/diaries/{input.DiaryId}");
+    validation.Headers.TryAddWithoutValidation("Authorization", request.Headers.Authorization.ToString());
+    using var response = await clients.CreateClient("journal").SendAsync(validation);
+    if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return Results.NotFound();
+    if (!response.IsSuccessStatusCode) return Results.Json(new { error = "journal_unavailable" }, statusCode: 503);
+    var id = Guid.NewGuid();
+    await using var command = db.CreateCommand("""
+        INSERT INTO reminder.diary_alerts(id,user_id,diary_id,start_local_date,next_local_date,local_time,timezone,repeat_mode,recurrence_end_local_date,next_trigger_at,status)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        RETURNING id,diary_id,start_local_date,next_local_date,local_time,timezone,repeat_mode,recurrence_end_local_date,next_trigger_at,status,created_at,updated_at
+        """);
+    command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(userId); command.Parameters.AddWithValue(input.DiaryId);
+    AddScheduleParameters(command, input, schedule);
+    await using var reader = await command.ExecuteReaderAsync(); await reader.ReadAsync();
+    return Results.Created($"/internal/diary-alerts/{id}", Read(reader));
+});
+
+app.MapPut("/internal/diary-alerts/{id:guid}", async (Guid id, AlertWrite input, HttpRequest request, NpgsqlDataSource db, IHttpClientFactory clients) =>
+{
+    if (!TryUser(request, out var userId)) return Results.Unauthorized();
+    var schedule = BuildSchedule(input); if (schedule.Error is not null) return Results.BadRequest(new { error = schedule.Error });
+    using var validation = new HttpRequestMessage(HttpMethod.Get, $"/internal/diaries/{input.DiaryId}"); validation.Headers.TryAddWithoutValidation("Authorization", request.Headers.Authorization.ToString());
+    using var response = await clients.CreateClient("journal").SendAsync(validation);
+    if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return Results.NotFound();
+    if (!response.IsSuccessStatusCode) return Results.Json(new { error = "journal_unavailable" }, statusCode: 503);
+    await using var command = db.CreateCommand("""
+        UPDATE reminder.diary_alerts SET diary_id=$3,start_local_date=$4,next_local_date=$5,local_time=$6,timezone=$7,repeat_mode=$8,
+          recurrence_end_local_date=$9,next_trigger_at=$10,status=$11,updated_at=now() WHERE id=$1 AND user_id=$2
+        """);
+    command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(userId); command.Parameters.AddWithValue(input.DiaryId); AddScheduleParameters(command, input, schedule);
+    return await command.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.NoContent();
+});
+
+app.MapDelete("/internal/diary-alerts/{id:guid}", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
+{
+    if (!TryUser(request, out var userId)) return Results.Unauthorized();
+    await using var command = db.CreateCommand("DELETE FROM reminder.diary_alerts WHERE id=$1 AND user_id=$2"); command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(userId);
+    return await command.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.NoContent();
+});
+
+app.MapPost("/internal/diary-alerts/{id:guid}/dismiss", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
+{
+    if (!TryUser(request, out var userId)) return Results.Unauthorized();
+    await using var command = db.CreateCommand("UPDATE reminder.diary_alerts SET status='dismissed',next_trigger_at=NULL,next_local_date=NULL,updated_at=now() WHERE id=$1 AND user_id=$2");
+    command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(userId);
+    return await command.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.NoContent();
+});
+
+app.MapGet("/internal/diary-alerts/day-summary", async (DateOnly date, HttpRequest request, NpgsqlDataSource db) =>
+{
+    if (!TryUser(request, out var userId)) return Results.Unauthorized();
+    await using var command = db.CreateCommand("SELECT count(*) FROM reminder.diary_alerts WHERE user_id=$1 AND start_local_date <= $2 AND recurrence_end_local_date >= $2 AND status='active'");
+    command.Parameters.AddWithValue(userId); command.Parameters.AddWithValue(date);
+    return Results.Ok(new { date, count = Convert.ToInt64(await command.ExecuteScalarAsync()) });
+});
+
+app.MapGet("/internal/diary-alerts/day-summaries", async (DateOnly from, DateOnly to, HttpRequest request, NpgsqlDataSource db) =>
+{
+    if (!TryUser(request, out var userId)) return Results.Unauthorized();
+    if (to < from || to.DayNumber - from.DayNumber > 62) return Results.BadRequest(new { error = "invalid_date_range" });
+    await using var command = db.CreateCommand("""
+        SELECT day::date,count(*) FROM reminder.diary_alerts a
+        CROSS JOIN LATERAL generate_series(greatest(a.start_local_date,$2),least(a.recurrence_end_local_date,$3),'1 day') day
+        WHERE a.user_id=$1 AND a.status='active' AND extract(isodow from day) < 6
+          AND (a.repeat_mode <> 'none' OR day::date=a.start_local_date)
+        GROUP BY day::date ORDER BY day::date
+        """);
+    command.Parameters.AddWithValue(userId); command.Parameters.AddWithValue(from); command.Parameters.AddWithValue(to);
+    await using var reader = await command.ExecuteReaderAsync(); var items = new List<object>();
+    while (await reader.ReadAsync()) items.Add(new { localDate = reader.GetFieldValue<DateOnly>(0), count = reader.GetInt64(1) });
+    return Results.Ok(new { items });
+});
+
+app.MapPost("/internal/worker/run", async (NpgsqlDataSource db) => Results.Ok(new { delivered = await RunWorker(db, 50) }));
+
+app.Run();
+
+static bool TryUser(HttpRequest request, out Guid userId) => Guid.TryParse(request.HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out userId);
+static bool ValidServiceKey(string supplied, string expected)
+{
+    var left = Encoding.UTF8.GetBytes(supplied); var right = Encoding.UTF8.GetBytes(expected);
+    return left.Length == right.Length && CryptographicOperations.FixedTimeEquals(left, right);
+}
+static Schedule BuildSchedule(AlertWrite input)
+{
+    if (input.RepeatMode is not ("none" or "week" or "month")) return new(null, input.StartLocalDate, null, "invalid_repeat_mode");
+    TimeZoneInfo timezone; try { timezone = TimeZoneInfo.FindSystemTimeZoneById(input.Timezone); } catch { return new(null, input.StartLocalDate, null, "invalid_timezone"); }
+    var end = input.RepeatMode switch { "week" => input.StartLocalDate.AddDays(((int)DayOfWeek.Friday - (int)input.StartLocalDate.DayOfWeek + 7) % 7), "month" => new DateOnly(input.StartLocalDate.Year, input.StartLocalDate.Month, 1).AddMonths(1).AddDays(-1), _ => input.StartLocalDate };
+    var first = NextWeekday(input.StartLocalDate, end); if (first is null) return new(null, end, null, null);
+    var local = first.Value.ToDateTime(input.LocalTime); if (timezone.IsInvalidTime(local)) return new(null, end, null, "invalid_local_time");
+    return new(first, end, TimeZoneInfo.ConvertTimeToUtc(local, timezone), null);
+}
+static DateOnly? NextWeekday(DateOnly candidate, DateOnly end)
+{
+    while (candidate <= end && candidate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) candidate = candidate.AddDays(1);
+    return candidate <= end ? candidate : null;
+}
+static void AddScheduleParameters(NpgsqlCommand command, AlertWrite input, Schedule schedule)
+{
+    command.Parameters.AddWithValue(input.StartLocalDate); command.Parameters.AddWithValue((object?)schedule.NextDate ?? DBNull.Value);
+    command.Parameters.AddWithValue(input.LocalTime); command.Parameters.AddWithValue(input.Timezone); command.Parameters.AddWithValue(input.RepeatMode);
+    command.Parameters.AddWithValue(schedule.EndDate); command.Parameters.AddWithValue((object?)schedule.NextUtc ?? DBNull.Value);
+    command.Parameters.AddWithValue(schedule.NextUtc is null ? "expired" : "active");
+}
+static AlertResponse Read(NpgsqlDataReader r) => new(r.GetGuid(0),r.GetGuid(1),r.GetFieldValue<DateOnly>(2),r.IsDBNull(3)?null:r.GetFieldValue<DateOnly>(3),r.GetFieldValue<TimeOnly>(4),r.GetString(5),r.GetString(6),r.GetFieldValue<DateOnly>(7),r.IsDBNull(8)?null:r.GetDateTime(8),r.GetString(9),r.GetDateTime(10),r.GetDateTime(11));
+static async Task<int> RunWorker(NpgsqlDataSource db, int limit)
+{
+    await using var connection = await db.OpenConnectionAsync(); await using var tx = await connection.BeginTransactionAsync();
+    await using var claim = new NpgsqlCommand("""
+        SELECT id,next_local_date,local_time,timezone,repeat_mode,recurrence_end_local_date,next_trigger_at
+        FROM reminder.diary_alerts WHERE status='active' AND next_trigger_at<=now()
+        ORDER BY next_trigger_at FOR UPDATE SKIP LOCKED LIMIT $1
+        """, connection, tx); claim.Parameters.AddWithValue(limit);
+    var due = new List<Due>(); await using (var reader = await claim.ExecuteReaderAsync()) while (await reader.ReadAsync()) due.Add(new(reader.GetGuid(0),reader.GetFieldValue<DateOnly>(1),reader.GetFieldValue<TimeOnly>(2),reader.GetString(3),reader.GetString(4),reader.GetFieldValue<DateOnly>(5),reader.GetDateTime(6)));
+    foreach (var item in due)
+    {
+        await using var attempt = new NpgsqlCommand("INSERT INTO reminder.reminder_delivery_attempts(id,diary_alert_id,scheduled_for,delivered_at,status) VALUES($1,$2,$3,now(),'delivered') ON CONFLICT DO NOTHING", connection, tx);
+        attempt.Parameters.AddWithValue(Guid.NewGuid()); attempt.Parameters.AddWithValue(item.Id); attempt.Parameters.AddWithValue(item.ScheduledFor); await attempt.ExecuteNonQueryAsync();
+        var nextDate = item.RepeatMode == "none" ? null : NextWeekday(item.LocalDate.AddDays(1), item.EndDate);
+        DateTime? nextUtc = null; if (nextDate is not null) { var tz = TimeZoneInfo.FindSystemTimeZoneById(item.Timezone); var local = nextDate.Value.ToDateTime(item.LocalTime); if (!tz.IsInvalidTime(local)) nextUtc = TimeZoneInfo.ConvertTimeToUtc(local, tz); }
+        await using var update = new NpgsqlCommand("UPDATE reminder.diary_alerts SET next_local_date=$2,next_trigger_at=$3,status=$4,updated_at=now() WHERE id=$1", connection, tx);
+        update.Parameters.AddWithValue(item.Id); update.Parameters.AddWithValue((object?)nextDate ?? DBNull.Value); update.Parameters.AddWithValue((object?)nextUtc ?? DBNull.Value); update.Parameters.AddWithValue(nextUtc is null ? "expired" : "active"); await update.ExecuteNonQueryAsync();
+    }
+    await tx.CommitAsync(); return due.Count;
+}
+
+record AlertWrite(Guid DiaryId, DateOnly StartLocalDate, TimeOnly LocalTime, string Timezone, string RepeatMode);
+record Schedule(DateOnly? NextDate, DateOnly EndDate, DateTime? NextUtc, string? Error);
+record Due(Guid Id, DateOnly LocalDate, TimeOnly LocalTime, string Timezone, string RepeatMode, DateOnly EndDate, DateTime ScheduledFor);
+record AlertResponse(Guid Id,Guid DiaryId,DateOnly StartLocalDate,DateOnly? NextLocalDate,TimeOnly LocalTime,string Timezone,string RepeatMode,DateOnly RecurrenceEndLocalDate,DateTime? NextTriggerAt,string Status,DateTime CreatedAt,DateTime UpdatedAt);
+record DiaryDeletedEvent(Guid EventId, string EventType, int Version, DiaryDeletedPayload Payload);
+record DiaryDeletedPayload(Guid DiaryId, Guid UserId);
