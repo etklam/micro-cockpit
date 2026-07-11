@@ -9,7 +9,7 @@ using Npgsql;
 var builder = WebApplication.CreateBuilder(args);
 var issuer = builder.Configuration["Jwt:Issuer"] ?? "trade-diary-identity";
 var audience = builder.Configuration["Jwt:Audience"] ?? "trade-diary-services";
-var rsa = RSA.Create(3072);
+var rsa = LoadSigningKey(builder.Configuration["Jwt:PrivateKeyPath"]);
 var signingKey = new RsaSecurityKey(rsa) { KeyId = Guid.NewGuid().ToString("N") };
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(
     builder.Configuration.GetConnectionString("Identity") ??
@@ -200,6 +200,15 @@ app.MapGet("/internal/auth/me", async (ClaimsPrincipal principal, NpgsqlDataSour
 app.Run();
 
 static AuthUser ReadUser(NpgsqlDataReader reader) => new(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetInt32(8));
+
+static RSA LoadSigningKey(string? path)
+{
+    var rsa = RSA.Create();
+    if (string.IsNullOrWhiteSpace(path)) { rsa.KeySize = 3072; return rsa; }
+    if (File.Exists(path)) { rsa.ImportFromPem(File.ReadAllText(path)); return rsa; }
+    rsa.KeySize = 3072; Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ".");
+    File.WriteAllText(path, rsa.ExportRSAPrivateKeyPem()); return rsa;
+}
 
 static async Task<object> CreateTokenPair(NpgsqlDataSource db, AuthUser user, Guid familyId, SecurityKey key, string issuer, string audience)
 {
