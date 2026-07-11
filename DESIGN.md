@@ -336,39 +336,41 @@ Data freshness
 
 ## 5.1 Dark Mode Tokens
 
-Dark mode should be calm, not pure black.
+v0.1 ships **dark-only** (committed dark). Calm near-black, not pure black — a
+whisper of the brand violet. The accent is violet (hue 279), replacing the
+earlier generic blue per the "quiet cockpit" direction.
+
+**Source of truth: `frontend/src/index.css`** (OKLCH). Contrast verified WCAG AA
+(ink→bg 16.5:1, muted→bg 7.35:1, primary-button label 6.17:1).
 
 ```css
---bg-app: #080D14;
---bg-surface: #0F1722;
---bg-surface-elevated: #141E2B;
---bg-card: #111A26;
---bg-card-hover: #182333;
+/* surfaces — hue 279, near-black with a whisper of violet */
+--bg:           oklch(0.150 0.008 279);   /* app background */
+--surface:      oklch(0.195 0.010 279);   /* cards, panels */
+--surface-2:    oklch(0.165 0.009 279);   /* inputs, inset wells */
+--overlay:      oklch(0.230 0.011 279);   /* hover / raised */
 
---border-subtle: #223044;
---border-strong: #334155;
+/* text */
+--ink:          oklch(0.94 0.004 279);    /* body */
+--muted:        oklch(0.70 0.012 279);    /* secondary, labels */
+--faint:        oklch(0.50 0.014 279);    /* large / decorative only */
 
---text-primary: #E6EDF5;
---text-secondary: #9AA8BA;
---text-muted: #64748B;
+/* brand — violet */
+--primary-btn:  oklch(0.50 0.17 279);     /* filled primary button */
+--primary:      oklch(0.62 0.16 279);     /* accents, links, focus, active nav */
 
---accent-primary: #3B82F6;
---accent-primary-soft: rgba(59, 130, 246, 0.16);
+/* P/L — restrained, never neon; direction always paired with a +/- sign */
+--gain:         oklch(0.72 0.14 155);
+--loss:         oklch(0.66 0.17 25);
+--warn:         oklch(0.78 0.14 85);      /* active alerts */
 
---profit: #22C55E;
---profit-soft: rgba(34, 197, 94, 0.13);
-
---loss: #EF4444;
---loss-soft: rgba(239, 68, 68, 0.13);
-
---warning: #F59E0B;
---warning-soft: rgba(245, 158, 11, 0.14);
-
---neutral: #94A3B8;
---neutral-soft: rgba(148, 163, 184, 0.12);
+/* lines adapt via color-mix(in oklch, var(--ink) N%, transparent) */
 ```
 
 ## 5.2 Light Mode Tokens
+
+Not implemented in v0.1 (dark-only). Kept as a provisional future reference; if
+implemented later, re-derive from the same violet brand seed on a true off-white.
 
 ```css
 --bg-app: #F6F3EC;

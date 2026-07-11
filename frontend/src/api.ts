@@ -1,4 +1,6 @@
-const base = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:5099'
+// Relative by default: same-origin /api is proxied by Vite in dev and by nginx
+// in Compose. Set VITE_API_URL to target a different Edge host.
+const base = import.meta.env.VITE_API_URL ?? ''
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = localStorage.getItem('accessToken')
@@ -14,7 +16,16 @@ export type Discipline = { id: string; content: string; position: number }
 export type Alert = { id: string; diaryId: string; startLocalDate: string; nextLocalDate: string | null; localTime: string; timezone: string; repeatMode: string; status: string }
 export type CalendarDay = { date: string; performance: null | { pnlAmount: number; pnlPercent: number | null; note?: string }; diaryCount: number; transactionCount: number; alertCount: number | null }
 export type Calendar = { year: number; month: number; summary: { totalPnl: number; tradingDays: number; winningDays: number; losingDays: number }; days: CalendarDay[] }
-export type Dashboard = { localDate: string; diary: { writtenToday: boolean; count: number }; performance: null | { pnlAmount: number; pnlPercent: number | null }; pendingAlerts: number | null; discipline: null | { content: string }; recentDiaries: Diary[] }
+export type Capability = 'available' | 'unavailable' | 'empty'
+export type Dashboard = {
+  localDate: string
+  diary: { writtenToday: boolean; count: number }
+  performance: null | { pnlAmount: number; pnlPercent: number | null; note?: string }
+  pendingAlerts: number | null
+  discipline: null | { content: string }
+  recentDiaries: Diary[]
+  capabilities?: { alerts: Capability; discipline: Capability }
+}
 
 export async function login(email: string, password: string) { const result = await request<{ accessToken: string }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }); localStorage.setItem('accessToken', result.accessToken) }
 export const getDashboard = () => request<Dashboard>('/api/app/dashboard')
