@@ -2,6 +2,7 @@ using Npgsql;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -93,21 +94,21 @@ app.MapPost("/internal/diaries", async (DiaryWrite input, HttpRequest request, N
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     if (string.IsNullOrWhiteSpace(input.Title)) return Results.BadRequest(new { error = "title_required" });
-    var id = Guid.NewGuid();
-    await using var command = db.CreateCommand("""
-        INSERT INTO journal.diaries (id, user_id, local_date, title, content)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING created_at, updated_at
-        """);
-    command.Parameters.AddWithValue(id);
-    command.Parameters.AddWithValue(userId);
-    command.Parameters.AddWithValue(input.LocalDate);
-    command.Parameters.AddWithValue(input.Title.Trim());
-    command.Parameters.AddWithValue(input.Content ?? "");
-    await using var reader = await command.ExecuteReaderAsync();
-    await reader.ReadAsync();
-    var result = new DiaryResponse(id, input.LocalDate, input.Title.Trim(), input.Content ?? "", reader.GetDateTime(0), reader.GetDateTime(1));
-    return Results.Created($"/internal/diaries/{id}", result);
+    if (!TryIdempotencyKey(request, out var key)) return Results.BadRequest(new { error = "invalid_idempotency_key" });
+    var result = await Idempotent(db, userId, "create-diary", key, input, async (connection, tx) =>
+    {
+        var id = Guid.NewGuid();
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO journal.diaries (id, user_id, local_date, title, content)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING created_at, updated_at
+            """, connection, tx);
+        command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(userId); command.Parameters.AddWithValue(input.LocalDate);
+        command.Parameters.AddWithValue(input.Title.Trim()); command.Parameters.AddWithValue(input.Content ?? "");
+        await using var reader = await command.ExecuteReaderAsync(); await reader.ReadAsync();
+        return Stored(201, $"/internal/diaries/{id}", new DiaryResponse(id, input.LocalDate, input.Title.Trim(), input.Content ?? "", reader.GetDateTime(0), reader.GetDateTime(1)));
+    });
+    return WriteResult(request.HttpContext, result);
 });
 
 app.MapPut("/internal/diaries/{id:guid}", async (Guid id, DiaryWrite input, HttpRequest request, NpgsqlDataSource db) =>
@@ -144,26 +145,26 @@ app.MapPost("/internal/quick-note", async (QuickNote input, HttpRequest request,
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     if (string.IsNullOrWhiteSpace(input.Content)) return Results.BadRequest(new { error = "content_required" });
-    if (input.TargetDiaryId is { } target)
+    if (!TryIdempotencyKey(request, out var key)) return Results.BadRequest(new { error = "invalid_idempotency_key" });
+    var result = await Idempotent(db, userId, "quick-note", key, input, async (connection, tx) =>
     {
-        await using var append = db.CreateCommand("""
-            UPDATE journal.diaries SET content = concat_ws(E'\n\n', nullif(content, ''), $3), updated_at=now()
-            WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
-            """);
-        append.Parameters.AddWithValue(target);
-        append.Parameters.AddWithValue(userId);
-        append.Parameters.AddWithValue(input.Content.Trim());
-        return await append.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.Ok(new { diaryId = target, appended = true });
-    }
+        if (input.TargetDiaryId is { } target)
+        {
+            await using var append = new NpgsqlCommand("""
+                UPDATE journal.diaries SET content = concat_ws(E'\n\n', nullif(content, ''), $3), updated_at=now()
+                WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
+                """, connection, tx);
+            append.Parameters.AddWithValue(target); append.Parameters.AddWithValue(userId); append.Parameters.AddWithValue(input.Content.Trim());
+            return await append.ExecuteNonQueryAsync() == 0 ? Stored(404, null, new { error = "not_found" }) : Stored(200, null, new { diaryId = target, appended = true });
+        }
 
-    var id = Guid.NewGuid();
-    await using var create = db.CreateCommand("INSERT INTO journal.diaries (id,user_id,local_date,title,content) VALUES ($1,$2,$3,'Quick note',$4)");
-    create.Parameters.AddWithValue(id);
-    create.Parameters.AddWithValue(userId);
-    create.Parameters.AddWithValue(input.LocalDate);
-    create.Parameters.AddWithValue(input.Content.Trim());
-    await create.ExecuteNonQueryAsync();
-    return Results.Created($"/internal/diaries/{id}", new { diaryId = id, appended = false });
+        var id = Guid.NewGuid();
+        await using var create = new NpgsqlCommand("INSERT INTO journal.diaries (id,user_id,local_date,title,content) VALUES ($1,$2,$3,'Quick note',$4)", connection, tx);
+        create.Parameters.AddWithValue(id); create.Parameters.AddWithValue(userId); create.Parameters.AddWithValue(input.LocalDate); create.Parameters.AddWithValue(input.Content.Trim());
+        await create.ExecuteNonQueryAsync();
+        return Stored(201, $"/internal/diaries/{id}", new { diaryId = id, appended = false });
+    });
+    return WriteResult(request.HttpContext, result);
 });
 
 app.MapGet("/internal/diaries/{diaryId:guid}/transactions", async (Guid diaryId, HttpRequest request, NpgsqlDataSource db) =>
@@ -186,18 +187,23 @@ app.MapPost("/internal/diaries/{diaryId:guid}/transactions", async (Guid diaryId
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     var error = ValidateTransaction(input);
     if (error is not null) return Results.BadRequest(new { error });
-    var id = Guid.NewGuid();
-    await using var command = db.CreateCommand("""
-        INSERT INTO journal.transactions (id,diary_id,user_id,symbol,side,quantity,price,currency,traded_at,notes)
-        SELECT $1,id,$2,$3,$4,$5,$6,$7,$8,$9 FROM journal.diaries
-        WHERE id=$10 AND user_id=$2 AND deleted_at IS NULL
-        RETURNING id,diary_id,symbol,side,quantity,price,currency,traded_at,notes,created_at,updated_at
-        """);
-    AddTransactionParameters(command, id, userId, diaryId, input);
-    await using var reader = await command.ExecuteReaderAsync();
-    return await reader.ReadAsync()
-        ? Results.Created($"/internal/diaries/{diaryId}/transactions/{id}", ReadTransaction(reader))
-        : Results.NotFound();
+    if (!TryIdempotencyKey(request, out var key)) return Results.BadRequest(new { error = "invalid_idempotency_key" });
+    var result = await Idempotent(db, userId, $"create-transaction:{diaryId}", key, input, async (connection, tx) =>
+    {
+        var id = Guid.NewGuid();
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO journal.transactions (id,diary_id,user_id,symbol,side,quantity,price,currency,traded_at,notes)
+            SELECT $1,id,$2,$3,$4,$5,$6,$7,$8,$9 FROM journal.diaries
+            WHERE id=$10 AND user_id=$2 AND deleted_at IS NULL
+            RETURNING id,diary_id,symbol,side,quantity,price,currency,traded_at,notes,created_at,updated_at
+            """, connection, tx);
+        AddTransactionParameters(command, id, userId, diaryId, input);
+        await using var reader = await command.ExecuteReaderAsync();
+        return await reader.ReadAsync()
+            ? Stored(201, $"/internal/diaries/{diaryId}/transactions/{id}", ReadTransaction(reader))
+            : Stored(404, null, new { error = "not_found" });
+    });
+    return WriteResult(request.HttpContext, result);
 });
 
 app.MapPut("/internal/diaries/{diaryId:guid}/transactions/{id:guid}", async (Guid diaryId, Guid id, TransactionWrite input, HttpRequest request, NpgsqlDataSource db) =>
@@ -234,6 +240,61 @@ app.Run();
 
 static bool TryUser(HttpRequest request, out Guid userId) =>
     Guid.TryParse(request.HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out userId);
+
+static bool TryIdempotencyKey(HttpRequest request, out string? key)
+{
+    key = request.Headers["Idempotency-Key"].FirstOrDefault()?.Trim();
+    if (key?.Length == 0) key = null;
+    return key is null || key.Length <= 200;
+}
+
+static async Task<StoredResult> Idempotent<T>(NpgsqlDataSource db, Guid userId, string operation, string? key, T payload,
+    Func<NpgsqlConnection, NpgsqlTransaction, Task<StoredResult>> execute)
+{
+    await using var connection = await db.OpenConnectionAsync();
+    await using var tx = await connection.BeginTransactionAsync();
+    if (key is null)
+    {
+        var direct = await execute(connection, tx); await tx.CommitAsync(); return direct;
+    }
+
+    var hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(payload)));
+    await using var reserve = new NpgsqlCommand("""
+        INSERT INTO journal.idempotency_keys(user_id,operation,idempotency_key,request_hash)
+        VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING
+        """, connection, tx);
+    reserve.Parameters.AddWithValue(userId); reserve.Parameters.AddWithValue(operation); reserve.Parameters.AddWithValue(key); reserve.Parameters.AddWithValue(hash);
+    var owner = await reserve.ExecuteNonQueryAsync() == 1;
+    if (!owner)
+    {
+        await using var read = new NpgsqlCommand("""
+            SELECT request_hash,status_code,location,response FROM journal.idempotency_keys
+            WHERE user_id=$1 AND operation=$2 AND idempotency_key=$3 FOR UPDATE
+            """, connection, tx);
+        read.Parameters.AddWithValue(userId); read.Parameters.AddWithValue(operation); read.Parameters.AddWithValue(key);
+        await using var reader = await read.ExecuteReaderAsync(); await reader.ReadAsync();
+        if (reader.GetString(0) != hash) return Stored(409, null, new { error = "idempotency_key_reused" });
+        return new StoredResult(reader.GetInt32(1), reader.IsDBNull(2) ? null : reader.GetString(2), JsonSerializer.Deserialize<JsonElement>(reader.GetString(3)));
+    }
+
+    var result = await execute(connection, tx);
+    await using var save = new NpgsqlCommand("""
+        UPDATE journal.idempotency_keys SET status_code=$4,location=$5,response=$6::jsonb
+        WHERE user_id=$1 AND operation=$2 AND idempotency_key=$3
+        """, connection, tx);
+    save.Parameters.AddWithValue(userId); save.Parameters.AddWithValue(operation); save.Parameters.AddWithValue(key);
+    save.Parameters.AddWithValue(result.StatusCode); save.Parameters.AddWithValue((object?)result.Location ?? DBNull.Value); save.Parameters.AddWithValue(result.Body.GetRawText());
+    await save.ExecuteNonQueryAsync(); await tx.CommitAsync(); return result;
+}
+
+static StoredResult Stored(int statusCode, string? location, object body) =>
+    new(statusCode, location, JsonSerializer.SerializeToElement(body));
+
+static IResult WriteResult(HttpContext context, StoredResult result)
+{
+    if (result.Location is not null) context.Response.Headers.Location = result.Location;
+    return Results.Json(result.Body, statusCode: result.StatusCode);
+}
 
 static DiaryResponse ReadDiary(NpgsqlDataReader reader) => new(
     reader.GetGuid(0), reader.GetFieldValue<DateOnly>(1), reader.GetString(2), reader.GetString(3),
@@ -273,6 +334,7 @@ record QuickNote(DateOnly LocalDate, string Content, Guid? TargetDiaryId);
 record DiaryResponse(Guid Id, DateOnly LocalDate, string Title, string Content, DateTime CreatedAt, DateTime UpdatedAt);
 record TransactionWrite(string Symbol, string Side, decimal Quantity, decimal Price, string Currency, DateTime TradedAt, string? Notes);
 record TransactionResponse(Guid Id, Guid DiaryId, string Symbol, string Side, decimal Quantity, decimal Price, string Currency, DateTime TradedAt, string Notes, DateTime CreatedAt, DateTime UpdatedAt);
+record StoredResult(int StatusCode, string? Location, JsonElement Body);
 
 sealed class OutboxPublisher(NpgsqlDataSource db, IHttpClientFactory clients, IConfiguration configuration, ILogger<OutboxPublisher> logger) : BackgroundService
 {
