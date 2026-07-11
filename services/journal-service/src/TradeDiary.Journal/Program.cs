@@ -20,6 +20,15 @@ builder.Services.AddHttpClient("reminder", client => client.BaseAddress = new Ur
 builder.Services.AddHostedService<OutboxPublisher>();
 var app = builder.Build();
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    if (context.User.FindFirst("account_type")?.Value == "agent" && context.Request.Path.StartsWithSegments("/internal"))
+    {
+        var required = context.Request.Method == HttpMethods.Get ? "diary:read" : "diary:write";
+        if (!context.User.FindAll("scope").Any(claim => claim.Value == required)) { context.Response.StatusCode = StatusCodes.Status403Forbidden; return; }
+    }
+    await next();
+});
 app.UseAuthorization();
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
