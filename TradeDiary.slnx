@@ -3,6 +3,10 @@
     <Project Path="gateway/TradeDiary.EdgeApi/TradeDiary.EdgeApi.csproj" />
   </Folder>
   <Folder Name="/services/" />
+  <Folder Name="/services/content-service/" />
+  <Folder Name="/services/content-service/src/">
+    <Project Path="services/content-service/src/TradeDiary.Content/TradeDiary.Content.csproj" />
+  </Folder>
   <Folder Name="/services/discipline-service/" />
   <Folder Name="/services/discipline-service/src/">
     <Project Path="services/discipline-service/src/TradeDiary.Discipline/TradeDiary.Discipline.csproj" />
@@ -15,6 +19,14 @@
   <Folder Name="/services/journal-service/src/">
     <Project Path="services/journal-service/src/TradeDiary.Journal/TradeDiary.Journal.csproj" />
   </Folder>
+  <Folder Name="/services/operations-service/" />
+  <Folder Name="/services/operations-service/src/">
+    <Project Path="services/operations-service/src/TradeDiary.Operations/TradeDiary.Operations.csproj" />
+  </Folder>
+  <Folder Name="/services/partner-service/" />
+  <Folder Name="/services/partner-service/src/">
+    <Project Path="services/partner-service/src/TradeDiary.Partner/TradeDiary.Partner.csproj" />
+  </Folder>
   <Folder Name="/services/performance-service/" />
   <Folder Name="/services/performance-service/src/">
     <Project Path="services/performance-service/src/TradeDiary.Performance/TradeDiary.Performance.csproj" />
@@ -22,5 +34,9 @@
   <Folder Name="/services/reminder-service/" />
   <Folder Name="/services/reminder-service/src/">
     <Project Path="services/reminder-service/src/TradeDiary.Reminder/TradeDiary.Reminder.csproj" />
+  </Folder>
+  <Folder Name="/services/tool-service/" />
+  <Folder Name="/services/tool-service/src/">
+    <Project Path="services/tool-service/src/TradeDiary.Tool/TradeDiary.Tool.csproj" />
   </Folder>
 </Solution>
