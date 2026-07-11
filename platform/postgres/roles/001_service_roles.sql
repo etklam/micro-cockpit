@@ -105,6 +105,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA operations TO opera
 GRANT USAGE ON SCHEMA market TO market_data_service;
 GRANT SELECT, INSERT, UPDATE, DELETE ON market.symbols, market.provider_runs, market.daily_bars TO market_data_service;
 GRANT SELECT ON market.published_symbols_v1, market.published_daily_bars_v1, market.published_provider_health_v1 TO market_data_service;
+GRANT USAGE ON SCHEMA market_data_public TO market_data_service;
+GRANT SELECT ON market_data_public.adjusted_daily_bars_v1 TO market_data_service;
 
 -- Cross-service market access is view-only. No consumer gets access to market base tables.
 GRANT USAGE ON SCHEMA market TO price_alert_service;
