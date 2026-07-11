@@ -97,6 +97,81 @@ services:
       identity: { condition: service_healthy }
       journal: { condition: service_healthy }
 
+  stock-research:
+    <<: *dotnet
+    build: { context: ., dockerfile: services/stock-research-service/src/TradeDiary.StockResearch/Dockerfile }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__StockResearch: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+    depends_on: { identity: { condition: service_healthy } }
+
+  market-data:
+    <<: *dotnet
+    build: { context: ., dockerfile: services/market-data-service/src/TradeDiary.MarketData/Dockerfile }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__MarketData: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:-change-me-before-exposing}
+    depends_on: { postgres: { condition: service_healthy } }
+
+  price-alert:
+    <<: *dotnet
+    build: { context: ., dockerfile: services/price-alert-service/src/TradeDiary.PriceAlert/Dockerfile }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__PriceAlert: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+    depends_on:
+      identity: { condition: service_healthy }
+      market-data: { condition: service_healthy }
+
+  rotation:
+    <<: *dotnet
+    build: { context: ., dockerfile: services/rotation-service/src/TradeDiary.Rotation/Dockerfile }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__Rotation: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+    depends_on:
+      identity: { condition: service_healthy }
+      market-data: { condition: service_healthy }
+
+  partner:
+    <<: *dotnet
+    build: { context: ., dockerfile: services/partner-service/src/TradeDiary.Partner/Dockerfile }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__Partner: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+    depends_on: { identity: { condition: service_healthy } }
+
+  content:
+    <<: *dotnet
+    build: { context: ., dockerfile: services/content-service/src/TradeDiary.Content/Dockerfile }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__Content: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+    depends_on: { identity: { condition: service_healthy } }
+
+  tool:
+    <<: *dotnet
+    build: { context: ., dockerfile: services/tool-service/src/TradeDiary.Tool/Dockerfile }
+    environment:
+      <<: *dotnet-env
+      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+    depends_on: { identity: { condition: service_healthy } }
+
+  operations:
+    <<: *dotnet
+    build: { context: ., dockerfile: services/operations-service/src/TradeDiary.Operations/Dockerfile }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__Operations: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+    depends_on: { identity: { condition: service_healthy } }
+
   edge:
     <<: *dotnet
     build:
@@ -110,6 +185,14 @@ services:
       Services__Performance: http://performance:8080
       Services__Discipline: http://discipline:8080
       Services__Reminder: http://reminder:8080
+      Services__StockResearch: http://stock-research:8080
+      Services__MarketData: http://market-data:8080
+      Services__PriceAlert: http://price-alert:8080
+      Services__Rotation: http://rotation:8080
+      Services__Partner: http://partner:8080
+      Services__Content: http://content:8080
+      Services__Tool: http://tool:8080
+      Services__Operations: http://operations:8080
     ports: ["5099:8080"]
     networks: [backend, public]
     depends_on:
@@ -117,6 +200,14 @@ services:
       performance: { condition: service_healthy }
       discipline: { condition: service_healthy }
       reminder: { condition: service_healthy }
+      stock-research: { condition: service_healthy }
+      market-data: { condition: service_healthy }
+      price-alert: { condition: service_healthy }
+      rotation: { condition: service_healthy }
+      partner: { condition: service_healthy }
+      content: { condition: service_healthy }
+      tool: { condition: service_healthy }
+      operations: { condition: service_healthy }
 
   frontend:
     build:

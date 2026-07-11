@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Routing;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
@@ -14,10 +15,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     options.Audience = "trade-diary-services";
 });
 builder.Services.AddAuthorization(options => options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
-foreach (var service in new[] { "identity", "journal", "performance", "discipline", "reminder" })
+var serviceDefaults = new Dictionary<string, string>
 {
-    var fallback = service switch { "identity" => "http://127.0.0.1:5100", "journal" => "http://127.0.0.1:5101", "performance" => "http://127.0.0.1:5102", "discipline" => "http://127.0.0.1:5103", _ => "http://127.0.0.1:5104" };
-    builder.Services.AddHttpClient(service, client => client.BaseAddress = new Uri(builder.Configuration[$"Services:{service}"] ?? fallback));
+    ["identity"]="http://127.0.0.1:5100", ["journal"]="http://127.0.0.1:5101", ["performance"]="http://127.0.0.1:5102",
+    ["discipline"]="http://127.0.0.1:5103", ["reminder"]="http://127.0.0.1:5104", ["stock-research"]="http://127.0.0.1:5105",
+    ["market-data"]="http://127.0.0.1:5106", ["price-alert"]="http://127.0.0.1:5107", ["rotation"]="http://127.0.0.1:5108",
+    ["partner"]="http://127.0.0.1:5109", ["content"]="http://127.0.0.1:5110", ["tool"]="http://127.0.0.1:5111", ["operations"]="http://127.0.0.1:5112"
+};
+foreach (var (service, fallback) in serviceDefaults)
+{
+    var key = string.Concat(service.Split('-').Select(x => char.ToUpperInvariant(x[0]) + x[1..]));
+    builder.Services.AddHttpClient(service, client => client.BaseAddress = new Uri(builder.Configuration[$"Services:{key}"] ?? fallback));
 }
 var app = builder.Build();
 
@@ -44,6 +52,12 @@ foreach (var action in new[] { "register", "login", "refresh", "logout" })
         return Results.Content(content, "application/json", statusCode: (int)response.StatusCode);
     }).AllowAnonymous();
 }
+app.MapPost("/api/auth/api-key/token", async (JsonElement body, HttpContext context, IHttpClientFactory clients) =>
+    await Forward(clients, "identity", "/internal/auth/api-key/token", HttpMethod.Post, body, context)).AllowAnonymous();
+app.MapPost("/api/app/agents", async (JsonElement body, HttpContext context, IHttpClientFactory clients) =>
+    await Forward(clients, "identity", "/internal/auth/agents", HttpMethod.Post, body, context));
+app.MapDelete("/api/app/api-keys/{id:guid}", async (Guid id, HttpContext context, IHttpClientFactory clients) =>
+    await ForwardNoBody(clients, "identity", $"/internal/auth/api-keys/{id}", HttpMethod.Delete, context));
 
 app.MapGet("/api/app/dashboard", async (HttpContext context, IHttpClientFactory clients) =>
 {
@@ -119,7 +133,76 @@ app.MapPost("/api/app/diary-alerts", async (JsonElement body, HttpContext contex
 app.MapPost("/api/app/diary-alerts/{id:guid}/dismiss", async (Guid id, HttpContext context, IHttpClientFactory clients) => await ForwardNoBody(clients,"reminder",$"/internal/diary-alerts/{id}/dismiss",HttpMethod.Post,context));
 app.MapDelete("/api/app/diary-alerts/{id:guid}", async (Guid id, HttpContext context, IHttpClientFactory clients) => await ForwardNoBody(clients,"reminder",$"/internal/diary-alerts/{id}",HttpMethod.Delete,context));
 
+// Late services stay deliberately thin: Edge owns the public path and transport headers, services own behavior.
+MapProxy(app, "/api/app/stocks", "stock-research", "/internal/stocks", [HttpMethods.Get, HttpMethods.Post]);
+MapProxy(app, "/api/app/stocks/{symbol}", "stock-research", "/internal/stocks/{symbol}", [HttpMethods.Get]);
+MapProxy(app, "/api/app/watchlist", "stock-research", "/internal/watchlist", [HttpMethods.Get]);
+MapProxy(app, "/api/app/watchlist/{stockId:guid}", "stock-research", "/internal/watchlist/{stockId}", [HttpMethods.Post, HttpMethods.Delete]);
+MapProxy(app, "/api/app/stocks/{stockId:guid}/note", "stock-research", "/internal/stocks/{stockId}/note", [HttpMethods.Get, HttpMethods.Put]);
+MapProxy(app, "/api/app/stocks/{stockId:guid}/timeline", "stock-research", "/internal/stocks/{stockId}/timeline", [HttpMethods.Get, HttpMethods.Post]);
+MapProxy(app, "/api/app/timeline/{id:guid}", "stock-research", "/internal/timeline/{id}", [HttpMethods.Get]);
+MapProxy(app, "/api/app/timeline/{originalId:guid}/corrections", "stock-research", "/internal/timeline/{originalId}/corrections", [HttpMethods.Post]);
+MapProxy(app, "/api/app/market/symbols", "market-data", "/internal/v1/symbols", [HttpMethods.Get]);
+MapProxy(app, "/api/app/market/bars/{symbol}", "market-data", "/internal/v1/bars/{symbol}", [HttpMethods.Get]);
+MapProxy(app, "/api/app/market/providers/health", "market-data", "/internal/v1/providers/health", [HttpMethods.Get]);
+MapProxy(app, "/api/app/price-alerts", "price-alert", "/internal/price-alerts", [HttpMethods.Get, HttpMethods.Post]);
+MapProxy(app, "/api/app/price-alerts/{id:guid}", "price-alert", "/internal/price-alerts/{id}", [HttpMethods.Put, HttpMethods.Delete]);
+MapProxy(app, "/api/app/price-alerts/{id:guid}/dismiss", "price-alert", "/internal/price-alerts/{id}/dismiss", [HttpMethods.Post]);
+MapProxy(app, "/api/app/price-alerts/{id:guid}/reactivate", "price-alert", "/internal/price-alerts/{id}/reactivate", [HttpMethods.Post]);
+MapProxy(app, "/api/app/price-alerts/{id:guid}/triggers", "price-alert", "/internal/price-alerts/{id}/triggers", [HttpMethods.Get]);
+MapProxy(app, "/api/app/rotation/universes", "rotation", "/internal/rotation/universes", [HttpMethods.Get, HttpMethods.Post]);
+MapProxy(app, "/api/app/rotation/universes/{id:guid}", "rotation", "/internal/rotation/universes/{id}", [HttpMethods.Put, HttpMethods.Delete]);
+MapProxy(app, "/api/app/rotation/universes/{id:guid}/symbols", "rotation", "/internal/rotation/universes/{id}/symbols", [HttpMethods.Put]);
+MapProxy(app, "/api/app/rotation/universes/{id:guid}/calculate", "rotation", "/internal/rotation/universes/{id}/calculate", [HttpMethods.Post]);
+MapProxy(app, "/api/app/rotation/monitor", "rotation", "/internal/rotation/monitor", [HttpMethods.Get]);
+MapProxy(app, "/api/app/partners", "partner", "/internal/partners", [HttpMethods.Get, HttpMethods.Post]);
+MapProxy(app, "/api/app/partners/{id:guid}", "partner", "/internal/partners/{id}", [HttpMethods.Delete]);
+MapProxy(app, "/api/app/partners/{id:guid}/accept", "partner", "/internal/partners/{id}/accept", [HttpMethods.Post]);
+MapProxy(app, "/api/app/partners/{id:guid}/share-policy", "partner", "/internal/partners/{id}/share-policy", [HttpMethods.Put]);
+MapProxy(app, "/api/app/partners/{ownerId:guid}/authorization", "partner", "/internal/partners/{ownerId}/authorization", [HttpMethods.Get]);
+MapProxy(app, "/api/app/tools/position-sizing", "tool", "/internal/tools/position-sizing", [HttpMethods.Post]);
+MapProxy(app, "/api/app/tools/risk-reward", "tool", "/internal/tools/risk-reward", [HttpMethods.Post]);
+MapProxy(app, "/api/app/tools/fire", "tool", "/internal/tools/fire", [HttpMethods.Post]);
+MapProxy(app, "/api/admin/posts", "content", "/internal/admin/posts", [HttpMethods.Post]);
+MapProxy(app, "/api/admin/posts/{id:guid}", "content", "/internal/admin/posts/{id}", [HttpMethods.Put, HttpMethods.Delete]);
+MapProxy(app, "/api/admin/operations/audit", "operations", "/internal/operations/audit", [HttpMethods.Get, HttpMethods.Post]);
+MapProxy(app, "/api/admin/operations/jobs", "operations", "/internal/operations/jobs", [HttpMethods.Get, HttpMethods.Post]);
+MapProxy(app, "/api/admin/operations/health", "operations", "/internal/operations/health", [HttpMethods.Post]);
+MapProxy(app, "/api/content/posts", "content", "/internal/posts", [HttpMethods.Get]).AllowAnonymous();
+MapProxy(app, "/api/content/posts/{slug}", "content", "/internal/posts/{slug}", [HttpMethods.Get]).AllowAnonymous();
+
+app.MapGet("/api/app/stocks/{symbol}/page", async (string symbol, HttpContext context, IHttpClientFactory clients) =>
+{
+    var stockTask = Send(clients, "stock-research", $"/internal/stocks/{Uri.EscapeDataString(symbol)}", context);
+    var barsTask = Send(clients, "market-data", $"/internal/v1/bars/{Uri.EscapeDataString(symbol)}{context.Request.QueryString}", context);
+    await Task.WhenAll(stockTask, barsTask);
+    if (stockTask.Result.Status != 200) return Results.Content(stockTask.Result.Body?.ToJsonString() ?? "", "application/json", statusCode: stockTask.Result.Status);
+    return Results.Ok(new JsonObject { ["stock"] = stockTask.Result.Body?.DeepClone(), ["bars"] = barsTask.Result.Status == 200 ? barsTask.Result.Body?.DeepClone() : null, ["capabilities"] = new JsonObject { ["marketData"] = barsTask.Result.Status == 200 ? "available" : "unavailable" } });
+});
+
 app.Run();
+
+static RouteHandlerBuilder MapProxy(WebApplication app, string route, string service, string target, string[] methods) =>
+    app.MapMethods(route, methods, async (HttpContext context, IHttpClientFactory clients) => await Proxy(clients, service, Expand(target, context.Request.RouteValues) + context.Request.QueryString, context));
+static string Expand(string path, RouteValueDictionary values)
+{
+    foreach (var (key, value) in values) path = path.Replace($"{{{key}}}", Uri.EscapeDataString(value?.ToString() ?? ""), StringComparison.Ordinal);
+    return path;
+}
+static async Task<IResult> Proxy(IHttpClientFactory clients, string service, string path, HttpContext context)
+{
+    try
+    {
+        using var request = new HttpRequestMessage(new HttpMethod(context.Request.Method), path);
+        if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding")) request.Content = new StreamContent(context.Request.Body);
+        if (request.Content is not null && context.Request.ContentType is not null) request.Content.Headers.TryAddWithoutValidation("Content-Type", context.Request.ContentType);
+        request.Headers.TryAddWithoutValidation("Authorization", context.Request.Headers.Authorization.ToString());
+        request.Headers.TryAddWithoutValidation("X-Correlation-ID", context.Items["correlationId"]?.ToString());
+        using var response = await clients.CreateClient(service).SendAsync(request); var body = await response.Content.ReadAsStringAsync();
+        return Results.Content(body, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+    }
+    catch { return Results.Problem("Service unavailable.", statusCode: 503); }
+}
 
 static DateOnly UserLocalDate(System.Security.Claims.ClaimsPrincipal user)
 {

@@ -19,6 +19,10 @@
   <Folder Name="/services/journal-service/src/">
     <Project Path="services/journal-service/src/TradeDiary.Journal/TradeDiary.Journal.csproj" />
   </Folder>
+  <Folder Name="/services/market-data-service/" />
+  <Folder Name="/services/market-data-service/src/">
+    <Project Path="services/market-data-service/src/TradeDiary.MarketData/TradeDiary.MarketData.csproj" />
+  </Folder>
   <Folder Name="/services/operations-service/" />
   <Folder Name="/services/operations-service/src/">
     <Project Path="services/operations-service/src/TradeDiary.Operations/TradeDiary.Operations.csproj" />
@@ -38,5 +42,15 @@
   <Folder Name="/services/tool-service/" />
   <Folder Name="/services/tool-service/src/">
     <Project Path="services/tool-service/src/TradeDiary.Tool/TradeDiary.Tool.csproj" />
+  </Folder>
+  <Folder Name="/services/price-alert-service/" />
+  <Folder Name="/services/price-alert-service/src/">
+    <Project Path="services/price-alert-service/src/TradeDiary.PriceAlert/TradeDiary.PriceAlert.csproj" />
+  </Folder>
+  <Folder Name="/services/stock-research-service/src/">
+    <Project Path="services/stock-research-service/src/TradeDiary.StockResearch/TradeDiary.StockResearch.csproj" />
+  </Folder>
+  <Folder Name="/services/rotation-service/src/">
+    <Project Path="services/rotation-service/src/TradeDiary.Rotation/TradeDiary.Rotation.csproj" />
   </Folder>
 </Solution>
