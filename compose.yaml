@@ -1,0 +1,141 @@
+x-dotnet: &dotnet
+  restart: unless-stopped
+  environment: &dotnet-env
+    ASPNETCORE_ENVIRONMENT: Production
+    ASPNETCORE_URLS: http://+:8080
+  networks: [backend]
+  healthcheck: &dotnet-health
+    test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+    interval: 10s
+    timeout: 3s
+    retries: 10
+    start_period: 10s
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: trade_diary
+      POSTGRES_USER: trade_diary
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_only}
+    ports: ["127.0.0.1:5433:5432"]
+    volumes:
+      - trade-diary-data:/var/lib/postgresql/data
+      - ./platform/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trade_diary -d trade_diary"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  identity:
+    <<: *dotnet
+    build:
+      context: .
+      dockerfile: services/identity-service/src/TradeDiary.Identity/Dockerfile
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__Identity: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      Auth__LocalRegistrationKey: ${LOCAL_REGISTRATION_KEY:-change-me-before-exposing}
+      Jwt__Issuer: trade-diary-identity
+      Jwt__Audience: trade-diary-services
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  journal:
+    <<: *dotnet
+    build:
+      context: .
+      dockerfile: services/journal-service/src/TradeDiary.Journal/Dockerfile
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__Journal: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+    depends_on:
+      identity: { condition: service_healthy }
+
+  performance:
+    <<: *dotnet
+    build:
+      context: .
+      dockerfile: services/performance-service/src/TradeDiary.Performance/Dockerfile
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__Performance: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+    depends_on:
+      identity: { condition: service_healthy }
+
+  discipline:
+    <<: *dotnet
+    build:
+      context: .
+      dockerfile: services/discipline-service/src/TradeDiary.Discipline/Dockerfile
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__Discipline: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+    depends_on:
+      identity: { condition: service_healthy }
+
+  reminder:
+    <<: *dotnet
+    build:
+      context: .
+      dockerfile: services/reminder-service/src/TradeDiary.Reminder/Dockerfile
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__Reminder: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+      Services__Journal: http://journal:8080
+    depends_on:
+      identity: { condition: service_healthy }
+      journal: { condition: service_healthy }
+
+  edge:
+    <<: *dotnet
+    build:
+      context: .
+      dockerfile: gateway/TradeDiary.EdgeApi/Dockerfile
+    environment:
+      <<: *dotnet-env
+      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+      Services__Identity: http://identity:8080
+      Services__Journal: http://journal:8080
+      Services__Performance: http://performance:8080
+      Services__Discipline: http://discipline:8080
+      Services__Reminder: http://reminder:8080
+    ports: ["5099:8080"]
+    networks: [backend, public]
+    depends_on:
+      journal: { condition: service_healthy }
+      performance: { condition: service_healthy }
+      discipline: { condition: service_healthy }
+      reminder: { condition: service_healthy }
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: ""
+    restart: unless-stopped
+    ports: ["8080:8080"]
+    networks: [backend, public]
+    depends_on:
+      edge: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  backend:
+    internal: true
+  public:
+
+volumes:
+  trade-diary-data:

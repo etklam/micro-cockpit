@@ -1,0 +1,12 @@
+.git
+.idea
+.vscode
+**/bin
+**/obj
+**/node_modules
+**/dist
+artifacts
+coverage
+*.md
+!README.md
+
