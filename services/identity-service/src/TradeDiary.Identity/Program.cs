@@ -156,6 +156,38 @@ app.MapPost("/internal/auth/logout", async (RefreshRequest input, NpgsqlDataSour
     return Results.NoContent();
 });
 
+app.MapPost("/internal/auth/agents", async (AgentRequest input, ClaimsPrincipal principal, NpgsqlDataSource db) =>
+{
+    if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var creator)) return Results.Unauthorized();
+    if (string.IsNullOrWhiteSpace(input.DisplayName) || input.BaseCurrency.Length != 3 || input.Scopes.Count == 0 || input.Scopes.Any(s => s is not ("diary:read" or "diary:write" or "research:read")))
+        return Results.BadRequest(new { error = "invalid_agent" });
+    var userId = Guid.NewGuid(); var keyId = Guid.NewGuid(); var raw = RandomNumberGenerator.GetBytes(32); var email = $"agent-{userId:N}@local.invalid";
+    await using var connection = await db.OpenConnectionAsync(); await using var tx = await connection.BeginTransactionAsync();
+    await using (var user = new NpgsqlCommand("INSERT INTO identity.users(id,email,display_name,timezone,base_currency,account_type) VALUES($1,$2,$3,$4,$5,'agent')", connection, tx))
+    { user.Parameters.AddWithValue(userId); user.Parameters.AddWithValue(email); user.Parameters.AddWithValue(input.DisplayName.Trim()); user.Parameters.AddWithValue(input.Timezone); user.Parameters.AddWithValue(input.BaseCurrency.ToUpperInvariant()); await user.ExecuteNonQueryAsync(); }
+    await using (var key = new NpgsqlCommand("INSERT INTO identity.api_keys(id,user_id,created_by,name,key_hash,scopes,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)", connection, tx))
+    { key.Parameters.AddWithValue(keyId); key.Parameters.AddWithValue(userId); key.Parameters.AddWithValue(creator); key.Parameters.AddWithValue(input.Name.Trim()); key.Parameters.AddWithValue(SHA256.HashData(raw)); key.Parameters.AddWithValue(input.Scopes.ToArray()); key.Parameters.AddWithValue((object?)input.ExpiresAt?.ToUniversalTime() ?? DBNull.Value); await key.ExecuteNonQueryAsync(); }
+    await tx.CommitAsync(); return Results.Created($"/internal/auth/agents/{userId}", new { userId, keyId, apiKey = Convert.ToBase64String(raw), scopes = input.Scopes });
+}).RequireAuthorization();
+
+app.MapPost("/internal/auth/api-key/token", async (ApiKeyTokenRequest input, NpgsqlDataSource db) =>
+{
+    byte[] raw; try { raw = Convert.FromBase64String(input.ApiKey); } catch { return Results.Unauthorized(); }
+    await using var command = db.CreateCommand("""
+        SELECT u.id,u.email,u.display_name,u.timezone,u.base_currency,u.role,u.account_type,u.status,u.status_version,k.scopes
+        FROM identity.api_keys k JOIN identity.users u ON u.id=k.user_id
+        WHERE k.key_hash=$1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at>now()) AND u.status='active'
+        """); command.Parameters.AddWithValue(SHA256.HashData(raw)); await using var reader = await command.ExecuteReaderAsync(); if (!await reader.ReadAsync()) return Results.Unauthorized();
+    var user = ReadUser(reader); var scopes = reader.GetFieldValue<string[]>(9); return Results.Ok(new { accessToken = CreateAccessToken(user, signingKey, issuer, audience, scopes), expiresAt = DateTime.UtcNow.AddMinutes(15) });
+}).AllowAnonymous();
+
+app.MapDelete("/internal/auth/api-keys/{id:guid}", async (Guid id, ClaimsPrincipal principal, NpgsqlDataSource db) =>
+{
+    if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var creator)) return Results.Unauthorized();
+    await using var command = db.CreateCommand("UPDATE identity.api_keys SET revoked_at=now() WHERE id=$1 AND created_by=$2 AND revoked_at IS NULL"); command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(creator);
+    return await command.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.NoContent();
+}).RequireAuthorization();
+
 app.MapGet("/internal/auth/me", async (ClaimsPrincipal principal, NpgsqlDataSource db) =>
 {
     if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var userId)) return Results.Unauthorized();
@@ -172,21 +204,30 @@ static AuthUser ReadUser(NpgsqlDataReader reader) => new(reader.GetGuid(0), read
 static async Task<object> CreateTokenPair(NpgsqlDataSource db, AuthUser user, Guid familyId, SecurityKey key, string issuer, string audience)
 {
     var now = DateTime.UtcNow;
-    var claims = new[] {
-        new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()), new Claim(JwtRegisteredClaimNames.Email, user.Email),
-        new Claim(ClaimTypes.Role, user.Role), new Claim("account_type", user.AccountType), new Claim("status_version", user.StatusVersion.ToString()),
-        new Claim("timezone", user.Timezone), new Claim("base_currency", user.BaseCurrency.Trim())
-    };
-    var jwt = new JwtSecurityToken(issuer, audience, claims, now, now.AddMinutes(15), new SigningCredentials(key, SecurityAlgorithms.RsaSha256));
+    var accessToken = CreateAccessToken(user, key, issuer, audience, []);
     var refreshBytes = RandomNumberGenerator.GetBytes(32);
     await using var command = db.CreateCommand("INSERT INTO identity.refresh_tokens (id,user_id,family_id,token_hash,expires_at) VALUES ($1,$2,$3,$4,$5)");
     command.Parameters.AddWithValue(Guid.NewGuid()); command.Parameters.AddWithValue(user.Id); command.Parameters.AddWithValue(familyId);
     command.Parameters.AddWithValue(SHA256.HashData(refreshBytes)); command.Parameters.AddWithValue(now.AddDays(30));
     await command.ExecuteNonQueryAsync();
-    return new { accessToken = new JwtSecurityTokenHandler().WriteToken(jwt), expiresAt = now.AddMinutes(15), refreshToken = Convert.ToBase64String(refreshBytes) };
+    return new { accessToken, expiresAt = now.AddMinutes(15), refreshToken = Convert.ToBase64String(refreshBytes) };
+}
+
+static string CreateAccessToken(AuthUser user, SecurityKey key, string issuer, string audience, IReadOnlyCollection<string> scopes)
+{
+    var now = DateTime.UtcNow;
+    var claims = new[] {
+        new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()), new Claim(JwtRegisteredClaimNames.Email, user.Email),
+        new Claim(ClaimTypes.Role, user.Role), new Claim("account_type", user.AccountType), new Claim("status_version", user.StatusVersion.ToString()),
+        new Claim("timezone", user.Timezone), new Claim("base_currency", user.BaseCurrency.Trim())
+    }.Concat(scopes.Select(scope => new Claim("scope", scope)));
+    var jwt = new JwtSecurityToken(issuer, audience, claims, now, now.AddMinutes(15), new SigningCredentials(key, SecurityAlgorithms.RsaSha256));
+    return new JwtSecurityTokenHandler().WriteToken(jwt);
 }
 
 record RegisterRequest(string Email, string Password, string DisplayName, string Timezone, string BaseCurrency);
 record LoginRequest(string Email, string Password);
 record RefreshRequest(string RefreshToken);
+record AgentRequest(string Name, string DisplayName, string Timezone, string BaseCurrency, List<string> Scopes, DateTime? ExpiresAt);
+record ApiKeyTokenRequest(string ApiKey);
 record AuthUser(Guid Id, string Email, string DisplayName, string Timezone, string BaseCurrency, string Role, string AccountType, string Status, int StatusVersion);
