@@ -9,6 +9,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) throw new Error(`request_failed_${response.status}`)
   return response.status === 204 ? undefined as T : response.json()
 }
+async function requestOptional<T>(path: string): Promise<T | null> {
+  try { return await request<T>(path) } catch (error) { if (String(error).includes('request_failed_404')) return null; throw error }
+}
 
 export type Diary = { id: string; localDate: string; title: string; content: string; createdAt: string; updatedAt: string }
 export type Transaction = { id: string; diaryId: string; symbol: string; side: string; quantity: number; price: number; currency: string; tradedAt: string; notes: string }
@@ -26,6 +29,14 @@ export type Dashboard = {
   recentDiaries: Diary[]
   capabilities?: { alerts: Capability; discipline: Capability }
 }
+export type Stock = { id: string; symbol: string; name: string; exchange?: string; assetType?: string }
+export type WatchlistItem = { stock: Stock; note: string | null; noteUpdatedAt: string | null; timelineCount: number }
+export type ResearchNote = { stockId: string; content: string; createdAt: string; updatedAt: string }
+export type TimelineEvent = { id: string; eventTime: string; sourceType: string; title: string; content?: string }
+export type PriceAlert = { id: string; symbol: string; threshold: number; conditionType: string; status: string; createdAt?: string }
+export type RotationItem = { symbol: string; label: string; return2w: number | null; rank2w: number | null; status?: string }
+export type Partner = { id: string; requesterUserId: string; partnerUserId: string; partnerType: string; status: string; createdAt: string }
+export type Article = { id: string; slug: string; title: string; body: string; publishedAt?: string }
 
 export async function login(email: string, password: string) { const result = await request<{ accessToken: string }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }); localStorage.setItem('accessToken', result.accessToken) }
 export const getDashboard = () => request<Dashboard>('/api/app/dashboard')
@@ -46,3 +57,17 @@ export const getAlerts = () => request<{ items: Alert[] }>('/api/app/diary-alert
 export const createAlert = (body: { diaryId: string; startLocalDate: string; localTime: string; timezone: string; repeatMode: string }) => request<Alert>('/api/app/diary-alerts', { method: 'POST', body: JSON.stringify(body) })
 export const dismissAlert = (id: string) => request<void>(`/api/app/diary-alerts/${id}/dismiss`, { method: 'POST' })
 export const deleteAlert = (id: string) => request<void>(`/api/app/diary-alerts/${id}`, { method: 'DELETE' })
+export const getWatchlist = () => request<{ items: WatchlistItem[] }>('/api/app/watchlist')
+export async function addWatchlist(symbol: string) { const stock = await request<Stock>(`/api/app/stocks/${encodeURIComponent(symbol)}`); return request<void>(`/api/app/watchlist/${stock.id}`, { method: 'POST' }) }
+export const removeWatchlist = (id: string) => request<void>(`/api/app/watchlist/${id}`, { method: 'DELETE' })
+export const getResearchNote = (id: string) => requestOptional<ResearchNote>(`/api/app/stocks/${id}/note`)
+export const saveResearchNote = (id: string, content: string) => request<ResearchNote>(`/api/app/stocks/${id}/note`, { method: 'PUT', body: JSON.stringify({ content }) })
+export const getResearchTimeline = (id: string) => request<{ items: TimelineEvent[] }>(`/api/app/stocks/${id}/timeline`)
+export const getPriceAlerts = () => request<{ items: PriceAlert[] }>('/api/app/price-alerts')
+export const addPriceAlert = (symbol: string, threshold: number, conditionType: string) => request<PriceAlert>('/api/app/price-alerts', { method: 'POST', body: JSON.stringify({ symbol, threshold, conditionType }) })
+export const deletePriceAlert = (id: string) => request<void>(`/api/app/price-alerts/${id}`, { method: 'DELETE' })
+export async function getMarketRotation() { const universes = await request<{ items: { code: string }[] }>('/api/app/rotation/universes'); if (!universes.items.length) return { snapshotDate: null as string | null, etfs: [] as RotationItem[] }; return request<{ snapshotDate: string | null; etfs: RotationItem[] }>(`/api/app/rotation/monitor?universe=${encodeURIComponent(universes.items[0].code)}`) }
+export const getPartners = () => request<{ items: Partner[] }>('/api/app/partners')
+export const getArticles = () => request<{ items: Article[] }>('/api/content/posts')
+export const calculate = (tool: string, values: Record<string, unknown>) => request<Record<string, number>>(`/api/app/tools/${tool}`, { method: 'POST', body: JSON.stringify(values) })
+export const createAgent = (name: string) => request<{ userId: string; keyId: string; apiKey: string }>('/api/app/agents', { method: 'POST', body: JSON.stringify({ name, displayName: name, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', baseCurrency: 'USD', scopes: ['research:read'] }) })

@@ -8,8 +8,9 @@ import type { IconName } from './icons'
 import { cx } from './format'
 import './App.css'
 import { TodayPage, DiaryPage, CalendarPage, DisciplinePage, AlertsPage } from './pages'
+import { ArticlesPage, MorePage, PartnersPage, PriceAlertsPage, RotationPage, ToolsPage, WatchlistPage } from './latePages'
 
-export type Page = 'today' | 'diary' | 'calendar' | 'discipline' | 'alerts'
+export type Page = 'today' | 'diary' | 'calendar' | 'discipline' | 'alerts' | 'more' | 'watchlist' | 'price-alerts' | 'rotation' | 'partners' | 'articles' | 'tools'
 
 const NAV: { id: Page; label: string; icon: IconName }[] = [
   { id: 'today', label: 'Today', icon: 'today' },
@@ -17,6 +18,11 @@ const NAV: { id: Page; label: string; icon: IconName }[] = [
   { id: 'calendar', label: 'Calendar', icon: 'calendar' },
   { id: 'discipline', label: 'Discipline', icon: 'compass' },
   { id: 'alerts', label: 'Alerts', icon: 'bell' },
+]
+const MORE: { id: Page; label: string }[] = [
+  { id: 'watchlist', label: 'Watchlist' }, { id: 'price-alerts', label: 'Price alerts' },
+  { id: 'rotation', label: 'Market rotation' }, { id: 'partners', label: 'Partners' },
+  { id: 'articles', label: 'Articles' }, { id: 'tools', label: 'Tools' },
 ]
 
 type Cockpit = { go: (p: Page) => void; confirm: (o: ConfirmOpts) => Promise<boolean> }
@@ -45,6 +51,13 @@ export default function App() {
             {page === 'calendar' && <CalendarPage />}
             {page === 'discipline' && <DisciplinePage />}
             {page === 'alerts' && <AlertsPage />}
+            {page === 'more' && <MorePage />}
+            {page === 'watchlist' && <WatchlistPage />}
+            {page === 'price-alerts' && <PriceAlertsPage />}
+            {page === 'rotation' && <RotationPage />}
+            {page === 'partners' && <PartnersPage />}
+            {page === 'articles' && <ArticlesPage />}
+            {page === 'tools' && <ToolsPage />}
           </main>
         </div>
         <MobileNav page={page} onNav={go} />
@@ -73,6 +86,10 @@ function Sidebar({ page, onNav, onSignOut }: { page: Page; onNav: (p: Page) => v
           </button>
         ))}
       </nav>
+      <details className="more-nav" open={MORE.some(x => x.id === page)}>
+        <summary>More</summary>
+        {MORE.map(x => <button key={x.id} className={cx('nav__item', page === x.id && 'is-active')} onClick={() => onNav(x.id)}>{x.label}</button>)}
+      </details>
       <div className="sidebar__foot">
         <Button variant="ghost" icon="logout" onClick={onSignOut} className="signout-btn">Sign out</Button>
       </div>
@@ -91,9 +108,11 @@ function MobileTop({ onSignOut }: { onSignOut: () => void }) {
 }
 
 function MobileNav({ page, onNav }: { page: Page; onNav: (p: Page) => void }) {
+  const mobile = NAV.slice(0, 4)
+  const moreActive = page === 'more' || page === 'alerts' || MORE.some(x => x.id === page)
   return (
     <nav className="mobile-nav" aria-label="Sections">
-      {NAV.map((n) => (
+      {mobile.map((n) => (
         <button
           key={n.id}
           type="button"
@@ -105,6 +124,7 @@ function MobileNav({ page, onNav }: { page: Page; onNav: (p: Page) => void }) {
           <span>{n.label}</span>
         </button>
       ))}
+      <button type="button" className={cx('mobile-nav__item', moreActive && 'is-active')} aria-current={moreActive ? 'page' : undefined} onClick={() => onNav('more')}><Icon name="layers" size={20} /><span>More</span></button>
     </nav>
   )
 }
