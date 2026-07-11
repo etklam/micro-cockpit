@@ -1,0 +1,88 @@
+* { box-sizing: border-box; }
+button, textarea, input, select { font: inherit; }
+button { color: inherit; }
+.shell { min-height: 100vh; display: grid; grid-template-columns: 236px 1fr; }
+aside { position: sticky; top: 0; height: 100vh; padding: 28px 18px; border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; }
+.brand { font-weight: 700; letter-spacing: -.02em; padding: 0 10px 32px; }
+.brand span { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 8px; border-radius: 9px; background: var(--accent); color: white; }
+aside nav { display: grid; gap: 6px; }
+aside nav button, .mobile-nav button { border: 0; background: transparent; text-align: left; padding: 11px 12px; border-radius: 9px; color: var(--muted); cursor: pointer; }
+aside nav button.active { color: var(--text); background: var(--accent-soft); }
+.today-status { margin-top: auto; display: grid; gap: 7px; padding: 15px; border: 1px solid var(--border); border-radius: 12px; }
+.today-status span, p { color: var(--muted); }
+small { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .11em; }
+main { width: min(1050px, 100%); margin: 0 auto; padding: 34px 42px 80px; }
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+h1 { margin: 5px 0 0; font-size: 28px; letter-spacing: -.03em; }
+h2 { font-size: 19px; margin: 18px 0 9px; }
+.avatar { width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 50%; background: var(--raised); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; }
+.quick label { display: block; font-size: 18px; font-weight: 650; margin-bottom: 12px; }
+textarea { width: 100%; min-height: 82px; resize: vertical; color: var(--text); border: 0; outline: 0; background: transparent; line-height: 1.5; }
+.quick > div, .recent > div { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 12px; color: var(--muted); font-size: 12px; }
+button { cursor: pointer; border: 0; background: transparent; }
+.primary { min-height: 40px; padding: 0 16px; border-radius: 9px; background: var(--accent); color: white; font-weight: 650; }
+.grid { display: grid; grid-template-columns: 1.5fr .9fr 1.2fr; gap: 14px; margin: 14px 0; }
+.grid .card { min-height: 210px; display: flex; flex-direction: column; align-items: flex-start; }
+.grid .card button { margin-top: auto; padding: 0; color: #78a9ff; }
+.pnl strong { font-size: 42px; margin-top: 24px; font-variant-numeric: tabular-nums; }
+blockquote { margin: 20px 0; line-height: 1.55; color: #cbd5e1; }
+.recent p { margin: 18px 0 2px; }
+.mobile-nav { display: none; }
+.login-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.login { width: min(430px, 100%); display: grid; gap: 18px; }
+.login .brand { padding: 0 0 20px; }
+.login h1 { margin: -8px 0 8px; }
+.login label { display: grid; gap: 7px; color: var(--muted); font-size: 13px; }
+.login input { min-height: 46px; border: 1px solid var(--border); border-radius: 9px; padding: 0 12px; background: var(--surface); color: var(--text); font: inherit; }
+.login .primary { width: 100%; }
+.error { color: #fca5a5; }
+.state { min-height: 100vh; display: grid; place-content: center; gap: 12px; text-align: center; }
+.form { display: grid; gap: 16px; margin-bottom: 16px; }
+.form label { display: grid; gap: 7px; color: var(--muted); font-size: 13px; }
+.form-row { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; }
+input, select { min-height: 42px; padding: 0 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.form textarea { min-height: 120px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.form-actions, .item-actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+.stack { display: grid; gap: 12px; }
+.item { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.item h2 { margin: 8px 0; }
+.item-actions button, .danger { color: #78a9ff; }
+.item-actions .danger, .danger { color: #fca5a5; }
+.prewrap { white-space: pre-wrap; }
+.empty { padding: 28px; text-align: center; color: var(--muted); }
+.inline-form { display: flex; gap: 10px; margin-bottom: 16px; }
+.inline-form input { flex: 1; }
+.calendar-head { display: flex; justify-content: center; align-items: center; gap: 20px; }
+.calendar-head button { font-size: 24px; }
+.weekdays, .days { display: grid; grid-template-columns: repeat(7, 1fr); }
+.weekdays { text-align: center; padding-bottom: 10px; }
+.days { gap: 5px; }
+.days button { min-height: 92px; padding: 9px; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; border: 1px solid transparent; border-radius: 8px; background: var(--surface); color: var(--muted); }
+.days button.selected { border-color: var(--accent); background: var(--accent-soft); }
+.days button.gain span { color: #6ee7b7; }.days button.loss span { color: #fca5a5; }
+.days button i { font-size: 10px; font-style: normal; }
+.pnl-form { margin-top: 14px; }
+.diary-item { padding: 0; overflow: hidden; }
+.diary-item > .item { padding: 22px; }
+.transactions { padding: 18px 22px; border-top: 1px solid var(--border); background: var(--surface); }
+.transactions h3 { margin-top: 0; }
+.trade-form { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.trade-list { display: grid; gap: 8px; margin-top: 14px; }
+.trade-list > div { display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--border); }
+@media (max-width: 760px) {
+  .shell { display: block; }
+  aside { display: none; }
+  main { padding: 24px 16px 92px; }
+  header { margin-bottom: 20px; }
+  .grid { grid-template-columns: 1fr; }
+  .grid .card { min-height: 180px; }
+  .mobile-nav { position: fixed; inset: auto 0 0; z-index: 5; display: grid; grid-template-columns: repeat(5, 1fr); background: rgba(15, 23, 34, .96); border-top: 1px solid var(--border); padding: 8px 4px max(8px, env(safe-area-inset-bottom)); }
+  .mobile-nav button { text-align: center; min-height: 44px; padding: 4px; font-size: 11px; }
+  .form-row, .trade-form { grid-template-columns: 1fr; }
+  .item { display: grid; }
+  .item-actions { justify-content: flex-start; }
+  .calendar { padding: 10px; overflow-x: auto; }
+  .weekdays, .days { min-width: 560px; }
+  .days button { min-height: 78px; }
+}
