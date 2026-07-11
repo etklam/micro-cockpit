@@ -17,7 +17,15 @@ app.MapPost("/internal/tools/risk-reward",(RiskReward x)=> x.EntryPrice<=0||x.St
 app.MapPost("/internal/tools/fire",(Fire x)=> x.AnnualExpenses<=0||x.WithdrawalRatePercent<=0
   ? Results.BadRequest(new{error="invalid_input"})
   : Results.Ok(new{target=decimal.Round(x.AnnualExpenses/(x.WithdrawalRatePercent/100m),2),gap=decimal.Max(0,decimal.Round(x.AnnualExpenses/(x.WithdrawalRatePercent/100m)-x.InvestedAssets,2))}));
+app.MapPost("/internal/tools/relative-value",(RelativeValue x)=>x.AssetPrice<=0||x.BenchmarkPrice<=0||x.HistoricalRatio<=0
+  ? Results.BadRequest(new{error="invalid_input"})
+  : Results.Ok(new{currentRatio=decimal.Round(x.AssetPrice/x.BenchmarkPrice,6),deviationPercent=decimal.Round(((x.AssetPrice/x.BenchmarkPrice)/x.HistoricalRatio-1)*100m,4)}));
+app.MapPost("/internal/tools/seasonality",(Seasonality x)=>x.Returns is null||x.Returns.Count==0||x.Returns.Count>120
+  ? Results.BadRequest(new{error="invalid_input"})
+  : Results.Ok(new{observations=x.Returns.Count,averageReturn=decimal.Round(x.Returns.Average(),4),positiveRate=decimal.Round((decimal)x.Returns.Count(v=>v>0)/x.Returns.Count*100m,2)}));
 app.Run();
 record PositionSizing(decimal AccountValue,decimal RiskPercent,decimal EntryPrice,decimal StopPrice);
 record RiskReward(decimal EntryPrice,decimal StopPrice,decimal TargetPrice);
 record Fire(decimal AnnualExpenses,decimal WithdrawalRatePercent,decimal InvestedAssets);
+record RelativeValue(decimal AssetPrice,decimal BenchmarkPrice,decimal HistoricalRatio);
+record Seasonality(List<decimal> Returns);

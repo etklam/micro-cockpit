@@ -163,6 +163,8 @@ MapProxy(app, "/api/app/partners/{ownerId:guid}/authorization", "partner", "/int
 MapProxy(app, "/api/app/tools/position-sizing", "tool", "/internal/tools/position-sizing", [HttpMethods.Post]);
 MapProxy(app, "/api/app/tools/risk-reward", "tool", "/internal/tools/risk-reward", [HttpMethods.Post]);
 MapProxy(app, "/api/app/tools/fire", "tool", "/internal/tools/fire", [HttpMethods.Post]);
+MapProxy(app, "/api/app/tools/relative-value", "tool", "/internal/tools/relative-value", [HttpMethods.Post]);
+MapProxy(app, "/api/app/tools/seasonality", "tool", "/internal/tools/seasonality", [HttpMethods.Post]);
 MapProxy(app, "/api/admin/posts", "content", "/internal/admin/posts", [HttpMethods.Post]);
 MapProxy(app, "/api/admin/posts/{id:guid}", "content", "/internal/admin/posts/{id}", [HttpMethods.Put, HttpMethods.Delete]);
 MapProxy(app, "/api/admin/operations/audit", "operations", "/internal/operations/audit", [HttpMethods.Get, HttpMethods.Post]);
