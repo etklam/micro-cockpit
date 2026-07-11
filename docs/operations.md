@@ -6,10 +6,42 @@ Set non-default secrets before exposing the stack:
 
 ```sh
 export POSTGRES_PASSWORD='replace-me'
+export MIGRATOR_DB_PASSWORD='replace-me-migrator'
+export IDENTITY_DB_PASSWORD='replace-me-identity'
+export JOURNAL_DB_PASSWORD='replace-me-journal'
+export PERFORMANCE_DB_PASSWORD='replace-me-performance'
+export DISCIPLINE_DB_PASSWORD='replace-me-discipline'
+export REMINDER_DB_PASSWORD='replace-me-reminder'
+export MARKET_DATA_DB_PASSWORD='replace-me-market-data'
+export PRICE_ALERT_DB_PASSWORD='replace-me-price-alert'
+export ROTATION_DB_PASSWORD='replace-me-rotation'
+export STOCK_RESEARCH_DB_PASSWORD='replace-me-stock-research'
+export PARTNER_DB_PASSWORD='replace-me-partner'
+export CONTENT_DB_PASSWORD='replace-me-content'
+export OPERATIONS_DB_PASSWORD='replace-me-operations'
 export LOCAL_REGISTRATION_KEY='replace-me-too'
 docker compose up -d --build
 docker compose ps
 ```
+
+Use independently generated values from the deployment secret store. Compose
+has no database-password defaults: missing secrets fail configuration instead
+of silently starting with production credentials from source control.
+
+`db-init` runs once after PostgreSQL becomes healthy. It keeps schema/object
+ownership on `trade_diary_migrator` and grants each LOGIN runtime role only
+`SELECT`, `INSERT`, `UPDATE`, and `DELETE` on its own schema. Price Alert and
+Rotation receive `SELECT` only on published market views. Re-run it after a
+migration to apply grants to existing objects:
+
+```sh
+docker compose run --rm db-init
+./tests/postgres-role-isolation.sh
+```
+
+Apply later SQL migrations as `trade_diary_migrator`, not as a runtime role,
+then run `db-init` again. The bootstrap administrator is reserved for role and
+ownership administration.
 
 `frontend` is served at `http://localhost:8080` and proxies `/api` to Edge.
 Edge is also bound at `http://localhost:5099`. PostgreSQL is reachable only
@@ -51,6 +83,7 @@ docker compose build --pull
 docker compose up -d
 ```
 
-The v0.1 Identity signing key is generated in memory on startup. Restarting
-Identity invalidates existing 15-minute access tokens; users can refresh or
-sign in again.
+Identity stores its RSA signing key in the `identity-keys` volume at
+`/keys/signing-key.pem`, so ordinary container replacement does not invalidate
+access tokens. Back up that volume and restrict access to it like any other
+authentication secret.

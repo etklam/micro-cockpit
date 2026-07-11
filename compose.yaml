@@ -18,7 +18,7 @@ services:
     environment:
       POSTGRES_DB: trade_diary
       POSTGRES_USER: trade_diary
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_only}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
     ports: ["127.0.0.1:5433:5432"]
     volumes:
       - trade-diary-data:/var/lib/postgresql/data
@@ -30,6 +30,34 @@ services:
       timeout: 3s
       retries: 10
 
+  db-init:
+    image: postgres:17-alpine
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGDATABASE: trade_diary
+      PGUSER: trade_diary
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      MIGRATOR_DB_PASSWORD: ${MIGRATOR_DB_PASSWORD:?set MIGRATOR_DB_PASSWORD}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?set IDENTITY_DB_PASSWORD}
+      JOURNAL_DB_PASSWORD: ${JOURNAL_DB_PASSWORD:?set JOURNAL_DB_PASSWORD}
+      PERFORMANCE_DB_PASSWORD: ${PERFORMANCE_DB_PASSWORD:?set PERFORMANCE_DB_PASSWORD}
+      DISCIPLINE_DB_PASSWORD: ${DISCIPLINE_DB_PASSWORD:?set DISCIPLINE_DB_PASSWORD}
+      REMINDER_DB_PASSWORD: ${REMINDER_DB_PASSWORD:?set REMINDER_DB_PASSWORD}
+      MARKET_DATA_DB_PASSWORD: ${MARKET_DATA_DB_PASSWORD:?set MARKET_DATA_DB_PASSWORD}
+      PRICE_ALERT_DB_PASSWORD: ${PRICE_ALERT_DB_PASSWORD:?set PRICE_ALERT_DB_PASSWORD}
+      ROTATION_DB_PASSWORD: ${ROTATION_DB_PASSWORD:?set ROTATION_DB_PASSWORD}
+      STOCK_RESEARCH_DB_PASSWORD: ${STOCK_RESEARCH_DB_PASSWORD:?set STOCK_RESEARCH_DB_PASSWORD}
+      PARTNER_DB_PASSWORD: ${PARTNER_DB_PASSWORD:?set PARTNER_DB_PASSWORD}
+      CONTENT_DB_PASSWORD: ${CONTENT_DB_PASSWORD:?set CONTENT_DB_PASSWORD}
+      OPERATIONS_DB_PASSWORD: ${OPERATIONS_DB_PASSWORD:?set OPERATIONS_DB_PASSWORD}
+    volumes:
+      - ./platform/postgres/roles:/roles:ro
+    command: ["/roles/apply.sh"]
+    networks: [backend]
+    depends_on:
+      postgres: { condition: service_healthy }
+
   identity:
     <<: *dotnet
     build:
@@ -37,12 +65,15 @@ services:
       dockerfile: services/identity-service/src/TradeDiary.Identity/Dockerfile
     environment:
       <<: *dotnet-env
-      ConnectionStrings__Identity: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      ConnectionStrings__Identity: Host=postgres;Database=trade_diary;Username=identity_service;Password=${IDENTITY_DB_PASSWORD:?set IDENTITY_DB_PASSWORD}
       Auth__LocalRegistrationKey: ${LOCAL_REGISTRATION_KEY:-change-me-before-exposing}
       Jwt__Issuer: trade-diary-identity
       Jwt__Audience: trade-diary-services
+      Jwt__PrivateKeyPath: /keys/signing-key.pem
+    volumes:
+      - identity-keys:/keys
     depends_on:
-      postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
 
   journal:
     <<: *dotnet
@@ -51,7 +82,7 @@ services:
       dockerfile: services/journal-service/src/TradeDiary.Journal/Dockerfile
     environment:
       <<: *dotnet-env
-      ConnectionStrings__Journal: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      ConnectionStrings__Journal: Host=postgres;Database=trade_diary;Username=journal_service;Password=${JOURNAL_DB_PASSWORD:?set JOURNAL_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
       Services__Reminder: http://reminder:8080
       Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:-change-me-before-exposing}
@@ -65,7 +96,7 @@ services:
       dockerfile: services/performance-service/src/TradeDiary.Performance/Dockerfile
     environment:
       <<: *dotnet-env
-      ConnectionStrings__Performance: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      ConnectionStrings__Performance: Host=postgres;Database=trade_diary;Username=performance_service;Password=${PERFORMANCE_DB_PASSWORD:?set PERFORMANCE_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
     depends_on:
       identity: { condition: service_healthy }
@@ -77,7 +108,7 @@ services:
       dockerfile: services/discipline-service/src/TradeDiary.Discipline/Dockerfile
     environment:
       <<: *dotnet-env
-      ConnectionStrings__Discipline: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      ConnectionStrings__Discipline: Host=postgres;Database=trade_diary;Username=discipline_service;Password=${DISCIPLINE_DB_PASSWORD:?set DISCIPLINE_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
     depends_on:
       identity: { condition: service_healthy }
@@ -89,7 +120,7 @@ services:
       dockerfile: services/reminder-service/src/TradeDiary.Reminder/Dockerfile
     environment:
       <<: *dotnet-env
-      ConnectionStrings__Reminder: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      ConnectionStrings__Reminder: Host=postgres;Database=trade_diary;Username=reminder_service;Password=${REMINDER_DB_PASSWORD:?set REMINDER_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
       Services__Journal: http://journal:8080
       Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:-change-me-before-exposing}
@@ -102,7 +133,7 @@ services:
     build: { context: ., dockerfile: services/stock-research-service/src/TradeDiary.StockResearch/Dockerfile }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__StockResearch: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      ConnectionStrings__StockResearch: Host=postgres;Database=trade_diary;Username=stock_research_service;Password=${STOCK_RESEARCH_DB_PASSWORD:?set STOCK_RESEARCH_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
     depends_on: { identity: { condition: service_healthy } }
 
@@ -111,16 +142,16 @@ services:
     build: { context: ., dockerfile: services/market-data-service/src/TradeDiary.MarketData/Dockerfile }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__MarketData: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      ConnectionStrings__MarketData: Host=postgres;Database=trade_diary;Username=market_data_service;Password=${MARKET_DATA_DB_PASSWORD:?set MARKET_DATA_DB_PASSWORD}
       Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:-change-me-before-exposing}
-    depends_on: { postgres: { condition: service_healthy } }
+    depends_on: { db-init: { condition: service_completed_successfully } }
 
   price-alert:
     <<: *dotnet
     build: { context: ., dockerfile: services/price-alert-service/src/TradeDiary.PriceAlert/Dockerfile }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__PriceAlert: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      ConnectionStrings__PriceAlert: Host=postgres;Database=trade_diary;Username=price_alert_service;Password=${PRICE_ALERT_DB_PASSWORD:?set PRICE_ALERT_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
     depends_on:
       identity: { condition: service_healthy }
@@ -131,7 +162,7 @@ services:
     build: { context: ., dockerfile: services/rotation-service/src/TradeDiary.Rotation/Dockerfile }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__Rotation: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      ConnectionStrings__Rotation: Host=postgres;Database=trade_diary;Username=rotation_service;Password=${ROTATION_DB_PASSWORD:?set ROTATION_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
     depends_on:
       identity: { condition: service_healthy }
@@ -142,7 +173,7 @@ services:
     build: { context: ., dockerfile: services/partner-service/src/TradeDiary.Partner/Dockerfile }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__Partner: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      ConnectionStrings__Partner: Host=postgres;Database=trade_diary;Username=partner_service;Password=${PARTNER_DB_PASSWORD:?set PARTNER_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
     depends_on: { identity: { condition: service_healthy } }
 
@@ -151,7 +182,7 @@ services:
     build: { context: ., dockerfile: services/content-service/src/TradeDiary.Content/Dockerfile }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__Content: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      ConnectionStrings__Content: Host=postgres;Database=trade_diary;Username=content_service;Password=${CONTENT_DB_PASSWORD:?set CONTENT_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
     depends_on: { identity: { condition: service_healthy } }
 
@@ -168,7 +199,7 @@ services:
     build: { context: ., dockerfile: services/operations-service/src/TradeDiary.Operations/Dockerfile }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__Operations: Host=postgres;Database=trade_diary;Username=trade_diary;Password=${POSTGRES_PASSWORD:-local_only}
+      ConnectionStrings__Operations: Host=postgres;Database=trade_diary;Username=operations_service;Password=${OPERATIONS_DB_PASSWORD:?set OPERATIONS_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
     depends_on: { identity: { condition: service_healthy } }
 
@@ -233,3 +264,4 @@ networks:
 
 volumes:
   trade-diary-data:
+  identity-keys:
