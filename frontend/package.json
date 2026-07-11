@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "api:generate": "node ../scripts/generate-edge-client.mjs",
+    "api:verify": "node ../scripts/verify-edge-client.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",

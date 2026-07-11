@@ -1,13 +1,10 @@
 // Relative by default: same-origin /api is proxied by Vite in dev and by nginx
 // in Compose. Set VITE_API_URL to target a different Edge host.
-const base = import.meta.env.VITE_API_URL ?? ''
+import { configureClient, request as generatedRequest } from './generated/edge'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('accessToken')
-  const response = await fetch(`${base}${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init?.headers } })
-  if (response.status === 401) { localStorage.removeItem('accessToken'); location.reload(); throw new Error('unauthorized') }
-  if (!response.ok) throw new Error(`request_failed_${response.status}`)
-  return response.status === 204 ? undefined as T : response.json()
+  configureClient({ baseUrl: import.meta.env.VITE_API_URL ?? '', token: localStorage.getItem('accessToken'), onUnauthorized: () => { localStorage.removeItem('accessToken'); location.reload() } })
+  return generatedRequest<T>(path, init)
 }
 async function requestOptional<T>(path: string): Promise<T | null> {
   try { return await request<T>(path) } catch (error) { if (String(error).includes('request_failed_404')) return null; throw error }
