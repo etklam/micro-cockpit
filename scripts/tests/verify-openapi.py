@@ -106,6 +106,8 @@ def operation(path: str, method: str) -> dict:
     params = re.findall(r"\{([^}]+)\}", path)
     if params:
         op["parameters"] = [{"name": name, "in": "path", "required": True, "schema": {"type": "string"}} for name in params]
+    if method == "post" and (path in {"/internal/diaries", "/internal/quick-note"} or path == "/internal/diaries/{diaryId}/transactions"):
+        op.setdefault("parameters", []).append({"name": "Idempotency-Key", "in": "header", "required": False, "schema": {"type": "string", "maxLength": 200}})
     if method in {"post", "put", "patch"}:
         op["requestBody"] = {"required": True, "content": {"application/json": {"schema": {"$ref": f"#/components/schemas/{write_schema}"}}}}
     if method == "delete":
