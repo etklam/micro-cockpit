@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../services/reminder-service/src/TradeDiary.Reminder/TradeDiary.Reminder.csproj" /></ItemGroup>
+</Project>

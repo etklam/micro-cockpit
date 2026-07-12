@@ -53,4 +53,26 @@
   <Folder Name="/services/rotation-service/src/">
     <Project Path="services/rotation-service/src/TradeDiary.Rotation/TradeDiary.Rotation.csproj" />
   </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/TradeDiary.Identity.Tests/">
+    <Project Path="tests/TradeDiary.Identity.Tests/TradeDiary.Identity.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/TradeDiary.Journal.Tests/">
+    <Project Path="tests/TradeDiary.Journal.Tests/TradeDiary.Journal.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/TradeDiary.Performance.Tests/">
+    <Project Path="tests/TradeDiary.Performance.Tests/TradeDiary.Performance.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/TradeDiary.Reminder.Tests/">
+    <Project Path="tests/TradeDiary.Reminder.Tests/TradeDiary.Reminder.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/TradeDiary.PriceAlert.Tests/">
+    <Project Path="tests/TradeDiary.PriceAlert.Tests/TradeDiary.PriceAlert.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/TradeDiary.Rotation.Tests/">
+    <Project Path="tests/TradeDiary.Rotation.Tests/TradeDiary.Rotation.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/TradeDiary.EdgeApi.Tests/">
+    <Project Path="tests/TradeDiary.EdgeApi.Tests/TradeDiary.EdgeApi.Tests.csproj" />
+  </Folder>
 </Solution>
