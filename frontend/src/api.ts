@@ -15,7 +15,7 @@ export type Transaction = { id: string; diaryId: string; symbol: string; side: s
 export type Discipline = { id: string; content: string; position: number }
 export type Alert = { id: string; diaryId: string; startLocalDate: string; nextLocalDate: string | null; localTime: string; timezone: string; repeatMode: string; status: string }
 export type CalendarDay = { date: string; performance: null | { pnlAmount: number; pnlPercent: number | null; note?: string }; diaryCount: number; transactionCount: number; alertCount: number | null }
-export type Calendar = { year: number; month: number; summary: { totalPnl: number; tradingDays: number; winningDays: number; losingDays: number }; days: CalendarDay[] }
+export type Calendar = { year: number; month: number; summary: { total: number; recordedDays: number; profitDays: number; lossDays: number; flatDays: number; bestDay: unknown | null; worstDay: unknown | null }; days: CalendarDay[] }
 export type Capability = 'available' | 'unavailable' | 'empty'
 export type Dashboard = {
   localDate: string

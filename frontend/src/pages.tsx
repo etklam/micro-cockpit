@@ -394,15 +394,15 @@ export function CalendarPage() {
     <>
       <PageHeader
         title="Calendar"
-        subtitle={summary ? `${summary.tradingDays} trading day${summary.tradingDays === 1 ? '' : 's'} this month` : undefined}
+        subtitle={summary ? `${summary.recordedDays} trading day${summary.recordedDays === 1 ? '' : 's'} this month` : undefined}
       />
 
       {summary ? (
         <div className="stat-row">
-          <Stat label="Net P/L" value={signed(summary.totalPnl)} tone={pnlTone(summary.totalPnl)} />
-          <Stat label="Winning days" value={String(summary.winningDays)} tone="gain" />
-          <Stat label="Losing days" value={String(summary.losingDays)} tone="loss" />
-          <Stat label="Trading days" value={String(summary.tradingDays)} />
+          <Stat label="Net P/L" value={signed(summary.total)} tone={pnlTone(summary.total)} />
+          <Stat label="Winning days" value={String(summary.profitDays)} tone="gain" />
+          <Stat label="Losing days" value={String(summary.lossDays)} tone="loss" />
+          <Stat label="Trading days" value={String(summary.recordedDays)} />
         </div>
       ) : null}
 
