@@ -2,25 +2,36 @@
 
 Diary-first trade journal. The current build targets the v0.1 boundary in `development-plan.md`.
 
-## Run the production stack
+## Run the production-like stack
+
+All required secrets live in `.env` (git-ignored). Copy the template and edit every value
+before exposing the stack — Compose fails fast if any of the 16 variables is unset.
 
 ```sh
-POSTGRES_PASSWORD='replace-me' \
-LOCAL_REGISTRATION_KEY='replace-me-too' \
+cp .env.example .env      # then edit .env and replace every change-me-* value
 docker compose up -d --build
+docker compose ps
 ```
 
-Open <http://localhost:8080>. The Edge API is also available at
-<http://localhost:5099>; PostgreSQL is bound to localhost on port `5433`.
-Identity, Journal, Performance, Discipline, and Reminder have no host ports.
+Open <http://localhost:8080>. The Edge API is at <http://localhost:5099>; PostgreSQL is bound
+to localhost on `5433`. Backend services have no host ports — only Frontend and Edge are public.
+
+Register the first user by sending `X-Registration-Key: <LOCAL_REGISTRATION_KEY>` to
+`POST /api/auth/register`, then sign in through the UI.
 
 ```sh
-docker compose ps
 docker compose logs -f edge
-docker compose down
+docker compose down        # stops containers, keeps the data volume
 ```
 
-Operational backup and restore instructions are in [docs/operations.md](docs/operations.md).
+## Operations
+
+Backup, restore, reset, and signing-key handling (full commands in [docs/operations.md](docs/operations.md)):
+
+- **Backup** — `pg_dump -Fc` of the `trade_diary` database (all schemas) to a file.
+- **Restore** — `pg_restore --clean --if-exists` into the target database; verify application tables.
+- **Destructive reset** — `docker compose down -v` removes the data volume; the next `up` re-runs migrations on an empty database.
+- **Signing key backup** — Identity's RSA private key lives in the `identity-keys` volume (`/keys/signing-key.pem`). Back it up; losing it invalidates all outstanding refresh tokens and forces re-login. The JWT `kid` is derived from the public key, so it is stable across restarts and only changes on key rotation.
 
 ## Run for development
 

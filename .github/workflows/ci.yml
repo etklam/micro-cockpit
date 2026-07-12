@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Restore .NET
+        run: dotnet restore TradeDiary.slnx
+      - name: Build solution
+        run: dotnet build TradeDiary.slnx --no-restore -m:1 --disable-build-servers
+      - name: Run .NET tests (unit + endpoint + Testcontainers integration)
+        run: dotnet test TradeDiary.slnx --no-build -m:1 --disable-build-servers --logger "console;verbosity=normal"
+
+      - name: Install frontend dependencies
+        run: npm --prefix frontend ci
+
+      - name: Install OpenAPI validator
+        run: python -m pip install openapi-spec-validator==0.7.2
+
+      - name: Generate OpenAPI from runtime DTOs
+        run: node scripts/generate-openapi.mjs
+      - name: Compose Edge OpenAPI
+        run: node scripts/compose-edge-openapi.mjs
+      - name: Validate committed OpenAPI documents
+        run: python scripts/validate-openapi.py
+      - name: Regenerate Edge client + verify no drift (OpenAPI, Edge doc, committed client)
+        run: npm --prefix frontend run api:verify
+      - name: Frontend lint
+        run: npm --prefix frontend run lint
+      - name: Frontend production build
+        run: npm --prefix frontend run build
+
+      - name: Architecture boundary checks
+        run: ./tests/verify-architecture.sh
+      - name: Migration ownership audit
+        run: python3 scripts/audit-migrations.py
+      - name: Validate Docker Compose config
+        env:
+          # Placeholder secrets are sufficient for `compose config` substitution validation.
+          POSTGRES_PASSWORD: ci
+          MIGRATOR_DB_PASSWORD: ci
+          IDENTITY_DB_PASSWORD: ci
+          JOURNAL_DB_PASSWORD: ci
+          PERFORMANCE_DB_PASSWORD: ci
+          DISCIPLINE_DB_PASSWORD: ci
+          REMINDER_DB_PASSWORD: ci
+          STOCK_RESEARCH_DB_PASSWORD: ci
+          MARKET_DATA_DB_PASSWORD: ci
+          PRICE_ALERT_DB_PASSWORD: ci
+          ROTATION_DB_PASSWORD: ci
+          PARTNER_DB_PASSWORD: ci
+          CONTENT_DB_PASSWORD: ci
+          OPERATIONS_DB_PASSWORD: ci
+          LOCAL_REGISTRATION_KEY: ci
+          INTERNAL_SERVICE_KEY: ci
+        run: docker compose config --quiet

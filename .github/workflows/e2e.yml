@@ -1,0 +1,45 @@
+name: e2e
+
+on:
+  workflow_dispatch:   # manual — full container stack + runtime checks; not on every push
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Prepare .env from template (ephemeral E2E secrets)
+        run: cp .env.example .env
+
+      - name: Build and start the full stack
+        run: docker compose up -d --build --wait --wait-timeout 300
+
+      - name: Stack health
+        run: |
+          docker compose ps
+          curl -fsS http://localhost:5099/health/ready
+          curl -fsS http://localhost:8080/ >/dev/null
+
+      - name: Smoke tests (auth, idempotency, JWT ownership, degradation)
+        env:
+          LOCAL_REGISTRATION_KEY: change-me-registration-key
+          INTERNAL_SERVICE_KEY: change-me-internal-service-key
+        run: |
+          chmod +x tests/*.sh
+          ./tests/smoke-auth.sh
+          ./tests/smoke-journal-idempotency.sh
+          ./tests/smoke-jwt-ownership.sh
+          ./tests/service-unavailable-degradation.sh
+          ./tests/postgres-role-isolation.sh
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --tail=200
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

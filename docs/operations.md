@@ -2,27 +2,16 @@
 
 ## Start and stop
 
-Set non-default secrets before exposing the stack:
+All required secrets are listed in `.env.example` (git-ignored once copied). Set non-default
+secrets before exposing the stack:
 
 ```sh
-export POSTGRES_PASSWORD='replace-me'
-export MIGRATOR_DB_PASSWORD='replace-me-migrator'
-export IDENTITY_DB_PASSWORD='replace-me-identity'
-export JOURNAL_DB_PASSWORD='replace-me-journal'
-export PERFORMANCE_DB_PASSWORD='replace-me-performance'
-export DISCIPLINE_DB_PASSWORD='replace-me-discipline'
-export REMINDER_DB_PASSWORD='replace-me-reminder'
-export MARKET_DATA_DB_PASSWORD='replace-me-market-data'
-export PRICE_ALERT_DB_PASSWORD='replace-me-price-alert'
-export ROTATION_DB_PASSWORD='replace-me-rotation'
-export STOCK_RESEARCH_DB_PASSWORD='replace-me-stock-research'
-export PARTNER_DB_PASSWORD='replace-me-partner'
-export CONTENT_DB_PASSWORD='replace-me-content'
-export OPERATIONS_DB_PASSWORD='replace-me-operations'
-export LOCAL_REGISTRATION_KEY='replace-me-too'
+cp .env.example .env      # edit .env and replace every change-me-* value
 docker compose up -d --build
 docker compose ps
 ```
+
+(You may instead `export` each variable inline — the full list is in `.env.example`.)
 
 Use independently generated values from the deployment secret store. Compose
 has no database-password defaults: missing secrets fail configuration instead
@@ -87,3 +76,52 @@ Identity stores its RSA signing key in the `identity-keys` volume at
 `/keys/signing-key.pem`, so ordinary container replacement does not invalidate
 access tokens. Back up that volume and restrict access to it like any other
 authentication secret.
+
+## Architecture notes
+
+### Authentication and session flow
+The access token (15 min, RS256) is held in browser memory only. The refresh token never reaches
+JavaScript: on login/register Edge extracts it from Identity's response, stores it in an
+`HttpOnly`/`SameSite=Lax`/`Secure`(HTTPS) cookie scoped to `/api/auth`, and returns only
+`{ accessToken, expiresAt }`. Reload restores the session by calling `POST /api/auth/refresh`
+(Edge reads the cookie, forwards it to Identity, rotates the cookie). On a `401` the frontend
+transport single-flight-refreshes once and retries; refresh failure ends the session. Logout calls
+`POST /api/auth/logout` (Identity revokes the refresh family) and clears the cookie. Reusing an
+already-used/revoked refresh token revokes the entire family.
+
+### Stable JWT key id
+`kid` is a SHA-256 thumbprint of the RSA **public** key (SubjectPublicKeyInfo), not a random value.
+The persisted key therefore yields the same `kid` across Identity restarts, so unexpired access
+tokens stay valid. Only a key rotation changes the `kid`.
+
+### Background workers
+Reminder, Price Alert, and Rotation each run a `BackgroundService` (no manual `/internal/worker/run`
+needed). Poll interval and enable/disable are config-driven (`Workers:<Service>:IntervalSeconds`,
+`Workers:<Service>:Enabled`, both with defaults, so Compose needs no new variables). Rotation also
+uses `Workers:Rotation:RunAtUtc` (default `02:00`) as its daily universe schedule. They keep the
+`FOR UPDATE SKIP LOCKED` claim logic (multi-instance safe), log each run under a correlation
+run-id, and one failed run never stops the worker or fails readiness. Reminder delivery goes
+through `IReminderDeliveryChannel` (currently `InAppReminderDeliveryChannel`, which records the
+in-app delivery attempt — explicitly not an email/push stub). Price Alert fails closed when the
+market provider is unhealthy and never re-triggers the same alert/trading-date. Rotation reuses the
+idempotent `batch_runs` calculate and treats `insufficient_data` as a normal outcome.
+
+### OpenAPI contract
+OpenAPI is generated from real DTOs, not regex. Each service emits `/openapi.json` via
+`Microsoft.AspNetCore.OpenApi`; `scripts/generate-openapi.mjs` runs each service and writes the 13
+service documents; `scripts/compose-edge-openapi.mjs` composes the Edge public document from them,
+and `scripts/validate-openapi.py` runs the standard `openapi-spec-validator` over all 14 documents
+(the regex verifier was removed). The frontend client is generated from the Edge document
+(`scripts/generate-edge-client.mjs`). `npm --prefix frontend run api:verify` fails if any committed
+document or the client has drifted from the runtime/composed output.
+
+### Testing strategy
+Production logic is tested directly in C# (unit + `WebApplicationFactory` endpoint + Testcontainers
+PostgreSQL integration). The legacy shell/Python smokes remain as disposable-stack runtime checks.
+See `TradeDiary.*.Tests` projects under each service and the CI workflow.
+
+### Market data ingestion
+Market Data has no background fetcher and no fake provider. Bar ingestion is an **external job's**
+responsibility: an authenticated loader drives `PUT /internal/admin/symbols/{raw}` →
+`POST /internal/admin/provider-runs` → `PUT .../bars` → `POST .../complete`; only completed runs
+publish into the cross-service `market_data_public` views that Price Alert and Rotation read.

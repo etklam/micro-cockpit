@@ -6,11 +6,12 @@ Audit date: 2026-07-12. `PASS` means repository evidence or a recorded disposabl
 
 | Evidence | Command | Current result |
 |---|---|---|
-| All .NET projects | `dotnet build TradeDiary.slnx --no-restore -m:1 --disable-build-servers` | PASS, 0 warnings/errors |
+| All .NET projects | `dotnet build TradeDiary.slnx --no-restore -m:1 --disable-build-servers` | PASS, 0 errors; existing NU1903 Microsoft.OpenApi advisory warnings remain |
+| Direct C# tests | `dotnet test TradeDiary.slnx --no-build -m:1 --disable-build-servers` | PASS, 17 tests across 7 test projects; includes WebApplicationFactory and Testcontainers PostgreSQL concurrency |
 | Frontend production build | `npm --prefix frontend run build` | PASS |
 | Generated Edge client | `npm --prefix frontend run api:verify` | PASS |
 | Architecture boundaries | `./tests/verify-architecture.sh` | PASS, 13 services / 2 events |
-| OpenAPI/source parity | `python3 scripts/tests/verify-openapi.py` | PASS, 14 documents / 218 operations |
+| OpenAPI real contract | `npm --prefix frontend run api:verify` + `python scripts/validate-openapi.py` | PASS, 13 service docs generated from runtime DTOs + composed Edge doc (59 paths / 78 ops); all 14 validated by openapi-spec-validator |
 | Migration ownership | `python3 scripts/audit-migrations.py` | PASS, 13 files / 13 schemas / 36 tables |
 | Cross-language replacement | `python3 tests/verify-rewrite-contract.py` | PASS, independent Python Tool replacement |
 | Domain golden tests | `tests/run-golden.sh` | PASS |
