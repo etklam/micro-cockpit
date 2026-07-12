@@ -2,19 +2,59 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.OpenApi;
+using Microsoft.OpenApi;
 using Npgsql;
 
 var builder=WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton(_=>NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Operations")??"Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o=>{o.MapInboundClaims=false;o.MetadataAddress=builder.Configuration["Auth:MetadataAddress"]??"http://127.0.0.1:5100/.well-known/openid-configuration";o.RequireHttpsMetadata=false;o.Audience="trade-diary-services";});
 builder.Services.AddAuthorization(o=>o.FallbackPolicy=new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddOpenApi(options=>{options.AddDocumentTransformer<SecuritySchemesTransformer>();options.AddOperationTransformer<SecurityRequirementTransformer>();});
 var app=builder.Build();app.UseAuthentication();app.UseAuthorization();
+app.MapOpenApi("/openapi.json").AllowAnonymous();
 app.MapGet("/health/live",()=>Results.Ok(new{status="healthy"})).AllowAnonymous();app.MapGet("/health/ready",async(NpgsqlDataSource db)=>{try{await db.OpenConnectionAsync();return Results.Ok(new{status="ready"});}catch{return Results.Json(new{status="not_ready"},statusCode:503);}}).AllowAnonymous();app.MapGet("/version",()=>Results.Ok(new{service="operations-service",version="0.1.0"})).AllowAnonymous();
-app.MapGet("/internal/operations/audit",async(int? limit,HttpRequest req,NpgsqlDataSource db)=>{if(!Admin(req,out _))return Results.NotFound();await using var c=db.CreateCommand("SELECT id,actor_user_id,action,resource_type,resource_id,details::text,occurred_at FROM operations.audit_events ORDER BY occurred_at DESC LIMIT $1");c.Parameters.AddWithValue(Math.Clamp(limit??100,1,500));await using var r=await c.ExecuteReaderAsync();var items=new List<object>();while(await r.ReadAsync())items.Add(new{id=r.GetGuid(0),actorUserId=r.IsDBNull(1)?null:(Guid?)r.GetGuid(1),action=r.GetString(2),resourceType=r.GetString(3),resourceId=r.IsDBNull(4)?null:r.GetString(4),details=JsonSerializer.Deserialize<JsonElement>(r.GetString(5)),occurredAt=r.GetDateTime(6)});return Results.Ok(new{items});});
-app.MapPost("/internal/operations/audit",async(AuditWrite x,HttpRequest req,NpgsqlDataSource db)=>{if(!Guid.TryParse(req.HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value,out var user))return Results.Unauthorized();await using var c=db.CreateCommand("INSERT INTO operations.audit_events(id,actor_user_id,action,resource_type,resource_id,details) VALUES($1,$2,$3,$4,$5,$6::jsonb)");c.Parameters.AddWithValue(Guid.NewGuid());c.Parameters.AddWithValue(user);c.Parameters.AddWithValue(x.Action);c.Parameters.AddWithValue(x.ResourceType);c.Parameters.AddWithValue((object?)x.ResourceId??DBNull.Value);c.Parameters.AddWithValue(JsonSerializer.Serialize(x.Details));await c.ExecuteNonQueryAsync();return Results.NoContent();});
-app.MapPost("/internal/operations/jobs",async(JobWrite x,HttpRequest req,NpgsqlDataSource db)=>{if(!Admin(req,out var user))return Results.NotFound();var id=Guid.NewGuid();await using var c=db.CreateCommand("INSERT INTO operations.job_registry(id,job_type,status,requested_by,payload) VALUES($1,$2,'queued',$3,$4::jsonb)");c.Parameters.AddWithValue(id);c.Parameters.AddWithValue(x.JobType);c.Parameters.AddWithValue(user);c.Parameters.AddWithValue(JsonSerializer.Serialize(x.Payload));await c.ExecuteNonQueryAsync();return Results.Accepted($"/internal/operations/jobs/{id}",new{id,status="queued"});});
-app.MapGet("/internal/operations/jobs",async(HttpRequest req,NpgsqlDataSource db)=>{if(!Admin(req,out _))return Results.NotFound();await using var c=db.CreateCommand("SELECT id,job_type,status,requested_by,created_at,updated_at FROM operations.job_registry ORDER BY created_at DESC LIMIT 100");await using var r=await c.ExecuteReaderAsync();var items=new List<object>();while(await r.ReadAsync())items.Add(new{id=r.GetGuid(0),jobType=r.GetString(1),status=r.GetString(2),requestedBy=r.GetGuid(3),createdAt=r.GetDateTime(4),updatedAt=r.GetDateTime(5)});return Results.Ok(new{items});});
-app.MapPost("/internal/operations/health",async(HealthWrite x,HttpRequest req,NpgsqlDataSource db)=>{if(!Admin(req,out _))return Results.NotFound();await using var c=db.CreateCommand("INSERT INTO operations.service_health_history(id,service_name,status) VALUES($1,$2,$3)");c.Parameters.AddWithValue(Guid.NewGuid());c.Parameters.AddWithValue(x.ServiceName);c.Parameters.AddWithValue(x.Status);await c.ExecuteNonQueryAsync();return Results.NoContent();});
+app.MapGet("/internal/operations/audit",async(int? limit,HttpRequest req,NpgsqlDataSource db)=>{if(!Admin(req,out _))return Results.NotFound();await using var c=db.CreateCommand("SELECT id,actor_user_id,action,resource_type,resource_id,details::text,occurred_at FROM operations.audit_events ORDER BY occurred_at DESC LIMIT $1");c.Parameters.AddWithValue(Math.Clamp(limit??100,1,500));await using var r=await c.ExecuteReaderAsync();var items=new List<AuditResponse>();while(await r.ReadAsync())items.Add(new AuditResponse(r.GetGuid(0),r.IsDBNull(1)?null:(Guid?)r.GetGuid(1),r.GetString(2),r.GetString(3),r.IsDBNull(4)?null:r.GetString(4),JsonSerializer.Deserialize<JsonElement>(r.GetString(5)),r.GetDateTime(6)));return Results.Ok(new CollectionResponse<AuditResponse>(items));})
+.Produces<CollectionResponse<AuditResponse>>(200).ProducesProblem(404);
+app.MapPost("/internal/operations/audit",async(AuditWrite x,HttpRequest req,NpgsqlDataSource db)=>{if(!Guid.TryParse(req.HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value,out var user))return Results.Unauthorized();await using var c=db.CreateCommand("INSERT INTO operations.audit_events(id,actor_user_id,action,resource_type,resource_id,details) VALUES($1,$2,$3,$4,$5,$6::jsonb)");c.Parameters.AddWithValue(Guid.NewGuid());c.Parameters.AddWithValue(user);c.Parameters.AddWithValue(x.Action);c.Parameters.AddWithValue(x.ResourceType);c.Parameters.AddWithValue((object?)x.ResourceId??DBNull.Value);c.Parameters.AddWithValue(JsonSerializer.Serialize(x.Details));await c.ExecuteNonQueryAsync();return Results.NoContent();})
+.Produces(204).ProducesProblem(401);
+app.MapPost("/internal/operations/jobs",async(JobWrite x,HttpRequest req,NpgsqlDataSource db)=>{if(!Admin(req,out var user))return Results.NotFound();var id=Guid.NewGuid();await using var c=db.CreateCommand("INSERT INTO operations.job_registry(id,job_type,status,requested_by,payload) VALUES($1,$2,'queued',$3,$4::jsonb)");c.Parameters.AddWithValue(id);c.Parameters.AddWithValue(x.JobType);c.Parameters.AddWithValue(user);c.Parameters.AddWithValue(JsonSerializer.Serialize(x.Payload));await c.ExecuteNonQueryAsync();return Results.Accepted($"/internal/operations/jobs/{id}",new JobAcceptedResponse(id,"queued"));})
+.Produces<JobAcceptedResponse>(202).ProducesProblem(404);
+app.MapGet("/internal/operations/jobs",async(HttpRequest req,NpgsqlDataSource db)=>{if(!Admin(req,out _))return Results.NotFound();await using var c=db.CreateCommand("SELECT id,job_type,status,requested_by,created_at,updated_at FROM operations.job_registry ORDER BY created_at DESC LIMIT 100");await using var r=await c.ExecuteReaderAsync();var items=new List<JobResponse>();while(await r.ReadAsync())items.Add(new JobResponse(r.GetGuid(0),r.GetString(1),r.GetString(2),r.GetGuid(3),r.GetDateTime(4),r.GetDateTime(5)));return Results.Ok(new CollectionResponse<JobResponse>(items));})
+.Produces<CollectionResponse<JobResponse>>(200).ProducesProblem(404);
+app.MapPost("/internal/operations/health",async(HealthWrite x,HttpRequest req,NpgsqlDataSource db)=>{if(!Admin(req,out _))return Results.NotFound();await using var c=db.CreateCommand("INSERT INTO operations.service_health_history(id,service_name,status) VALUES($1,$2,$3)");c.Parameters.AddWithValue(Guid.NewGuid());c.Parameters.AddWithValue(x.ServiceName);c.Parameters.AddWithValue(x.Status);await c.ExecuteNonQueryAsync();return Results.NoContent();})
+.Produces(204).ProducesProblem(404);
 app.Run();
+
 static bool Admin(HttpRequest r,out Guid id)=>Guid.TryParse(r.HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value,out id)&&r.HttpContext.User.IsInRole("admin");
 record AuditWrite(string Action,string ResourceType,string? ResourceId,JsonElement Details);record JobWrite(string JobType,JsonElement Payload);record HealthWrite(string ServiceName,string Status);
+record AuditResponse(Guid Id,Guid? ActorUserId,string Action,string ResourceType,string? ResourceId,JsonElement Details,DateTime OccurredAt);
+record JobAcceptedResponse(Guid Id,string Status);
+record JobResponse(Guid Id,string JobType,string Status,Guid RequestedBy,DateTime CreatedAt,DateTime UpdatedAt);
+record CollectionResponse<T>(List<T> Items);
+
+// ponytail: shared OpenAPI security wiring — bearerAuth for user routes, serviceKey for internal admin/worker/events.
+sealed class SecuritySchemesTransformer : IOpenApiDocumentTransformer
+{
+    public Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
+    {
+        document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes["bearerAuth"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT" };
+        document.Components.SecuritySchemes["serviceKey"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.ApiKey, In = ParameterLocation.Header, Name = "X-Service-Key" };
+        return Task.CompletedTask;
+    }
+}
+sealed class SecurityRequirementTransformer : IOpenApiOperationTransformer
+{
+    public Task TransformAsync(OpenApiOperation operation, OpenApiOperationTransformerContext context, CancellationToken cancellationToken)
+    {
+        var metadata = context.Description.ActionDescriptor.EndpointMetadata;
+        if (metadata.OfType<AllowAnonymousAttribute>().Any()) return Task.CompletedTask;
+        var path = "/" + (context.Description.RelativePath ?? string.Empty);
+        var scheme = path.Contains("/internal/admin/", StringComparison.Ordinal) || path.Contains("/internal/worker/", StringComparison.Ordinal) || path.Contains("/internal/events/", StringComparison.Ordinal) ? "serviceKey" : "bearerAuth";
+        operation.Security ??= new List<OpenApiSecurityRequirement>();
+        operation.Security.Add(new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(scheme, context.Document)] = new List<string>() });
+        return Task.CompletedTask;
+    }
+}

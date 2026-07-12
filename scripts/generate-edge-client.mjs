@@ -9,7 +9,15 @@ const api = JSON.parse(readFileSync(source, 'utf8'))
 const refName = (ref) => ref.split('/').at(-1)
 const typeOf = (schema = {}) => {
   if (schema.$ref) return refName(schema.$ref)
-  if (Array.isArray(schema.type)) return schema.type.map((type) => type === 'null' ? 'null' : typeOf({ ...schema, type })).join(' | ')
+  if (Array.isArray(schema.type)) {
+    // .NET's schema exporter marks decimal as ["number","string"] (string preserves precision),
+    // often nullable as ["null","number","string"]. The Edge runtime emits JSON numbers, so collapse.
+    const nonNull = schema.type.filter((t) => t !== 'null')
+    if (nonNull.length === 2 && nonNull.includes('number') && nonNull.includes('string')) {
+      return schema.type.includes('null') ? 'number | null' : 'number'
+    }
+    return schema.type.map((type) => type === 'null' ? 'null' : typeOf({ ...schema, type })).join(' | ')
+  }
   if (schema.enum) return schema.enum.map(JSON.stringify).join(' | ')
   if (schema.oneOf || schema.anyOf) return (schema.oneOf || schema.anyOf).map(typeOf).join(' | ')
   if (schema.allOf) return schema.allOf.map(typeOf).join(' & ')
@@ -50,13 +58,13 @@ for (const [path, pathItem] of Object.entries(api.paths)) {
     const init = [`method: ${JSON.stringify(method.toUpperCase())}`]
     if (body) init.push('body: JSON.stringify(body)')
     const querySuffix = queryParams.length ? ' + withQuery(query)' : ''
-    operations.push(`export const ${camel(operation.operationId)} = (${args.join(', ')}) => request<${typeOf(successSchema(operation) || {})}>(${renderedPath}${querySuffix}, { ${init.join(', ')} })`)
+    operations.push(`export const ${camel(operation.operationId)} = (${[...args, 'extra?: RequestInit'].join(', ')}) => request<${typeOf(successSchema(operation) || {})}>(${renderedPath}${querySuffix}, { ${init.join(', ')}, ...extra })`)
   }
 }
 
 const schemas = Object.entries(api.components?.schemas || {}).map(([name, schema]) => `export type ${name} = ${typeOf(schema)}`).join('\n')
 const queryHelper = Object.values(api.paths).some((pathItem) => Object.values(pathItem).some((operation) => operation?.parameters?.some?.((parameter) => parameter.in === 'query'))) ? `const withQuery = (query: Record<string, unknown>) => {\n  const params = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== null).map(([key, value]) => [key, String(value)]))\n  return params.size ? \`?${'${params}'}\` : ''\n}\n` : ''
-const output = `// Generated from contracts/openapi/edge-api.openapi.json. Do not edit.\n\n${schemas}\n\nexport type RequestOptions = { baseUrl?: string; token?: string | null; onUnauthorized?: () => void }\n\nlet options: RequestOptions = {}\nexport const configureClient = (next: RequestOptions) => { options = next }\nexport async function request<T>(path: string, init: RequestInit = {}): Promise<T> {\n  const response = await fetch(\`${'${options.baseUrl ?? \'\'}${path}'}\`, { ...init, headers: { 'Content-Type': 'application/json', ...(options.token ? { Authorization: \`Bearer ${'${options.token}'}\` } : {}), ...init.headers } })\n  if (response.status === 401) options.onUnauthorized?.()\n  if (!response.ok) throw new Error(\`request_failed_${'${response.status}'}\`)\n  return response.status === 204 ? undefined as T : response.json()\n}\n${queryHelper}\n${operations.join('\n')}\n`
+const output = `// Generated from contracts/openapi/edge-api.openapi.json. Do not edit.\n\n${schemas}\n\nexport type RequestOptions = { baseUrl?: string; token?: string | null; refresh?: () => Promise<string | null>; onUnauthorized?: () => void }\n\nlet options: RequestOptions = {}\nlet refreshInFlight: Promise<string | null> | null = null\nexport const configureClient = (next: RequestOptions) => { options = next; refreshInFlight = null }\nasync function send(path: string, init: RequestInit, token: string | null | undefined): Promise<Response> {\n  return fetch(\`${'${options.baseUrl ?? \'\'}${path}'}\`, { ...init, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: \`Bearer ${'${token}'}\` } : {}), ...init.headers } })\n}\nexport async function request<T>(path: string, init: RequestInit = {}): Promise<T> {\n  let response = await send(path, init, options.token)\n  if (response.status === 401 && options.refresh && !path.endsWith('/api/auth/refresh')) {\n    refreshInFlight ??= options.refresh().finally(() => { refreshInFlight = null })\n    const fresh = await refreshInFlight\n    if (fresh) response = await send(path, init, fresh)\n    else { options.onUnauthorized?.(); throw new Error('request_failed_401') }\n  }\n  if (response.status === 401) options.onUnauthorized?.()\n  if (!response.ok) throw new Error(\`request_failed_${'${response.status}'}\`)\n  return response.status === 204 ? undefined as T : response.json()\n}\n${queryHelper}\n${operations.join('\n')}\n`
 
 mkdirSync(dirname(target), { recursive: true })
 writeFileSync(target, output)

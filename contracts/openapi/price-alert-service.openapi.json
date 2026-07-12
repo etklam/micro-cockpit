@@ -1,825 +1,471 @@
 {
-  "openapi": "3.1.0",
+  "openapi": "3.1.1",
   "info": {
-    "title": "Trade Diary price-alert-service",
-    "version": "0.1.0"
+    "title": "TradeDiary.PriceAlert | v1",
+    "version": "1.0.0"
   },
-  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "servers": [
+    {
+      "url": "http://127.0.0.1:5607/"
+    }
+  ],
   "paths": {
     "/health/live": {
       "get": {
-        "operationId": "get_health_live",
+        "tags": [
+          "TradeDiary.PriceAlert"
+        ],
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Health"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
+            "description": "OK"
           }
-        },
-        "security": []
+        }
       }
     },
     "/health/ready": {
       "get": {
-        "operationId": "get_health_ready",
+        "tags": [
+          "TradeDiary.PriceAlert"
+        ],
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Health"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": []
-      }
-    },
-    "/internal/price-alerts": {
-      "get": {
-        "operationId": "get_internal_price_alerts",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/PriceAlert"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      },
-      "post": {
-        "operationId": "post_internal_price_alerts",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PriceAlert"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PriceAlertWrite"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/price-alerts/{id}": {
-      "delete": {
-        "operationId": "delete_internal_price_alerts_id",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PriceAlert"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "204": {
-            "description": "Deleted"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ]
-      },
-      "put": {
-        "operationId": "put_internal_price_alerts_id",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PriceAlert"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PriceAlertWrite"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/price-alerts/{id}/dismiss": {
-      "post": {
-        "operationId": "post_internal_price_alerts_id_dismiss",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PriceAlert"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PriceAlertWrite"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/price-alerts/{id}/reactivate": {
-      "post": {
-        "operationId": "post_internal_price_alerts_id_reactivate",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PriceAlert"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PriceAlertWrite"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/price-alerts/{id}/triggers": {
-      "get": {
-        "operationId": "get_internal_price_alerts_id_triggers",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/PriceAlert"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ]
-      }
-    },
-    "/internal/worker/run": {
-      "post": {
-        "operationId": "post_internal_worker_run",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JsonValue"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "serviceKey": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/WriteRequest"
-              }
-            }
+            "description": "OK"
           }
         }
       }
     },
     "/version": {
       "get": {
-        "operationId": "get_version",
+        "tags": [
+          "TradeDiary.PriceAlert"
+        ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/internal/price-alerts": {
+      "get": {
+        "tags": [
+          "TradeDiary.PriceAlert"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Version"
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/CollectionResponseOfPriceAlertResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "TradeDiary.PriceAlert"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceAlertWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceAlertResponse"
                 }
               }
             }
           },
           "400": {
-            "$ref": "#/components/responses/Problem"
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": []
-      }
-    }
-  },
-  "components": {
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT"
-      },
-      "serviceKey": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-Service-Key"
-      }
-    },
-    "schemas": {
-      "JsonValue": {},
-      "WriteRequest": {
-        "type": "object",
-        "additionalProperties": true
-      },
-      "Health": {
-        "type": "object",
-        "required": [
-          "status"
-        ],
-        "properties": {
-          "status": {
-            "type": "string"
-          }
-        }
-      },
-      "Version": {
-        "type": "object",
-        "required": [
-          "service",
-          "version"
-        ],
-        "properties": {
-          "service": {
-            "type": "string"
-          },
-          "version": {
-            "type": "string"
-          }
-        }
-      },
-      "Problem": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "string"
-          },
-          "detail": {
-            "type": "string"
-          }
-        }
-      },
-      "Collection": {
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/JsonValue"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
             }
           }
-        }
-      },
-      "AuthTokens": {
-        "type": "object",
-        "required": [
-          "accessToken",
-          "refreshToken"
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/price-alerts/{id}": {
+      "put": {
+        "tags": [
+          "TradeDiary.PriceAlert"
         ],
-        "properties": {
-          "accessToken": {
-            "type": "string"
-          },
-          "refreshToken": {
-            "type": "string"
-          },
-          "expiresIn": {
-            "type": "integer"
-          }
-        }
-      },
-      "AuthWrite": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "password": {
-            "type": "string"
-          },
-          "refreshToken": {
-            "type": "string"
-          }
-        }
-      },
-      "Diary": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "title": {
-            "type": "string"
-          },
-          "content": {
-            "type": "string"
-          },
-          "localDate": {
-            "type": "string",
-            "format": "date"
-          }
-        }
-      },
-      "DiaryWrite": {
-        "type": "object",
-        "required": [
-          "title",
-          "content",
-          "localDate"
-        ],
-        "properties": {
-          "title": {
-            "type": "string"
-          },
-          "content": {
-            "type": "string"
-          },
-          "localDate": {
-            "type": "string",
-            "format": "date"
-          }
-        }
-      },
-      "QuickNoteWrite": {
-        "type": "object",
-        "required": [
-          "content"
-        ],
-        "properties": {
-          "content": {
-            "type": "string"
-          },
-          "diaryId": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          }
-        }
-      },
-      "Transaction": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "symbol": {
-            "type": "string"
-          },
-          "side": {
-            "type": "string"
-          },
-          "quantity": {
-            "type": "number"
-          },
-          "price": {
-            "type": "number"
-          }
-        }
-      },
-      "TransactionWrite": {
-        "type": "object",
-        "required": [
-          "symbol",
-          "side",
-          "quantity",
-          "price"
-        ],
-        "properties": {
-          "symbol": {
-            "type": "string"
-          },
-          "side": {
-            "type": "string"
-          },
-          "quantity": {
-            "type": "number",
-            "exclusiveMinimum": 0
-          },
-          "price": {
-            "type": "number",
-            "minimum": 0
-          }
-        }
-      },
-      "DailyPerformance": {
-        "type": "object",
-        "properties": {
-          "localDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "profitLoss": {
-            "type": "number"
-          },
-          "percentReturn": {
-            "type": [
-              "number",
-              "null"
-            ]
-          }
-        }
-      },
-      "DailyPerformanceWrite": {
-        "type": "object",
-        "required": [
-          "profitLoss"
-        ],
-        "properties": {
-          "profitLoss": {
-            "type": "number"
-          },
-          "capitalBase": {
-            "type": [
-              "number",
-              "null"
-            ],
-            "exclusiveMinimum": 0
-          }
-        }
-      },
-      "Discipline": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "text": {
-            "type": "string"
-          },
-          "position": {
-            "type": "integer"
-          }
-        }
-      },
-      "DisciplineWrite": {
-        "type": "object",
-        "required": [
-          "text"
-        ],
-        "properties": {
-          "text": {
-            "type": "string"
-          },
-          "ids": {
-            "type": "array",
-            "items": {
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
               "type": "string",
               "format": "uuid"
             }
           }
-        }
-      },
-      "DiaryAlert": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "diaryId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "scheduledFor": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "status": {
-            "type": "string"
-          }
-        }
-      },
-      "DiaryAlertWrite": {
-        "type": "object",
-        "required": [
-          "diaryId",
-          "scheduledFor"
         ],
-        "properties": {
-          "diaryId": {
-            "type": "string",
-            "format": "uuid"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceAlertWrite"
+              }
+            }
           },
-          "scheduledFor": {
-            "type": "string",
-            "format": "date-time"
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
           },
-          "recurrence": {
-            "type": "string"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
-        }
-      },
-      "Stock": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "symbol": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
+        },
+        "security": [
+          {
+            "bearerAuth": []
           }
-        }
+        ]
       },
-      "StockWrite": {
-        "type": "object",
-        "required": [
-          "symbol"
+      "delete": {
+        "tags": [
+          "TradeDiary.PriceAlert"
         ],
-        "properties": {
-          "symbol": {
-            "type": "string"
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
           },
-          "name": {
-            "type": "string"
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/price-alerts/{id}/dismiss": {
+      "post": {
+        "tags": [
+          "TradeDiary.PriceAlert"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/price-alerts/{id}/reactivate": {
+      "post": {
+        "tags": [
+          "TradeDiary.PriceAlert"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/price-alerts/{id}/triggers": {
+      "get": {
+        "tags": [
+          "TradeDiary.PriceAlert"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionResponseOfTriggerResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/worker/run": {
+      "post": {
+        "tags": [
+          "TradeDiary.PriceAlert"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerRunResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "serviceKey": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CollectionResponseOfPriceAlertResponse": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceAlertResponse"
+            }
           }
         }
       },
-      "PriceAlert": {
+      "CollectionResponseOfTriggerResponse": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TriggerResponse"
+            }
+          }
+        }
+      },
+      "PriceAlertResponse": {
+        "required": [
+          "id",
+          "symbol",
+          "conditionType",
+          "threshold",
+          "lookbackDays",
+          "direction",
+          "status",
+          "baselineClose",
+          "lastEvaluatedDate",
+          "createdAt",
+          "updatedAt"
+        ],
         "type": "object",
         "properties": {
           "id": {
@@ -827,23 +473,72 @@
             "format": "uuid"
           },
           "symbol": {
+            "type": "string"
+          },
+          "conditionType": {
             "type": "string"
           },
           "threshold": {
-            "type": "number"
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "lookbackDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "direction": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "status": {
             "type": "string"
+          },
+          "baselineClose": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "lastEvaluatedDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
       "PriceAlertWrite": {
-        "type": "object",
         "required": [
           "symbol",
           "conditionType",
-          "threshold"
+          "threshold",
+          "lookbackDays",
+          "direction"
         ],
+        "type": "object",
         "properties": {
           "symbol": {
             "type": "string"
@@ -852,207 +547,140 @@
             "type": "string"
           },
           "threshold": {
-            "type": "number"
-          }
-        }
-      },
-      "RotationUniverse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "symbols": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "RotationUniverseWrite": {
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "symbols": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "Partner": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "status": {
-            "type": "string"
-          },
-          "partnerUserId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
-      "PartnerWrite": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "resources": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "Post": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "body": {
-            "type": "string"
-          }
-        }
-      },
-      "PostWrite": {
-        "type": "object",
-        "required": [
-          "slug",
-          "title"
-        ],
-        "properties": {
-          "slug": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "body": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          }
-        }
-      },
-      "AuditEvent": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "action": {
-            "type": "string"
-          },
-          "resourceType": {
-            "type": "string"
-          },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "AuditWrite": {
-        "type": "object",
-        "required": [
-          "action",
-          "resourceType"
-        ],
-        "properties": {
-          "action": {
-            "type": "string"
-          },
-          "resourceType": {
-            "type": "string"
-          },
-          "resourceId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
-              "string",
-              "null"
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "lookbackDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "direction": {
+            "type": [
+              "null",
+              "string"
             ]
           }
         }
       },
-      "MarketBar": {
+      "ProblemDetails": {
         "type": "object",
         "properties": {
-          "tradingDate": {
-            "type": "string",
-            "format": "date"
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
-          "open": {
-            "type": "number"
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
-          "high": {
-            "type": "number"
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           },
-          "low": {
-            "type": "number"
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
-          "close": {
-            "type": "number"
-          },
-          "volume": {
-            "type": "number"
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
-      "MarketBarWrite": {
-        "type": "object",
+      "TriggerResponse": {
         "required": [
+          "id",
           "tradingDate",
-          "close"
+          "observedClose",
+          "triggeredAt",
+          "dismissedAt"
         ],
+        "type": "object",
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
           "tradingDate": {
             "type": "string",
             "format": "date"
           },
-          "close": {
-            "type": "number"
+          "observedClose": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "triggeredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dismissedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "WorkerRunResponse": {
+        "required": [
+          "triggered"
+        ],
+        "type": "object",
+        "properties": {
+          "triggered": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       }
     },
-    "responses": {
-      "Problem": {
-        "description": "Request failed",
-        "content": {
-          "application/problem+json": {
-            "schema": {
-              "$ref": "#/components/schemas/Problem"
-            }
-          }
-        }
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "serviceKey": {
+        "type": "apiKey",
+        "name": "X-Service-Key",
+        "in": "header"
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "TradeDiary.PriceAlert"
+    }
+  ]
 }

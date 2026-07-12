@@ -2,6 +2,8 @@ using Npgsql;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.OpenApi;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(
@@ -15,9 +17,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     options.Audience = "trade-diary-services";
 });
 builder.Services.AddAuthorization(options => options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<SecuritySchemesTransformer>();
+    options.AddOperationTransformer<SecurityRequirementTransformer>();
+});
 var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapOpenApi("/openapi.json").AllowAnonymous();
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 app.MapGet("/health/ready", async (NpgsqlDataSource db) =>
@@ -44,7 +52,8 @@ app.MapPut("/internal/daily-performances/{date}", async (DateOnly date, Performa
     command.Parameters.AddWithValue(input.Note ?? "");
     await command.ExecuteNonQueryAsync();
     return Results.Ok(ToResponse(date, input.PnlAmount, input.CapitalBase, input.Note ?? ""));
-});
+})
+.Produces<PerformanceResponse>(200).ProducesValidationProblem().ProducesProblem(401);
 
 app.MapGet("/internal/performance/day/{date}", async (DateOnly date, HttpRequest request, NpgsqlDataSource db) =>
 {
@@ -55,18 +64,22 @@ app.MapGet("/internal/performance/day/{date}", async (DateOnly date, HttpRequest
     await using var reader = await command.ExecuteReaderAsync();
     if (!await reader.ReadAsync()) return Results.NotFound(); // Missing is not zero.
     return Results.Ok(ToResponse(date, reader.GetDecimal(0), reader.IsDBNull(1) ? null : reader.GetDecimal(1), reader.GetString(2)));
-});
+})
+.Produces<PerformanceResponse>(200).ProducesProblem(401).ProducesProblem(404);
 
 app.MapGet("/internal/daily-performances", async (DateOnly from, DateOnly to, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     if (to < from || to.DayNumber - from.DayNumber > 62) return Results.BadRequest(new { error = "invalid_date_range" });
     await using var command = db.CreateCommand("SELECT local_date,pnl_amount,capital_base,note FROM performance.daily_performances WHERE user_id=$1 AND local_date BETWEEN $2 AND $3 ORDER BY local_date");
-    command.Parameters.AddWithValue(userId); command.Parameters.AddWithValue(from); command.Parameters.AddWithValue(to);
-    await using var reader = await command.ExecuteReaderAsync(); var items = new List<object>();
+    command.Parameters.AddWithValue(userId);
+    command.Parameters.AddWithValue(from);
+    command.Parameters.AddWithValue(to);
+    await using var reader = await command.ExecuteReaderAsync(); var items = new List<PerformanceResponse>();
     while (await reader.ReadAsync()) items.Add(ToResponse(reader.GetFieldValue<DateOnly>(0), reader.GetDecimal(1), reader.IsDBNull(2) ? null : reader.GetDecimal(2), reader.GetString(3)));
-    return Results.Ok(new { items });
-});
+    return Results.Ok(new CollectionResponse<PerformanceResponse>(items));
+})
+.Produces<CollectionResponse<PerformanceResponse>>(200).ProducesValidationProblem().ProducesProblem(401);
 
 app.MapDelete("/internal/daily-performances/{date}", async (DateOnly date, HttpRequest request, NpgsqlDataSource db) =>
 {
@@ -75,7 +88,8 @@ app.MapDelete("/internal/daily-performances/{date}", async (DateOnly date, HttpR
     command.Parameters.AddWithValue(userId);
     command.Parameters.AddWithValue(date);
     return await command.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.NoContent();
-});
+})
+.Produces(204).ProducesProblem(401).ProducesProblem(404);
 
 app.MapGet("/internal/performance/month-summary", async (int year, int month, HttpRequest request, NpgsqlDataSource db) =>
 {
@@ -94,25 +108,65 @@ app.MapGet("/internal/performance/month-summary", async (int year, int month, Ht
     command.Parameters.AddWithValue(end);
     await using var reader = await command.ExecuteReaderAsync();
     await reader.ReadAsync();
-    return Results.Ok(new {
-        year, month, total = reader.GetDecimal(0), recordedDays = reader.GetInt64(1),
-        profitDays = reader.GetInt64(2), lossDays = reader.GetInt64(3), flatDays = reader.GetInt64(4),
-        bestDay = reader.IsDBNull(5) ? (decimal?)null : reader.GetDecimal(5), worstDay = reader.IsDBNull(6) ? (decimal?)null : reader.GetDecimal(6)
-    });
-});
+    return Results.Ok(new MonthSummaryResponse(
+        year, month, reader.GetDecimal(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4),
+        reader.IsDBNull(5) ? null : reader.GetDecimal(5), reader.IsDBNull(6) ? null : reader.GetDecimal(6)));
+})
+.Produces<MonthSummaryResponse>(200).ProducesValidationProblem().ProducesProblem(401);
 
 app.Run();
 
 static bool TryUser(HttpRequest request, out Guid userId) =>
     Guid.TryParse(request.HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out userId);
 
-static object ToResponse(DateOnly date, decimal amount, decimal? capital, string note) => new
-{
-    localDate = date,
-    pnlAmount = amount,
-    capitalBase = capital,
-    pnlPercent = capital is null ? (decimal?)null : decimal.Round(amount / capital.Value * 100, 4),
-    note
-};
+static PerformanceResponse ToResponse(DateOnly date, decimal amount, decimal? capital, string note) => new(
+    date, amount, capital, PerformanceMath.PnlPercentage(amount, capital), note);
 
 record PerformanceWrite(decimal PnlAmount, decimal? CapitalBase, string? Note);
+record PerformanceResponse(DateOnly LocalDate, decimal PnlAmount, decimal? CapitalBase, decimal? PnlPercent, string Note);
+record MonthSummaryResponse(int Year, int Month, decimal Total, long RecordedDays, long ProfitDays, long LossDays, long FlatDays, decimal? BestDay, decimal? WorstDay);
+record CollectionResponse<T>(List<T> Items);
+
+// ponytail: shared OpenAPI security wiring — bearerAuth for user routes, serviceKey for internal admin/worker/events.
+// Duplicated per service intentionally: no shared kernel is allowed across services.
+sealed class SecuritySchemesTransformer : IOpenApiDocumentTransformer
+{
+    public Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
+    {
+        document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes["bearerAuth"] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT"
+        };
+        document.Components.SecuritySchemes["serviceKey"] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.ApiKey,
+            In = ParameterLocation.Header,
+            Name = "X-Service-Key"
+        };
+        return Task.CompletedTask;
+    }
+}
+
+sealed class SecurityRequirementTransformer : IOpenApiOperationTransformer
+{
+    public Task TransformAsync(OpenApiOperation operation, OpenApiOperationTransformerContext context, CancellationToken cancellationToken)
+    {
+        var metadata = context.Description.ActionDescriptor.EndpointMetadata;
+        if (metadata.OfType<AllowAnonymousAttribute>().Any()) return Task.CompletedTask;
+        var path = "/" + (context.Description.RelativePath ?? string.Empty);
+        var scheme = path.Contains("/internal/admin/", StringComparison.Ordinal)
+                     || path.Contains("/internal/worker/", StringComparison.Ordinal)
+                     || path.Contains("/internal/events/", StringComparison.Ordinal)
+            ? "serviceKey" : "bearerAuth";
+        operation.Security ??= new List<OpenApiSecurityRequirement>();
+        operation.Security.Add(new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference(scheme, context.Document)] = new List<string>()
+        });
+        return Task.CompletedTask;
+    }
+}

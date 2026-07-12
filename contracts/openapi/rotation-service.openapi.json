@@ -1,430 +1,861 @@
 {
-  "openapi": "3.1.0",
+  "openapi": "3.1.1",
   "info": {
-    "title": "Trade Diary rotation-service",
-    "version": "0.1.0"
+    "title": "TradeDiary.Rotation | v1",
+    "version": "1.0.0"
   },
-  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "servers": [
+    {
+      "url": "http://127.0.0.1:5608/"
+    }
+  ],
   "paths": {
     "/health/live": {
       "get": {
-        "operationId": "get_health_live",
+        "tags": [
+          "TradeDiary.Rotation"
+        ],
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Health"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
+            "description": "OK"
           }
-        },
-        "security": []
+        }
       }
     },
     "/health/ready": {
       "get": {
-        "operationId": "get_health_ready",
+        "tags": [
+          "TradeDiary.Rotation"
+        ],
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Health"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": []
-      }
-    },
-    "/internal/rotation/monitor": {
-      "get": {
-        "operationId": "get_internal_rotation_monitor",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/JsonValue"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/internal/rotation/universes": {
-      "get": {
-        "operationId": "get_internal_rotation_universes",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/RotationUniverse"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      },
-      "post": {
-        "operationId": "post_internal_rotation_universes",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RotationUniverse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RotationUniverseWrite"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/rotation/universes/{id}": {
-      "delete": {
-        "operationId": "delete_internal_rotation_universes_id",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RotationUniverse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "204": {
-            "description": "Deleted"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ]
-      },
-      "put": {
-        "operationId": "put_internal_rotation_universes_id",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RotationUniverse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RotationUniverseWrite"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/rotation/universes/{id}/calculate": {
-      "post": {
-        "operationId": "post_internal_rotation_universes_id_calculate",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RotationUniverse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RotationUniverseWrite"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/rotation/universes/{id}/symbols": {
-      "put": {
-        "operationId": "put_internal_rotation_universes_id_symbols",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RotationUniverse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RotationUniverseWrite"
-              }
-            }
+            "description": "OK"
           }
         }
       }
     },
     "/version": {
       "get": {
-        "operationId": "get_version",
+        "tags": [
+          "TradeDiary.Rotation"
+        ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/internal/rotation/universes": {
+      "get": {
+        "tags": [
+          "TradeDiary.Rotation"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Version"
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/CollectionResponseOfUniverseResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "TradeDiary.Rotation"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UniverseWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UniverseCreatedResponse"
                 }
               }
             }
           },
           "400": {
-            "$ref": "#/components/responses/Problem"
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
-        "security": []
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/rotation/universes/{id}": {
+      "put": {
+        "tags": [
+          "TradeDiary.Rotation"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UniverseWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "TradeDiary.Rotation"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/rotation/universes/{id}/symbols": {
+      "put": {
+        "tags": [
+          "TradeDiary.Rotation"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/UniverseSymbolWrite"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/rotation/universes/{id}/calculate": {
+      "post": {
+        "tags": [
+          "TradeDiary.Rotation"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalculateResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/rotation/monitor": {
+      "get": {
+        "tags": [
+          "TradeDiary.Rotation"
+        ],
+        "parameters": [
+          {
+            "name": "universe",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     }
   },
   "components": {
+    "schemas": {
+      "CalculateResponse": {
+        "required": [
+          "universeId",
+          "snapshotDate",
+          "status",
+          "formulaVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "universeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "snapshotDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string"
+          },
+          "formulaVersion": {
+            "type": "string"
+          }
+        }
+      },
+      "CollectionResponseOfUniverseResponse": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UniverseResponse"
+            }
+          }
+        }
+      },
+      "EtfSnapshotResponse": {
+        "required": [
+          "symbol",
+          "label",
+          "sector",
+          "close",
+          "return2w",
+          "return1m",
+          "return3m",
+          "rank2w",
+          "percentile2w",
+          "aboveMa20",
+          "aboveMa50",
+          "aboveMa200",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sector": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "close": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "return2w": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "return1m": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "return3m": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "rank2w": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "percentile2w": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "aboveMa20": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "aboveMa50": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "aboveMa200": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "MonitorMarketState": {
+        "required": [
+          "state",
+          "breadthPercent",
+          "benchmarkAboveMa200",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "breadthPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "benchmarkAboveMa200": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "MonitorResponse": {
+        "required": [
+          "universe",
+          "snapshotDate",
+          "formulaVersion",
+          "status",
+          "marketState",
+          "sectorBreadth",
+          "etfs"
+        ],
+        "type": "object",
+        "properties": {
+          "universe": {
+            "$ref": "#/components/schemas/MonitorUniverse"
+          },
+          "snapshotDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "formulaVersion": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "marketState": {
+            "$ref": "#/components/schemas/MonitorMarketState"
+          },
+          "sectorBreadth": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SectorBreadthResponse"
+            }
+          },
+          "etfs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EtfSnapshotResponse"
+            }
+          }
+        }
+      },
+      "MonitorUniverse": {
+        "required": [
+          "id",
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SectorBreadthResponse": {
+        "required": [
+          "sector",
+          "memberCount",
+          "availableCount",
+          "aboveMa20Percent",
+          "aboveMa50Percent",
+          "aboveMa200Percent",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "sector": {
+            "type": "string"
+          },
+          "memberCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "availableCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "aboveMa20Percent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "aboveMa50Percent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "aboveMa200Percent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "UniverseCreatedResponse": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "rankScope"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rankScope": {
+            "type": "string"
+          }
+        }
+      },
+      "UniverseResponse": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "rankScope",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rankScope": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UniverseSymbolWrite": {
+        "required": [
+          "symbol",
+          "label",
+          "sector",
+          "sortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sector": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "UniverseWrite": {
+        "required": [
+          "code",
+          "name",
+          "rankScope"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rankScope": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      }
+    },
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
@@ -433,575 +864,14 @@
       },
       "serviceKey": {
         "type": "apiKey",
-        "in": "header",
-        "name": "X-Service-Key"
-      }
-    },
-    "schemas": {
-      "JsonValue": {},
-      "WriteRequest": {
-        "type": "object",
-        "additionalProperties": true
-      },
-      "Health": {
-        "type": "object",
-        "required": [
-          "status"
-        ],
-        "properties": {
-          "status": {
-            "type": "string"
-          }
-        }
-      },
-      "Version": {
-        "type": "object",
-        "required": [
-          "service",
-          "version"
-        ],
-        "properties": {
-          "service": {
-            "type": "string"
-          },
-          "version": {
-            "type": "string"
-          }
-        }
-      },
-      "Problem": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "string"
-          },
-          "detail": {
-            "type": "string"
-          }
-        }
-      },
-      "Collection": {
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/JsonValue"
-            }
-          }
-        }
-      },
-      "AuthTokens": {
-        "type": "object",
-        "required": [
-          "accessToken",
-          "refreshToken"
-        ],
-        "properties": {
-          "accessToken": {
-            "type": "string"
-          },
-          "refreshToken": {
-            "type": "string"
-          },
-          "expiresIn": {
-            "type": "integer"
-          }
-        }
-      },
-      "AuthWrite": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "password": {
-            "type": "string"
-          },
-          "refreshToken": {
-            "type": "string"
-          }
-        }
-      },
-      "Diary": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "title": {
-            "type": "string"
-          },
-          "content": {
-            "type": "string"
-          },
-          "localDate": {
-            "type": "string",
-            "format": "date"
-          }
-        }
-      },
-      "DiaryWrite": {
-        "type": "object",
-        "required": [
-          "title",
-          "content",
-          "localDate"
-        ],
-        "properties": {
-          "title": {
-            "type": "string"
-          },
-          "content": {
-            "type": "string"
-          },
-          "localDate": {
-            "type": "string",
-            "format": "date"
-          }
-        }
-      },
-      "QuickNoteWrite": {
-        "type": "object",
-        "required": [
-          "content"
-        ],
-        "properties": {
-          "content": {
-            "type": "string"
-          },
-          "diaryId": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          }
-        }
-      },
-      "Transaction": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "symbol": {
-            "type": "string"
-          },
-          "side": {
-            "type": "string"
-          },
-          "quantity": {
-            "type": "number"
-          },
-          "price": {
-            "type": "number"
-          }
-        }
-      },
-      "TransactionWrite": {
-        "type": "object",
-        "required": [
-          "symbol",
-          "side",
-          "quantity",
-          "price"
-        ],
-        "properties": {
-          "symbol": {
-            "type": "string"
-          },
-          "side": {
-            "type": "string"
-          },
-          "quantity": {
-            "type": "number",
-            "exclusiveMinimum": 0
-          },
-          "price": {
-            "type": "number",
-            "minimum": 0
-          }
-        }
-      },
-      "DailyPerformance": {
-        "type": "object",
-        "properties": {
-          "localDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "profitLoss": {
-            "type": "number"
-          },
-          "percentReturn": {
-            "type": [
-              "number",
-              "null"
-            ]
-          }
-        }
-      },
-      "DailyPerformanceWrite": {
-        "type": "object",
-        "required": [
-          "profitLoss"
-        ],
-        "properties": {
-          "profitLoss": {
-            "type": "number"
-          },
-          "capitalBase": {
-            "type": [
-              "number",
-              "null"
-            ],
-            "exclusiveMinimum": 0
-          }
-        }
-      },
-      "Discipline": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "text": {
-            "type": "string"
-          },
-          "position": {
-            "type": "integer"
-          }
-        }
-      },
-      "DisciplineWrite": {
-        "type": "object",
-        "required": [
-          "text"
-        ],
-        "properties": {
-          "text": {
-            "type": "string"
-          },
-          "ids": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        }
-      },
-      "DiaryAlert": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "diaryId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "scheduledFor": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "status": {
-            "type": "string"
-          }
-        }
-      },
-      "DiaryAlertWrite": {
-        "type": "object",
-        "required": [
-          "diaryId",
-          "scheduledFor"
-        ],
-        "properties": {
-          "diaryId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "scheduledFor": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "recurrence": {
-            "type": "string"
-          }
-        }
-      },
-      "Stock": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "symbol": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        }
-      },
-      "StockWrite": {
-        "type": "object",
-        "required": [
-          "symbol"
-        ],
-        "properties": {
-          "symbol": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        }
-      },
-      "PriceAlert": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "symbol": {
-            "type": "string"
-          },
-          "threshold": {
-            "type": "number"
-          },
-          "status": {
-            "type": "string"
-          }
-        }
-      },
-      "PriceAlertWrite": {
-        "type": "object",
-        "required": [
-          "symbol",
-          "conditionType",
-          "threshold"
-        ],
-        "properties": {
-          "symbol": {
-            "type": "string"
-          },
-          "conditionType": {
-            "type": "string"
-          },
-          "threshold": {
-            "type": "number"
-          }
-        }
-      },
-      "RotationUniverse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "symbols": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "RotationUniverseWrite": {
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "symbols": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "Partner": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "status": {
-            "type": "string"
-          },
-          "partnerUserId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
-      "PartnerWrite": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "resources": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "Post": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "body": {
-            "type": "string"
-          }
-        }
-      },
-      "PostWrite": {
-        "type": "object",
-        "required": [
-          "slug",
-          "title"
-        ],
-        "properties": {
-          "slug": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "body": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          }
-        }
-      },
-      "AuditEvent": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "action": {
-            "type": "string"
-          },
-          "resourceType": {
-            "type": "string"
-          },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "AuditWrite": {
-        "type": "object",
-        "required": [
-          "action",
-          "resourceType"
-        ],
-        "properties": {
-          "action": {
-            "type": "string"
-          },
-          "resourceType": {
-            "type": "string"
-          },
-          "resourceId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
-      "MarketBar": {
-        "type": "object",
-        "properties": {
-          "tradingDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "open": {
-            "type": "number"
-          },
-          "high": {
-            "type": "number"
-          },
-          "low": {
-            "type": "number"
-          },
-          "close": {
-            "type": "number"
-          },
-          "volume": {
-            "type": "number"
-          }
-        }
-      },
-      "MarketBarWrite": {
-        "type": "object",
-        "required": [
-          "tradingDate",
-          "close"
-        ],
-        "properties": {
-          "tradingDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "close": {
-            "type": "number"
-          }
-        }
-      }
-    },
-    "responses": {
-      "Problem": {
-        "description": "Request failed",
-        "content": {
-          "application/problem+json": {
-            "schema": {
-              "$ref": "#/components/schemas/Problem"
-            }
-          }
-        }
+        "name": "X-Service-Key",
+        "in": "header"
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "TradeDiary.Rotation"
+    }
+  ]
 }
