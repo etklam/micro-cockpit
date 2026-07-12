@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import * as api from './api'
 import { Brand, Button, ErrorBox, Field, IconButton, TextInput, useConfirm } from './ui'
@@ -30,13 +30,23 @@ const Ctx = createContext<Cockpit>(null!)
 export const useCockpit = () => useContext(Ctx)
 
 export default function App() {
-  const [authed, setAuthed] = useState(() => Boolean(localStorage.getItem('accessToken')))
+  const [authed, setAuthed] = useState(false)
+  const [booted, setBooted] = useState(false)
   const [page, setPage] = useState<Page>('today')
   const { confirm, confirmNode } = useConfirm()
 
+  // ponytail: access token is in-memory only, so on reload we have no token — restore the session
+  // via the refresh cookie before deciding whether to show Login. configureSession lets the
+  // transport signal session-end (refresh failed) so we drop back to Login.
+  useEffect(() => {
+    api.configureSession(() => setAuthed(false))
+    api.restoreSession().then(setAuthed).finally(() => setBooted(true))
+  }, [])
+
+  if (!booted) return null
   if (!authed) return <Login onDone={() => setAuthed(true)} />
 
-  const signOut = () => { localStorage.removeItem('accessToken'); setAuthed(false) }
+  const signOut = async () => { await api.logout(); setAuthed(false) }
   const go = (p: Page) => { setPage(p); scrollTo({ top: 0, behavior: 'smooth' }) }
 
   return (

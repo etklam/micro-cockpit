@@ -42,16 +42,49 @@ app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAn
 app.MapGet("/health/ready", () => Results.Ok(new { status = "ready" })).AllowAnonymous();
 app.MapGet("/version", () => Results.Ok(new { service = "edge-api", version = "0.1.0" })).AllowAnonymous();
 
-foreach (var action in new[] { "register", "login", "refresh", "logout" })
+// ponytail: Edge owns the browser session. The refresh token never reaches JS — login/refresh
+// set it as an HttpOnly cookie and return only { accessToken, expiresAt }; refresh/logout read
+// the cookie and forward it to Identity (which still owns rotation + family revocation).
+app.MapPost("/api/auth/register", async (JsonElement body, HttpContext context, IHttpClientFactory clients) =>
 {
-    app.MapPost($"/api/auth/{action}", async (JsonElement body, HttpContext context, IHttpClientFactory clients) =>
+    using var request = new HttpRequestMessage(HttpMethod.Post, "/internal/auth/register") { Content = JsonContent.Create(body) };
+    if (context.Request.Headers.TryGetValue("X-Registration-Key", out var key)) request.Headers.TryAddWithoutValidation("X-Registration-Key", key.ToString());
+    var response = await clients.CreateClient("identity").SendAsync(request);
+    return Results.Content(await response.Content.ReadAsStringAsync(), "application/json", statusCode: (int)response.StatusCode);
+}).AllowAnonymous();
+app.MapPost("/api/auth/login", async (JsonElement body, HttpContext context, IHttpClientFactory clients) =>
+{
+    using var request = new HttpRequestMessage(HttpMethod.Post, "/internal/auth/login") { Content = JsonContent.Create(body) };
+    var response = await clients.CreateClient("identity").SendAsync(request);
+    if (!response.IsSuccessStatusCode) return Results.Content(await response.Content.ReadAsStringAsync(), "application/json", statusCode: (int)response.StatusCode);
+    var tokens = JsonNode.Parse(await response.Content.ReadAsStringAsync())?.AsObject();
+    if (tokens == null) return Results.Problem("invalid_token_response", statusCode: 502);
+    SetRefreshCookie(context, tokens["refreshToken"]?.GetValue<string>());
+    return Results.Ok(new { accessToken = tokens["accessToken"]?.GetValue<string>(), expiresAt = tokens["expiresAt"]?.GetValue<string>() });
+}).AllowAnonymous();
+app.MapPost("/api/auth/refresh", async (HttpContext context, IHttpClientFactory clients) =>
+{
+    var cookie = context.Request.Cookies["td_refresh"];
+    if (string.IsNullOrEmpty(cookie)) return Results.Unauthorized();
+    using var request = new HttpRequestMessage(HttpMethod.Post, "/internal/auth/refresh") { Content = JsonContent.Create(new { refreshToken = cookie }) };
+    var response = await clients.CreateClient("identity").SendAsync(request);
+    if (!response.IsSuccessStatusCode) { ClearRefreshCookie(context); return Results.Unauthorized(); }
+    var tokens = JsonNode.Parse(await response.Content.ReadAsStringAsync())?.AsObject();
+    if (tokens == null) { ClearRefreshCookie(context); return Results.Problem("invalid_token_response", statusCode: 502); }
+    SetRefreshCookie(context, tokens["refreshToken"]?.GetValue<string>());
+    return Results.Ok(new { accessToken = tokens["accessToken"]?.GetValue<string>(), expiresAt = tokens["expiresAt"]?.GetValue<string>() });
+}).AllowAnonymous();
+app.MapPost("/api/auth/logout", async (HttpContext context, IHttpClientFactory clients) =>
+{
+    var cookie = context.Request.Cookies["td_refresh"];
+    if (!string.IsNullOrEmpty(cookie))
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"/internal/auth/{action}") { Content = JsonContent.Create(body) };
-        if (context.Request.Headers.TryGetValue("X-Registration-Key", out var key)) request.Headers.TryAddWithoutValidation("X-Registration-Key", key.ToString());
-        var response = await clients.CreateClient("identity").SendAsync(request); var content = await response.Content.ReadAsStringAsync();
-        return Results.Content(content, "application/json", statusCode: (int)response.StatusCode);
-    }).AllowAnonymous();
-}
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/internal/auth/logout") { Content = JsonContent.Create(new { refreshToken = cookie }) };
+        try { await clients.CreateClient("identity").SendAsync(request); } catch { /* logout is best-effort; clear the cookie regardless */ }
+    }
+    ClearRefreshCookie(context);
+    return Results.NoContent();
+}).AllowAnonymous();
 app.MapPost("/api/auth/api-key/token", async (JsonElement body, HttpContext context, IHttpClientFactory clients) =>
     await Forward(clients, "identity", "/internal/auth/api-key/token", HttpMethod.Post, body, context)).AllowAnonymous();
 app.MapPost("/api/app/agents", async (JsonElement body, HttpContext context, IHttpClientFactory clients) =>
@@ -198,13 +231,43 @@ static async Task<IResult> Proxy(IHttpClientFactory clients, string service, str
         using var request = new HttpRequestMessage(new HttpMethod(context.Request.Method), path);
         if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding")) request.Content = new StreamContent(context.Request.Body);
         if (request.Content is not null && context.Request.ContentType is not null) request.Content.Headers.TryAddWithoutValidation("Content-Type", context.Request.ContentType);
-        request.Headers.TryAddWithoutValidation("Authorization", context.Request.Headers.Authorization.ToString());
-        request.Headers.TryAddWithoutValidation("X-Correlation-ID", context.Items["correlationId"]?.ToString());
+        ForwardHeaders(request, context);
         using var response = await clients.CreateClient(service).SendAsync(request); var body = await response.Content.ReadAsStringAsync();
+        PropagateHeaders(context, response);
         return Results.Content(body, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
     }
     catch { return Results.Problem("Service unavailable.", statusCode: 503); }
 }
+
+// ponytail: Edge ferries transport headers only — Authorization + correlation always; Idempotency-Key
+// passes through so Journal's idempotency layer applies across the Edge hop; Location comes back so
+// created resources keep their address. Services own behavior, Edge owns transport.
+static void ForwardHeaders(HttpRequestMessage request, HttpContext context)
+{
+    ProxyHeaders.Forward(request, context);
+}
+static void PropagateHeaders(HttpContext context, HttpResponseMessage response)
+{
+    ProxyHeaders.Propagate(context, response);
+}
+
+// ponytail: HttpOnly + SameSite=Lax + Secure(when HTTPS). Path scoped to /api/auth so the cookie
+// only travels on refresh/logout. Identity owns rotation; Edge only ferries the value.
+static void SetRefreshCookie(HttpContext context, string? refreshToken)
+{
+    if (string.IsNullOrEmpty(refreshToken)) { ClearRefreshCookie(context); return; }
+    context.Response.Cookies.Append("td_refresh", refreshToken, new CookieOptions
+    {
+        HttpOnly = true,
+        SameSite = SameSiteMode.Lax,
+        Secure = context.Request.IsHttps,
+        IsEssential = true,
+        MaxAge = TimeSpan.FromDays(30),
+        Path = "/api/auth"
+    });
+}
+static void ClearRefreshCookie(HttpContext context) =>
+    context.Response.Cookies.Delete("td_refresh", new CookieOptions { Path = "/api/auth" });
 
 static DateOnly UserLocalDate(System.Security.Claims.ClaimsPrincipal user)
 {
@@ -229,9 +292,9 @@ static async Task<IResult> Forward(IHttpClientFactory clients, string service, s
     try
     {
         using var request = new HttpRequestMessage(method,path) { Content = JsonContent.Create(body) };
-        request.Headers.TryAddWithoutValidation("Authorization",context.Request.Headers.Authorization.ToString());
-        request.Headers.TryAddWithoutValidation("X-Correlation-ID",context.Items["correlationId"]?.ToString());
+        ForwardHeaders(request, context);
         using var response = await clients.CreateClient(service).SendAsync(request); var text = await response.Content.ReadAsStringAsync();
+        PropagateHeaders(context, response);
         return Results.Content(text,string.IsNullOrWhiteSpace(response.Content.Headers.ContentType?.MediaType)?"application/json":response.Content.Headers.ContentType.MediaType,statusCode:(int)response.StatusCode);
     }
     catch { return Results.Problem("Service unavailable.",statusCode:503); }
@@ -241,9 +304,9 @@ static async Task<IResult> ForwardNoBody(IHttpClientFactory clients, string serv
     try
     {
         using var request = new HttpRequestMessage(method,path);
-        request.Headers.TryAddWithoutValidation("Authorization",context.Request.Headers.Authorization.ToString());
-        request.Headers.TryAddWithoutValidation("X-Correlation-ID",context.Items["correlationId"]?.ToString());
+        ForwardHeaders(request, context);
         using var response = await clients.CreateClient(service).SendAsync(request); var text = await response.Content.ReadAsStringAsync();
+        PropagateHeaders(context, response);
         return Results.Content(text,string.IsNullOrWhiteSpace(response.Content.Headers.ContentType?.MediaType)?"application/json":response.Content.Headers.ContentType.MediaType,statusCode:(int)response.StatusCode);
     }
     catch { return Results.Problem("Service unavailable.",statusCode:503); }

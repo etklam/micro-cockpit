@@ -3,14 +3,19 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 var issuer = builder.Configuration["Jwt:Issuer"] ?? "trade-diary-identity";
 var audience = builder.Configuration["Jwt:Audience"] ?? "trade-diary-services";
 var rsa = LoadSigningKey(builder.Configuration["Jwt:PrivateKeyPath"]);
-var signingKey = new RsaSecurityKey(rsa) { KeyId = Guid.NewGuid().ToString("N") };
+// ponytail: kid is a deterministic SHA-256 thumbprint of the RSA public key (SubjectPublicKeyInfo),
+// so the same persisted key yields the same kid across restarts; only a key rotation changes it.
+var signingKey = new RsaSecurityKey(rsa) { KeyId = SigningKeyIdentity.GetKeyId(rsa) };
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(
     builder.Configuration.GetConnectionString("Identity") ??
     "Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
@@ -26,41 +31,48 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     };
 });
 builder.Services.AddAuthorization();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<SecuritySchemesTransformer>();
+    options.AddOperationTransformer<SecurityRequirementTransformer>();
+});
 var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapOpenApi("/openapi.json").AllowAnonymous();
 
-app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 app.MapGet("/health/ready", async (NpgsqlDataSource db) =>
 {
     try { await db.OpenConnectionAsync(); return Results.Ok(new { status = "ready" }); }
     catch { return Results.Json(new { status = "not_ready" }, statusCode: 503); }
-});
-app.MapGet("/version", () => Results.Ok(new { service = "identity-service", version = "0.1.0" }));
-app.MapGet("/internal/auth/sso/providers", () => Results.Ok(new { enabledProviders = Array.Empty<string>() }));
+}).AllowAnonymous();
+app.MapGet("/version", () => Results.Ok(new { service = "identity-service", version = "0.1.0" })).AllowAnonymous();
+app.MapGet("/internal/auth/sso/providers", () => Results.Ok(new SsoProvidersResponse(Array.Empty<string>())))
+    .Produces<SsoProvidersResponse>(200);
 app.MapGet("/.well-known/openid-configuration", (HttpRequest request) => Results.Ok(new
 {
     issuer,
     jwks_uri = $"{request.Scheme}://{request.Host}/.well-known/jwks.json"
-}));
+})).AllowAnonymous();
 app.MapGet("/.well-known/jwks.json", () =>
 {
     var p = rsa.ExportParameters(false);
     return Results.Ok(new { keys = new[] { new { kty = "RSA", use = "sig", alg = "RS256", kid = signingKey.KeyId, n = Base64UrlEncoder.Encode(p.Modulus), e = Base64UrlEncoder.Encode(p.Exponent) } } });
-});
+}).AllowAnonymous();
 
 app.MapPost("/internal/auth/register", async (RegisterRequest input, HttpRequest request, NpgsqlDataSource db, IConfiguration config) =>
 {
     var registrationKey = config["Auth:LocalRegistrationKey"];
-    if (string.IsNullOrEmpty(registrationKey)) return Results.NotFound();
+    if (string.IsNullOrEmpty(registrationKey)) return Results.Problem("not_found", statusCode: 404);
     if (!CryptographicOperations.FixedTimeEquals(
         Encoding.UTF8.GetBytes(request.Headers["X-Registration-Key"].FirstOrDefault() ?? ""),
-        Encoding.UTF8.GetBytes(registrationKey))) return Results.NotFound();
+        Encoding.UTF8.GetBytes(registrationKey))) return Results.Problem("not_found", statusCode: 404);
     var email = input.Email.Trim().ToLowerInvariant();
     if (!email.Contains('@') || input.Password.Length < 12 || string.IsNullOrWhiteSpace(input.DisplayName))
-        return Results.BadRequest(new { error = "invalid_registration" });
+        return Results.Problem("invalid_registration", statusCode: 400);
     if (input.BaseCurrency.Length != 3 || string.IsNullOrWhiteSpace(input.Timezone))
-        return Results.BadRequest(new { error = "invalid_locale" });
+        return Results.Problem("invalid_locale", statusCode: 400);
 
     var id = Guid.NewGuid();
     var salt = RandomNumberGenerator.GetBytes(16);
@@ -83,14 +95,15 @@ app.MapPost("/internal/auth/register", async (RegisterRequest input, HttpRequest
         credential.Parameters.AddWithValue(hash); credential.Parameters.AddWithValue(iterations);
         await credential.ExecuteNonQueryAsync();
         await transaction.CommitAsync();
-        return Results.Created("/internal/auth/me", new { id, email, input.DisplayName, input.Timezone, baseCurrency = input.BaseCurrency.ToUpperInvariant() });
+        return Results.Created("/internal/auth/me", new RegisterResponse(id, email, input.DisplayName, input.Timezone, input.BaseCurrency.ToUpperInvariant()));
     }
     catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
     {
         await transaction.RollbackAsync();
-        return Results.Conflict(new { error = "email_exists" });
+        return Results.Problem("email_exists", statusCode: 409);
     }
-});
+})
+.Produces<RegisterResponse>(201).ProducesProblem(400).ProducesProblem(404).ProducesProblem(409);
 
 app.MapPost("/internal/auth/login", async (LoginRequest input, NpgsqlDataSource db) =>
 {
@@ -107,7 +120,8 @@ app.MapPost("/internal/auth/login", async (LoginRequest input, NpgsqlDataSource 
     var user = ReadUser(reader);
     await reader.CloseAsync();
     return Results.Ok(await CreateTokenPair(db, user, Guid.NewGuid(), signingKey, issuer, audience));
-});
+})
+.Produces<AuthTokens>(200).ProducesProblem(401);
 
 app.MapPost("/internal/auth/refresh", async (RefreshRequest input, NpgsqlDataSource db) =>
 {
@@ -139,7 +153,8 @@ app.MapPost("/internal/auth/refresh", async (RefreshRequest input, NpgsqlDataSou
     await using var use = new NpgsqlCommand("UPDATE identity.refresh_tokens SET used_at=now() WHERE id=$1", connection, transaction);
     use.Parameters.AddWithValue(tokenId); await use.ExecuteNonQueryAsync(); await transaction.CommitAsync();
     return Results.Ok(await CreateTokenPair(db, user, familyId, signingKey, issuer, audience));
-});
+})
+.Produces<AuthTokens>(200).ProducesProblem(401);
 
 app.MapPost("/internal/auth/logout", async (RefreshRequest input, NpgsqlDataSource db) =>
 {
@@ -154,21 +169,24 @@ app.MapPost("/internal/auth/logout", async (RefreshRequest input, NpgsqlDataSour
     }
     catch { }
     return Results.NoContent();
-});
+})
+.Produces(204);
 
 app.MapPost("/internal/auth/agents", async (AgentRequest input, ClaimsPrincipal principal, NpgsqlDataSource db) =>
 {
     if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var creator)) return Results.Unauthorized();
     if (string.IsNullOrWhiteSpace(input.DisplayName) || input.BaseCurrency.Length != 3 || input.Scopes.Count == 0 || input.Scopes.Any(s => s is not ("diary:read" or "diary:write" or "research:read")))
-        return Results.BadRequest(new { error = "invalid_agent" });
+        return Results.Problem("invalid_agent", statusCode: 400);
     var userId = Guid.NewGuid(); var keyId = Guid.NewGuid(); var raw = RandomNumberGenerator.GetBytes(32); var email = $"agent-{userId:N}@local.invalid";
     await using var connection = await db.OpenConnectionAsync(); await using var tx = await connection.BeginTransactionAsync();
     await using (var user = new NpgsqlCommand("INSERT INTO identity.users(id,email,display_name,timezone,base_currency,account_type) VALUES($1,$2,$3,$4,$5,'agent')", connection, tx))
     { user.Parameters.AddWithValue(userId); user.Parameters.AddWithValue(email); user.Parameters.AddWithValue(input.DisplayName.Trim()); user.Parameters.AddWithValue(input.Timezone); user.Parameters.AddWithValue(input.BaseCurrency.ToUpperInvariant()); await user.ExecuteNonQueryAsync(); }
     await using (var key = new NpgsqlCommand("INSERT INTO identity.api_keys(id,user_id,created_by,name,key_hash,scopes,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)", connection, tx))
     { key.Parameters.AddWithValue(keyId); key.Parameters.AddWithValue(userId); key.Parameters.AddWithValue(creator); key.Parameters.AddWithValue(input.Name.Trim()); key.Parameters.AddWithValue(SHA256.HashData(raw)); key.Parameters.AddWithValue(input.Scopes.ToArray()); key.Parameters.AddWithValue((object?)input.ExpiresAt?.ToUniversalTime() ?? DBNull.Value); await key.ExecuteNonQueryAsync(); }
-    await tx.CommitAsync(); return Results.Created($"/internal/auth/agents/{userId}", new { userId, keyId, apiKey = Convert.ToBase64String(raw), scopes = input.Scopes });
-}).RequireAuthorization();
+    await tx.CommitAsync(); return Results.Created($"/internal/auth/agents/{userId}", new AgentResponse(userId, keyId, Convert.ToBase64String(raw), input.Scopes));
+})
+.RequireAuthorization()
+.Produces<AgentResponse>(201).ProducesProblem(400).ProducesProblem(401);
 
 app.MapPost("/internal/auth/api-key/token", async (ApiKeyTokenRequest input, NpgsqlDataSource db) =>
 {
@@ -178,15 +196,19 @@ app.MapPost("/internal/auth/api-key/token", async (ApiKeyTokenRequest input, Npg
         FROM identity.api_keys k JOIN identity.users u ON u.id=k.user_id
         WHERE k.key_hash=$1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at>now()) AND u.status='active'
         """); command.Parameters.AddWithValue(SHA256.HashData(raw)); await using var reader = await command.ExecuteReaderAsync(); if (!await reader.ReadAsync()) return Results.Unauthorized();
-    var user = ReadUser(reader); var scopes = reader.GetFieldValue<string[]>(9); return Results.Ok(new { accessToken = CreateAccessToken(user, signingKey, issuer, audience, scopes), expiresAt = DateTime.UtcNow.AddMinutes(15) });
-}).AllowAnonymous();
+    var user = ReadUser(reader); var scopes = reader.GetFieldValue<string[]>(9); return Results.Ok(new ApiKeyTokenResponse(CreateAccessToken(user, signingKey, issuer, audience, scopes), DateTime.UtcNow.AddMinutes(15)));
+})
+.AllowAnonymous()
+.Produces<ApiKeyTokenResponse>(200).ProducesProblem(401);
 
 app.MapDelete("/internal/auth/api-keys/{id:guid}", async (Guid id, ClaimsPrincipal principal, NpgsqlDataSource db) =>
 {
     if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var creator)) return Results.Unauthorized();
     await using var command = db.CreateCommand("UPDATE identity.api_keys SET revoked_at=now() WHERE id=$1 AND created_by=$2 AND revoked_at IS NULL"); command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(creator);
-    return await command.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.NoContent();
-}).RequireAuthorization();
+    return await command.ExecuteNonQueryAsync() == 0 ? Results.Problem("not_found", statusCode: 404) : Results.NoContent();
+})
+.RequireAuthorization()
+.Produces(204).ProducesProblem(401).ProducesProblem(404);
 
 app.MapGet("/internal/auth/me", async (ClaimsPrincipal principal, NpgsqlDataSource db) =>
 {
@@ -194,8 +216,10 @@ app.MapGet("/internal/auth/me", async (ClaimsPrincipal principal, NpgsqlDataSour
     await using var command = db.CreateCommand("SELECT id,email,display_name,timezone,base_currency,role,account_type,status,status_version FROM identity.users WHERE id=$1 AND status='active'");
     command.Parameters.AddWithValue(userId);
     await using var reader = await command.ExecuteReaderAsync();
-    return await reader.ReadAsync() ? Results.Ok(ReadUser(reader)) : Results.NotFound();
-}).RequireAuthorization();
+    return await reader.ReadAsync() ? Results.Ok(ReadUser(reader)) : Results.Problem("not_found", statusCode: 404);
+})
+.RequireAuthorization()
+.Produces<AuthUser>(200).ProducesProblem(401).ProducesProblem(404);
 
 app.Run();
 
@@ -210,7 +234,7 @@ static RSA LoadSigningKey(string? path)
     File.WriteAllText(path, rsa.ExportRSAPrivateKeyPem()); return rsa;
 }
 
-static async Task<object> CreateTokenPair(NpgsqlDataSource db, AuthUser user, Guid familyId, SecurityKey key, string issuer, string audience)
+static async Task<AuthTokens> CreateTokenPair(NpgsqlDataSource db, AuthUser user, Guid familyId, SecurityKey key, string issuer, string audience)
 {
     var now = DateTime.UtcNow;
     var accessToken = CreateAccessToken(user, key, issuer, audience, []);
@@ -219,7 +243,7 @@ static async Task<object> CreateTokenPair(NpgsqlDataSource db, AuthUser user, Gu
     command.Parameters.AddWithValue(Guid.NewGuid()); command.Parameters.AddWithValue(user.Id); command.Parameters.AddWithValue(familyId);
     command.Parameters.AddWithValue(SHA256.HashData(refreshBytes)); command.Parameters.AddWithValue(now.AddDays(30));
     await command.ExecuteNonQueryAsync();
-    return new { accessToken, expiresAt = now.AddMinutes(15), refreshToken = Convert.ToBase64String(refreshBytes) };
+    return new AuthTokens(accessToken, now.AddMinutes(15), Convert.ToBase64String(refreshBytes));
 }
 
 static string CreateAccessToken(AuthUser user, SecurityKey key, string issuer, string audience, IReadOnlyCollection<string> scopes)
@@ -240,3 +264,52 @@ record RefreshRequest(string RefreshToken);
 record AgentRequest(string Name, string DisplayName, string Timezone, string BaseCurrency, List<string> Scopes, DateTime? ExpiresAt);
 record ApiKeyTokenRequest(string ApiKey);
 record AuthUser(Guid Id, string Email, string DisplayName, string Timezone, string BaseCurrency, string Role, string AccountType, string Status, int StatusVersion);
+record AuthTokens(string AccessToken, DateTime ExpiresAt, string RefreshToken);
+record RegisterResponse(Guid Id, string Email, string DisplayName, string Timezone, string BaseCurrency);
+record AgentResponse(Guid UserId, Guid KeyId, string ApiKey, List<string> Scopes);
+record ApiKeyTokenResponse(string AccessToken, DateTime ExpiresAt);
+record SsoProvidersResponse(string[] EnabledProviders);
+
+// ponytail: shared OpenAPI security wiring — bearerAuth for user routes, serviceKey for internal admin/worker/events.
+// Duplicated per service intentionally: no shared kernel is allowed across services.
+sealed class SecuritySchemesTransformer : IOpenApiDocumentTransformer
+{
+    public Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
+    {
+        document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes["bearerAuth"] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT"
+        };
+        document.Components.SecuritySchemes["serviceKey"] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.ApiKey,
+            In = ParameterLocation.Header,
+            Name = "X-Service-Key"
+        };
+        return Task.CompletedTask;
+    }
+}
+
+sealed class SecurityRequirementTransformer : IOpenApiOperationTransformer
+{
+    public Task TransformAsync(OpenApiOperation operation, OpenApiOperationTransformerContext context, CancellationToken cancellationToken)
+    {
+        var metadata = context.Description.ActionDescriptor.EndpointMetadata;
+        if (metadata.OfType<AllowAnonymousAttribute>().Any()) return Task.CompletedTask;
+        var path = "/" + (context.Description.RelativePath ?? string.Empty);
+        var scheme = path.Contains("/internal/admin/", StringComparison.Ordinal)
+                     || path.Contains("/internal/worker/", StringComparison.Ordinal)
+                     || path.Contains("/internal/events/", StringComparison.Ordinal)
+            ? "serviceKey" : "bearerAuth";
+        operation.Security ??= new List<OpenApiSecurityRequirement>();
+        operation.Security.Add(new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference(scheme, context.Document)] = new List<string>()
+        });
+        return Task.CompletedTask;
+    }
+}

@@ -21,13 +21,15 @@ export function TodayPage() {
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const idem = api.useIdempotencyKey()
 
   async function saveNote() {
     if (!note.trim() || !data) return
     setSaving(true)
     try {
-      await api.saveQuickNote(data.localDate, note.trim())
+      await api.saveQuickNote(data.localDate, note.trim(), idem.key())
       setNote('')
+      idem.reset()
       setSaved(true)
       await reload()
       setTimeout(() => setSaved(false), 2500)
@@ -125,11 +127,11 @@ export function TodayPage() {
           <h2 id="recent-h">Recent reflections</h2>
           <Button variant="ghost" size="sm" icon="arrow" onClick={() => go('diary')}>All</Button>
         </div>
-        {data.recentDiaries.length === 0 ? (
+        {(data.recentDiaries ?? []).length === 0 ? (
           <EmptyBox icon="diary" title="Nothing written yet" hint="Your latest entries will gather here." />
         ) : (
           <ul className="recent__list">
-            {data.recentDiaries.map((d) => (
+            {(data.recentDiaries ?? []).map((d) => (
               <li key={d.id}>
                 <button className="recent__item" onClick={() => go('diary')}>
                   <span className="recent__date">{d.localDate}</span>
@@ -159,19 +161,20 @@ export function DiaryPage() {
   const [openTrades, setOpenTrades] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
+  const idem = api.useIdempotencyKey()
 
   function startEdit(d: Diary) {
     setEditing(d); setTitle(d.title); setContent(d.content); setDate(d.localDate)
     document.getElementById('diary-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
-  function reset() { setEditing(null); setTitle(''); setContent(''); setDate(todayISO()); setFormError('') }
+  function reset() { setEditing(null); setTitle(''); setContent(''); setDate(todayISO()); setFormError(''); idem.reset() }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setSaving(true); setFormError('')
     try {
       if (editing) await api.updateDiary(editing.id, date, title, content)
-      else await api.createDiary(date, title, content)
+      else await api.createDiary(date, title, content, idem.key())
       reset()
       await reload()
     } catch {
@@ -287,6 +290,7 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
   const [notes, setNotes] = useState('')
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
+  const idem = api.useIdempotencyKey()
 
   async function add(e: FormEvent) {
     e.preventDefault()
@@ -295,8 +299,9 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
       await api.createTransaction(diaryId, {
         symbol, side, quantity: Number(qty), price: Number(price), currency,
         tradedAt: new Date(tradedAt).toISOString(), notes,
-      })
+      }, idem.key())
       setSymbol(''); setQty(''); setPrice(''); setNotes('')
+      idem.reset()
       await reload()
     } catch {
       setFormError('Could not add the trade.')

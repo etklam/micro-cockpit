@@ -33,14 +33,14 @@ export function WatchlistPage() {
   const items = list.data?.items ?? []
   return <><PageHeader title="Watchlist" subtitle="Research before action" />
     <Card flush><form className="inline-form-wrap inline-form" onSubmit={add}><TextInput aria-label="Symbol" required maxLength={16} value={symbol} onChange={e => setSymbol(e.target.value)} placeholder="Symbol, e.g. NVDA" /><Button variant="primary" icon="plus" type="submit" loading={busy}>Watch</Button></form></Card>
-    <ListState loading={list.loading} error={list.error} empty={!items.length} retry={list.reload}><div className="research-layout"><ul className="compact-list">{items.map(item => <li key={item.stock.id}><Card className={selected?.stock.id === item.stock.id ? 'is-selected' : ''}><button className="row-main" onClick={() => setSelected(item)}><strong>{item.stock.symbol}</strong><span>{item.stock.name || item.note || 'Open research'}</span></button><IconButton icon="trash" label={`Remove ${item.stock.symbol}`} onClick={() => remove(item.stock.id)} /></Card></li>)}</ul>{selected ? <Research key={selected.stock.id} item={selected} /> : <Card><EmptyBox title="Choose a symbol" hint="Notes and its timeline will appear here." dense /></Card>}</div></ListState>
+    <ListState loading={list.loading} error={list.error} empty={!items.length} retry={list.reload}><div className="research-layout"><ul className="compact-list">{items.map(item => <li key={item.stock.id}><Card className={selected?.stock.id === item.stock.id ? 'is-selected' : ''}><button className="row-main" onClick={() => setSelected(item)}><strong>{item.stock.symbol}</strong><span>{item.stock.name || item.currentNote || 'Open research'}</span></button><IconButton icon="trash" label={`Remove ${item.stock.symbol}`} onClick={() => remove(item.stock.id)} /></Card></li>)}</ul>{selected ? <Research key={selected.stock.id} item={selected} /> : <Card><EmptyBox title="Choose a symbol" hint="Notes and its timeline will appear here." dense /></Card>}</div></ListState>
   </>
 }
 
 function Research({ item }: { item: WatchlistItem }) {
   const note = useAsync(() => api.getResearchNote(item.stock.id), [item.stock.id])
   const timeline = useAsync(() => api.getResearchTimeline(item.stock.id), [item.stock.id])
-  const [content, setContent] = useState(item.note ?? '')
+  const [content, setContent] = useState(item.currentNote ?? '')
   const [busy, setBusy] = useState(false)
   async function save(e: FormEvent) { e.preventDefault(); setBusy(true); try { await api.saveResearchNote(item.stock.id, content.trim()); note.reload(); timeline.reload() } finally { setBusy(false) } }
   return <Card className="research"><h2>{item.stock.symbol} research</h2><form onSubmit={save} className="stack"><Field label="Research note"><TextArea value={content} onChange={e => setContent(e.target.value)} placeholder="What changed your thesis?" /></Field><Button variant="primary" type="submit" loading={busy}>Save note</Button></form>
