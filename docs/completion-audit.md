@@ -20,6 +20,7 @@ Audit date: 2026-07-12. `PASS` means repository evidence or a recorded disposabl
 | Dependency degradation | `./tests/service-unavailable-degradation.sh` | PASS, optional Reminder degrades and required Journal returns 503 |
 | Backup and restore | custom dump restored into a disposable database | PASS, application tables verified and target removed |
 | Release log secret scan | Compose logs checked for configured credentials, bearer tokens and API keys | PASS, no matches |
+| Browser/device acceptance | Playwright at 1280×720 and 375×812 | PASS, login + 11 routes; no console/network/HTTP errors or horizontal overflow; keyboard focus advances |
 
 The concurrent Journal idempotency behavior has a committed smoke harness. It targets test-only direct service ports, while production Compose intentionally exposes only Edge and frontend, so a direct-port run is not counted as release evidence here.
 
@@ -33,7 +34,7 @@ The concurrent Journal idempotency behavior has a committed smoke harness. It ta
 | 3 Journal | PASS (repository) | CRUD/transactions/Quick Note/soft-delete/events/idempotency implemented, with concurrent replay/conflict harness committed. |
 | 4 Performance/calendar | PASS (repository + smoke) | Manual P/L, missing-is-null, aggregation, BFF and responsive calendar UI. |
 | 5 Discipline/reminder | PASS (repository + smoke) | Deterministic/random modes, recurrence, locked worker, deletion event, concurrency smoke. |
-| 6 v0.1 closure | PARTIAL | Full UI, deployment/backup/security docs and E2E harnesses exist; container, restore, degradation and log checks pass. Final browser/device acceptance remains. |
+| 6 v0.1 closure | PASS | Full UI, deployment/backup/security docs and E2E harnesses exist; container, restore, degradation, log and browser/device checks pass. |
 | 7 Stock Research | PASS (repository + smoke) | Stock-only directory, watchlist, mutable note, immutable timeline/corrections, UI. |
 | 8 Market Data | PASS (repository + smoke) | Admin ingestion, provider health, daily bars, approved versioned view. |
 | 9 Price Alert | PASS (repository + smoke) | Four conditions, worker, history, dismiss/reactivate, market-health fail-closed, UI. |
@@ -57,7 +58,7 @@ The concurrent Journal idempotency behavior has a committed smoke harness. It ta
 - PASS: all named product areas and core mobile loop are implemented.
 - PASS: no holdings, cost-basis, tax-lot, brokerage or portfolio-accounting engine exists.
 - PASS: cross-user 404 behavior is covered in core and later-service smoke scripts.
-- PARTIAL: browser/device visual and keyboard acceptance has not been recorded against the final Compose stack.
+- PASS: final Compose browser acceptance covers desktop/mobile login, all 11 navigable product pages, empty states, overflow, console/network failures and keyboard focus.
 
 ### Security and operations
 
@@ -66,7 +67,6 @@ The concurrent Journal idempotency behavior has a committed smoke harness. It ta
 
 ## Remaining release blockers
 
-1. Run final browser/mobile accessibility acceptance against the Compose stack.
-2. Optionally run the direct-service Journal concurrency harness under a test-only port override; production Compose intentionally keeps internal service ports private.
+None. The direct-service Journal concurrency harness remains an optional test-only check; production Compose intentionally keeps internal service ports private.
 
-Repository implementation and runtime release checks are complete. Visual/browser acceptance is the remaining manual release gate.
+Repository implementation, runtime release checks and browser/device acceptance are complete.
