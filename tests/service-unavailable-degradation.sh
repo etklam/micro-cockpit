@@ -14,7 +14,7 @@ login=$(curl -fsS -H 'Content-Type: application/json' \
 auth="Authorization: Bearer $(jq -er .accessToken <<<"$login")"
 
 docker compose stop reminder >/dev/null
-trap 'docker compose start reminder >/dev/null' EXIT
+trap 'docker compose start journal reminder >/dev/null' EXIT
 
 dashboard=$(curl -fsS -H "$auth" "$edge/api/app/dashboard")
 test "$(jq -r .capabilities.alerts <<<"$dashboard")" = unavailable
