@@ -150,8 +150,12 @@ app.MapDelete("/internal/diaries/{id:guid}", async (Guid id, HttpRequest request
     await using var command = new NpgsqlCommand("UPDATE journal.diaries SET deleted_at=now(),updated_at=now() WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL", connection, tx);
     command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(userId);
     if (await command.ExecuteNonQueryAsync() == 0) return Results.Problem("not_found", statusCode: 404);
-    await using var outbox = new NpgsqlCommand("INSERT INTO journal.outbox_events(event_id,event_type,event_version,payload) VALUES($1,'DiaryDeleted.v1',1,jsonb_build_object('diaryId',$2,'userId',$3))", connection, tx);
-    outbox.Parameters.AddWithValue(Guid.NewGuid()); outbox.Parameters.AddWithValue(id); outbox.Parameters.AddWithValue(userId);
+    var deleted = DiaryDeletedV1Envelope.Create(Guid.NewGuid(), id, userId);
+    await using var outbox = new NpgsqlCommand("INSERT INTO journal.outbox_events(event_id,event_type,event_version,payload) VALUES($1,$2,$3,$4::jsonb)", connection, tx);
+    outbox.Parameters.AddWithValue(deleted.EventId);
+    outbox.Parameters.AddWithValue(deleted.EventType);
+    outbox.Parameters.AddWithValue(deleted.Version);
+    outbox.Parameters.AddWithValue(JsonSerializer.Serialize(deleted.Payload, JsonSerializerOptions.Web));
     await outbox.ExecuteNonQueryAsync(); await tx.CommitAsync();
     return Results.NoContent();
 })
@@ -306,7 +310,27 @@ static async Task<StoredResult> Idempotent<T>(NpgsqlDataSource db, Guid userId, 
         """, connection, tx);
     save.Parameters.AddWithValue(userId); save.Parameters.AddWithValue(operation); save.Parameters.AddWithValue(key);
     save.Parameters.AddWithValue(result.StatusCode); save.Parameters.AddWithValue((object?)result.Location ?? DBNull.Value); save.Parameters.AddWithValue(result.Body.GetRawText());
-    await save.ExecuteNonQueryAsync(); await tx.CommitAsync(); return result;
+    await save.ExecuteNonQueryAsync();
+
+    // The response column is jsonb, which canonicalizes object-key order. Read the
+    // just-stored value back before returning so the owner and every replay use the
+    // exact same serialized shape, including under concurrent requests.
+    await using var stored = new NpgsqlCommand("""
+        SELECT status_code,location,response::text FROM journal.idempotency_keys
+        WHERE user_id=$1 AND operation=$2 AND idempotency_key=$3
+        """, connection, tx);
+    stored.Parameters.AddWithValue(userId); stored.Parameters.AddWithValue(operation); stored.Parameters.AddWithValue(key);
+    StoredResult storedResult;
+    await using (var storedReader = await stored.ExecuteReaderAsync())
+    {
+        await storedReader.ReadAsync();
+        storedResult = new StoredResult(
+            storedReader.GetInt32(0),
+            storedReader.IsDBNull(1) ? null : storedReader.GetString(1),
+            JsonSerializer.Deserialize<JsonElement>(storedReader.GetString(2)));
+    }
+    await tx.CommitAsync();
+    return storedResult;
 }
 
 // ponytail: camelCase so PascalCase response records serialize to the same camelCase keys as the anonymous projections they replace.
@@ -454,9 +478,13 @@ sealed class OutboxPublisher(NpgsqlDataSource db, IHttpClientFactory clients, IC
         while (await reader.ReadAsync(cancellationToken)) events.Add((reader.GetGuid(0), reader.GetString(1), reader.GetInt32(2), reader.GetString(3)));
         foreach (var item in events)
         {
+            if (item.Type != DiaryDeletedV1Envelope.Type || item.Version != DiaryDeletedV1Envelope.EventVersion) continue;
+            var payload = JsonSerializer.Deserialize<DiaryDeletedV1>(item.Payload, JsonSerializerOptions.Web)
+                ?? throw new JsonException("DiaryDeleted.v1 payload is required.");
+            var deleted = DiaryDeletedV1Envelope.Create(item.Id, payload.DiaryId, payload.UserId);
             using var request = new HttpRequestMessage(HttpMethod.Post, "/internal/events/diary-deleted");
             request.Headers.Add("X-Service-Key", configuration["Internal:ServiceKey"] ?? "local-service-key");
-            request.Content = JsonContent.Create(new { eventId = item.Id, eventType = item.Type, version = item.Version, payload = JsonSerializer.Deserialize<JsonElement>(item.Payload) });
+            request.Content = JsonContent.Create(deleted, options: JsonSerializerOptions.Web);
             using var response = await clients.CreateClient("reminder").SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode) continue;
             await using var mark = db.CreateCommand("UPDATE journal.outbox_events SET published_at=now() WHERE event_id=$1 AND published_at IS NULL");

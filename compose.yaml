@@ -66,7 +66,7 @@ services:
     environment:
       <<: *dotnet-env
       ConnectionStrings__Identity: Host=postgres;Database=trade_diary;Username=identity_service;Password=${IDENTITY_DB_PASSWORD:?set IDENTITY_DB_PASSWORD}
-      Auth__LocalRegistrationKey: ${LOCAL_REGISTRATION_KEY:-change-me-before-exposing}
+      Auth__LocalRegistrationKey: ${LOCAL_REGISTRATION_KEY:?set LOCAL_REGISTRATION_KEY}
       Jwt__Issuer: trade-diary-identity
       Jwt__Audience: trade-diary-services
       Jwt__PrivateKeyPath: /keys/signing-key.pem
@@ -85,7 +85,7 @@ services:
       ConnectionStrings__Journal: Host=postgres;Database=trade_diary;Username=journal_service;Password=${JOURNAL_DB_PASSWORD:?set JOURNAL_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
       Services__Reminder: http://reminder:8080
-      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:-change-me-before-exposing}
+      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
     depends_on:
       identity: { condition: service_healthy }
 
@@ -123,7 +123,7 @@ services:
       ConnectionStrings__Reminder: Host=postgres;Database=trade_diary;Username=reminder_service;Password=${REMINDER_DB_PASSWORD:?set REMINDER_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
       Services__Journal: http://journal:8080
-      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:-change-me-before-exposing}
+      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
     depends_on:
       identity: { condition: service_healthy }
       journal: { condition: service_healthy }
@@ -143,7 +143,7 @@ services:
     environment:
       <<: *dotnet-env
       ConnectionStrings__MarketData: Host=postgres;Database=trade_diary;Username=market_data_service;Password=${MARKET_DATA_DB_PASSWORD:?set MARKET_DATA_DB_PASSWORD}
-      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:-change-me-before-exposing}
+      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
     depends_on: { db-init: { condition: service_completed_successfully } }
 
   price-alert:

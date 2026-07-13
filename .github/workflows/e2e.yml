@@ -15,6 +15,9 @@ jobs:
       - name: Prepare .env from template (ephemeral E2E secrets)
         run: cp .env.example .env
 
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+
       - name: Build and start the full stack
         run: docker compose up -d --build --wait --wait-timeout 300
 
@@ -24,15 +27,37 @@ jobs:
           curl -fsS http://localhost:5099/health/ready
           curl -fsS http://localhost:8080/ >/dev/null
 
-      - name: Smoke tests (auth, idempotency, JWT ownership, degradation)
+      - name: Register ephemeral smoke user
         env:
+          EDGE_URL: http://127.0.0.1:5099
+          LOCAL_REGISTRATION_KEY: change-me-registration-key
+          TEST_EMAIL: owner@example.com
+          TEST_PASSWORD: correct-horse-battery-staple
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "X-Registration-Key: $LOCAL_REGISTRATION_KEY" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -nc --arg email "$TEST_EMAIL" --arg password "$TEST_PASSWORD" \
+              '{email:$email,password:$password,displayName:"E2E Owner",timezone:"UTC",baseCurrency:"USD"}')" \
+            "$EDGE_URL/api/auth/register")
+          test "$code" = 201 || test "$code" = 409
+
+      - name: Smoke tests (Edge auth, BFF, events, reminders, rotation, degradation)
+        env:
+          EDGE_URL: http://127.0.0.1:5099
           LOCAL_REGISTRATION_KEY: change-me-registration-key
           INTERNAL_SERVICE_KEY: change-me-internal-service-key
+          TEST_EMAIL: owner@example.com
+          TEST_PASSWORD: correct-horse-battery-staple
         run: |
+          set -a
+          source .env
+          set +a
           chmod +x tests/*.sh
           ./tests/smoke-auth.sh
           ./tests/smoke-journal-idempotency.sh
           ./tests/smoke-jwt-ownership.sh
+          ./tests/smoke-release-paths.sh
           ./tests/service-unavailable-degradation.sh
           ./tests/postgres-role-isolation.sh
 

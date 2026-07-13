@@ -19,6 +19,8 @@ var signingKey = new RsaSecurityKey(rsa) { KeyId = SigningKeyIdentity.GetKeyId(r
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(
     builder.Configuration.GetConnectionString("Identity") ??
     "Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
+builder.Services.AddSingleton(new RefreshTokenFamilyOptions(signingKey, issuer, audience));
+builder.Services.AddSingleton<RefreshTokenFamily>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
     options.MapInboundClaims = false;
@@ -105,7 +107,7 @@ app.MapPost("/internal/auth/register", async (RegisterRequest input, HttpRequest
 })
 .Produces<RegisterResponse>(201).ProducesProblem(400).ProducesProblem(404).ProducesProblem(409);
 
-app.MapPost("/internal/auth/login", async (LoginRequest input, NpgsqlDataSource db) =>
+app.MapPost("/internal/auth/login", async (LoginRequest input, NpgsqlDataSource db, RefreshTokenFamily refreshTokens) =>
 {
     await using var command = db.CreateCommand("""
         SELECT u.id,u.email,u.display_name,u.timezone,u.base_currency,u.role,u.account_type,u.status,u.status_version,
@@ -119,55 +121,22 @@ app.MapPost("/internal/auth/login", async (LoginRequest input, NpgsqlDataSource 
     if (!CryptographicOperations.FixedTimeEquals(candidate, (byte[])reader[10]) || reader.GetString(7) != "active") return Results.Unauthorized();
     var user = ReadUser(reader);
     await reader.CloseAsync();
-    return Results.Ok(await CreateTokenPair(db, user, Guid.NewGuid(), signingKey, issuer, audience));
+    return Results.Ok(await refreshTokens.IssueAsync(user, Guid.NewGuid()));
 })
 .Produces<AuthTokens>(200).ProducesProblem(401);
 
-app.MapPost("/internal/auth/refresh", async (RefreshRequest input, NpgsqlDataSource db) =>
+app.MapPost("/internal/auth/refresh", async (RefreshRequest input, RefreshTokenFamily refreshTokens) =>
 {
-    byte[] supplied;
-    try { supplied = Convert.FromBase64String(input.RefreshToken); }
-    catch { return Results.Unauthorized(); }
-    var tokenHash = SHA256.HashData(supplied);
-    await using var connection = await db.OpenConnectionAsync();
-    await using var transaction = await connection.BeginTransactionAsync();
-    await using var command = new NpgsqlCommand("""
-        SELECT r.id,r.user_id,r.family_id,r.expires_at,r.used_at,r.revoked_at,
-               u.email,u.display_name,u.timezone,u.base_currency,u.role,u.account_type,u.status,u.status_version
-        FROM identity.refresh_tokens r JOIN identity.users u ON u.id=r.user_id
-        WHERE r.token_hash=$1 FOR UPDATE
-        """, connection, transaction);
-    command.Parameters.AddWithValue(tokenHash);
-    await using var reader = await command.ExecuteReaderAsync();
-    if (!await reader.ReadAsync()) return Results.Unauthorized();
-    var tokenId = reader.GetGuid(0); var familyId = reader.GetGuid(2);
-    var invalid = reader.GetDateTime(3) <= DateTime.UtcNow || !reader.IsDBNull(4) || !reader.IsDBNull(5) || reader.GetString(12) != "active";
-    var user = new AuthUser(reader.GetGuid(1), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetString(9), reader.GetString(10), reader.GetString(11), reader.GetString(12), reader.GetInt32(13));
-    await reader.CloseAsync();
-    if (invalid)
-    {
-        await using var revoke = new NpgsqlCommand("UPDATE identity.refresh_tokens SET revoked_at=coalesce(revoked_at,now()) WHERE family_id=$1", connection, transaction);
-        revoke.Parameters.AddWithValue(familyId); await revoke.ExecuteNonQueryAsync(); await transaction.CommitAsync();
-        return Results.Unauthorized();
-    }
-    await using var use = new NpgsqlCommand("UPDATE identity.refresh_tokens SET used_at=now() WHERE id=$1", connection, transaction);
-    use.Parameters.AddWithValue(tokenId); await use.ExecuteNonQueryAsync(); await transaction.CommitAsync();
-    return Results.Ok(await CreateTokenPair(db, user, familyId, signingKey, issuer, audience));
+    var result = await refreshTokens.RotateAsync(input.RefreshToken);
+    return result.Status == RefreshTokenRotationStatus.Rotated
+        ? Results.Ok(result.Tokens)
+        : Results.Unauthorized();
 })
 .Produces<AuthTokens>(200).ProducesProblem(401);
 
-app.MapPost("/internal/auth/logout", async (RefreshRequest input, NpgsqlDataSource db) =>
+app.MapPost("/internal/auth/logout", async (RefreshRequest input, RefreshTokenFamily refreshTokens) =>
 {
-    try
-    {
-        var hash = SHA256.HashData(Convert.FromBase64String(input.RefreshToken));
-        await using var command = db.CreateCommand("""
-            UPDATE identity.refresh_tokens SET revoked_at=coalesce(revoked_at,now())
-            WHERE family_id=(SELECT family_id FROM identity.refresh_tokens WHERE token_hash=$1)
-            """);
-        command.Parameters.AddWithValue(hash); await command.ExecuteNonQueryAsync();
-    }
-    catch { }
+    await refreshTokens.RevokeFamilyAsync(input.RefreshToken);
     return Results.NoContent();
 })
 .Produces(204);
@@ -196,7 +165,7 @@ app.MapPost("/internal/auth/api-key/token", async (ApiKeyTokenRequest input, Npg
         FROM identity.api_keys k JOIN identity.users u ON u.id=k.user_id
         WHERE k.key_hash=$1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at>now()) AND u.status='active'
         """); command.Parameters.AddWithValue(SHA256.HashData(raw)); await using var reader = await command.ExecuteReaderAsync(); if (!await reader.ReadAsync()) return Results.Unauthorized();
-    var user = ReadUser(reader); var scopes = reader.GetFieldValue<string[]>(9); return Results.Ok(new ApiKeyTokenResponse(CreateAccessToken(user, signingKey, issuer, audience, scopes), DateTime.UtcNow.AddMinutes(15)));
+    var user = ReadUser(reader); var scopes = reader.GetFieldValue<string[]>(9); return Results.Ok(new ApiKeyTokenResponse(IdentityAccessTokenIssuer.Create(user, signingKey, issuer, audience, scopes), DateTime.UtcNow.AddMinutes(15)));
 })
 .AllowAnonymous()
 .Produces<ApiKeyTokenResponse>(200).ProducesProblem(401);
@@ -232,30 +201,6 @@ static RSA LoadSigningKey(string? path)
     if (File.Exists(path)) { rsa.ImportFromPem(File.ReadAllText(path)); return rsa; }
     rsa.KeySize = 3072; Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ".");
     File.WriteAllText(path, rsa.ExportRSAPrivateKeyPem()); return rsa;
-}
-
-static async Task<AuthTokens> CreateTokenPair(NpgsqlDataSource db, AuthUser user, Guid familyId, SecurityKey key, string issuer, string audience)
-{
-    var now = DateTime.UtcNow;
-    var accessToken = CreateAccessToken(user, key, issuer, audience, []);
-    var refreshBytes = RandomNumberGenerator.GetBytes(32);
-    await using var command = db.CreateCommand("INSERT INTO identity.refresh_tokens (id,user_id,family_id,token_hash,expires_at) VALUES ($1,$2,$3,$4,$5)");
-    command.Parameters.AddWithValue(Guid.NewGuid()); command.Parameters.AddWithValue(user.Id); command.Parameters.AddWithValue(familyId);
-    command.Parameters.AddWithValue(SHA256.HashData(refreshBytes)); command.Parameters.AddWithValue(now.AddDays(30));
-    await command.ExecuteNonQueryAsync();
-    return new AuthTokens(accessToken, now.AddMinutes(15), Convert.ToBase64String(refreshBytes));
-}
-
-static string CreateAccessToken(AuthUser user, SecurityKey key, string issuer, string audience, IReadOnlyCollection<string> scopes)
-{
-    var now = DateTime.UtcNow;
-    var claims = new[] {
-        new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()), new Claim(JwtRegisteredClaimNames.Email, user.Email),
-        new Claim(ClaimTypes.Role, user.Role), new Claim("account_type", user.AccountType), new Claim("status_version", user.StatusVersion.ToString()),
-        new Claim("timezone", user.Timezone), new Claim("base_currency", user.BaseCurrency.Trim())
-    }.Concat(scopes.Select(scope => new Claim("scope", scope)));
-    var jwt = new JwtSecurityToken(issuer, audience, claims, now, now.AddMinutes(15), new SigningCredentials(key, SecurityAlgorithms.RsaSha256));
-    return new JwtSecurityTokenHandler().WriteToken(jwt);
 }
 
 record RegisterRequest(string Email, string Password, string DisplayName, string Timezone, string BaseCurrency);

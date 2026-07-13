@@ -23,7 +23,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     options.RequireHttpsMetadata = false; // ponytail: local compose only; production config must use HTTPS.
     options.Audience = "trade-diary-services";
 });
-builder.Services.AddAuthorization(options => options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddSingleton<IAuthorizationHandler, ServiceKeyAuthorizationHandler>();
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+    options.AddPolicy(ReminderAuthorizationPolicies.ServiceKey, policy => policy.AddRequirements(new ServiceKeyRequirement()));
+});
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<SecuritySchemesTransformer>();
@@ -36,22 +41,14 @@ app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAn
 app.MapGet("/health/ready", async (NpgsqlDataSource db) => { try { await db.OpenConnectionAsync(); return Results.Ok(new { status = "ready" }); } catch { return Results.Json(new { status = "not_ready" }, statusCode: 503); } }).AllowAnonymous();
 app.MapGet("/version", () => Results.Ok(new { service = "reminder-service", version = "0.1.0" })).AllowAnonymous();
 
-app.MapPost("/internal/events/diary-deleted", async (DiaryDeletedEvent input, HttpRequest request, NpgsqlDataSource db, IConfiguration configuration) =>
+app.MapPost("/internal/events/diary-deleted", async (DiaryDeletedV1Envelope? input, NpgsqlDataSource db) =>
 {
-    if (!ValidServiceKey(request.Headers["X-Service-Key"].ToString(), configuration["Internal:ServiceKey"] ?? "local-service-key")) return Results.Unauthorized();
-    if (input.EventId == Guid.Empty || input.EventType != "DiaryDeleted.v1" || input.Version != 1 || input.Payload.DiaryId == Guid.Empty || input.Payload.UserId == Guid.Empty)
+    if (!DiaryDeletedHandler.IsValid(input))
         return Results.Problem("invalid_event", statusCode: 400);
-    await using var connection = await db.OpenConnectionAsync(); await using var tx = await connection.BeginTransactionAsync();
-    await using var inbox = new NpgsqlCommand("INSERT INTO reminder.inbox_events(event_id,event_type,event_version,payload) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT DO NOTHING", connection, tx);
-    inbox.Parameters.AddWithValue(input.EventId); inbox.Parameters.AddWithValue(input.EventType); inbox.Parameters.AddWithValue(input.Version);
-    inbox.Parameters.AddWithValue(System.Text.Json.JsonSerializer.Serialize(input.Payload));
-    if (await inbox.ExecuteNonQueryAsync() == 0) { await tx.CommitAsync(); return Results.NoContent(); }
-    await using var expire = new NpgsqlCommand("UPDATE reminder.diary_alerts SET status='expired',next_local_date=NULL,next_trigger_at=NULL,updated_at=now() WHERE diary_id=$1 AND user_id=$2 AND status='active'", connection, tx);
-    expire.Parameters.AddWithValue(input.Payload.DiaryId); expire.Parameters.AddWithValue(input.Payload.UserId); await expire.ExecuteNonQueryAsync();
-    await using var processed = new NpgsqlCommand("UPDATE reminder.inbox_events SET processed_at=now() WHERE event_id=$1", connection, tx);
-    processed.Parameters.AddWithValue(input.EventId); await processed.ExecuteNonQueryAsync(); await tx.CommitAsync();
+    await DiaryDeletedHandler.ProcessAsync(db, input!);
     return Results.NoContent();
-}).AllowAnonymous()
+})
+.RequireAuthorization(ReminderAuthorizationPolicies.ServiceKey)
 .Produces(204).ProducesProblem(400).ProducesProblem(401);
 
 app.MapGet("/internal/diary-alerts", async (HttpRequest request, NpgsqlDataSource db) =>
@@ -150,24 +147,16 @@ app.MapGet("/internal/diary-alerts/day-summaries", async (DateOnly from, DateOnl
 .Produces<CollectionResponse<DayCountResponse>>(200).ProducesProblem(400).ProducesProblem(401);
 
 app.MapPost("/internal/worker/run", async (NpgsqlDataSource db, IReminderDeliveryChannel delivery) => Results.Ok(new WorkerRunResult(await ReminderEngine.RunWorker(db, delivery, 50))))
+.RequireAuthorization()
 .Produces<WorkerRunResult>(200);
 
 app.Run();
 
 static bool TryUser(HttpRequest request, out Guid userId) => Guid.TryParse(request.HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out userId);
-static bool ValidServiceKey(string supplied, string expected)
-{
-    var left = Encoding.UTF8.GetBytes(supplied); var right = Encoding.UTF8.GetBytes(expected);
-    return left.Length == right.Length && CryptographicOperations.FixedTimeEquals(left, right);
-}
 static Schedule BuildSchedule(DiaryAlertWrite input)
 {
-    if (input.RepeatMode is not ("none" or "week" or "month")) return new(null, input.StartLocalDate, null, "invalid_repeat_mode");
-    TimeZoneInfo timezone; try { timezone = TimeZoneInfo.FindSystemTimeZoneById(input.Timezone); } catch { return new(null, input.StartLocalDate, null, "invalid_timezone"); }
-    var end = input.RepeatMode switch { "week" => input.StartLocalDate.AddDays(((int)DayOfWeek.Friday - (int)input.StartLocalDate.DayOfWeek + 7) % 7), "month" => new DateOnly(input.StartLocalDate.Year, input.StartLocalDate.Month, 1).AddMonths(1).AddDays(-1), _ => input.StartLocalDate };
-    var first = ReminderEngine.NextWeekday(input.StartLocalDate, end); if (first is null) return new(null, end, null, null);
-    var local = first.Value.ToDateTime(input.LocalTime); if (timezone.IsInvalidTime(local)) return new(null, end, null, "invalid_local_time");
-    return new(first, end, TimeZoneInfo.ConvertTimeToUtc(local, timezone), null);
+    var decision = DiaryAlertSchedule.Create(input.StartLocalDate, input.LocalTime, input.Timezone, input.RepeatMode);
+    return new(decision.NextLocalDate, decision.RecurrenceEndLocalDate, decision.NextUtcTrigger, decision.Error);
 }
 static void AddScheduleParameters(NpgsqlCommand command, DiaryAlertWrite input, Schedule schedule)
 {
@@ -182,8 +171,6 @@ record DiaryAlertWrite(Guid DiaryId, DateOnly StartLocalDate, TimeOnly LocalTime
 record Schedule(DateOnly? NextDate, DateOnly EndDate, DateTime? NextUtc, string? Error);
 record Due(Guid Id, Guid DiaryId, Guid UserId, DateOnly LocalDate, TimeOnly LocalTime, string Timezone, string RepeatMode, DateOnly EndDate, DateTime ScheduledFor);
 record DiaryAlertResponse(Guid Id,Guid DiaryId,DateOnly StartLocalDate,DateOnly? NextLocalDate,TimeOnly LocalTime,string Timezone,string RepeatMode,DateOnly RecurrenceEndLocalDate,DateTime? NextTriggerAt,string Status,DateTime CreatedAt,DateTime UpdatedAt);
-record DiaryDeletedEvent(Guid EventId, string EventType, int Version, DiaryDeletedPayload Payload);
-record DiaryDeletedPayload(Guid DiaryId, Guid UserId);
 record CollectionResponse<T>(List<T> Items);
 record DaySummaryResponse(DateOnly Date, long Count);
 record DayCountResponse(DateOnly LocalDate, long Count);
@@ -191,27 +178,15 @@ record WorkerRunResult(int Delivered);
 
 // Reusable reminder business logic. Lives in a named static class (not a top-level local function) so both the
 // /internal/worker/run endpoint and the ReminderWorker hosted service can call it: C# forbids sibling types from
-// calling top-level local functions (CS8801). Algorithm/SQL unchanged from the previous inline version.
+// calling top-level local functions (CS8801).
 public static class ReminderEngine
 {
-    public static DateOnly? NextWeekday(DateOnly candidate, DateOnly end)
-    {
-        while (candidate <= end && candidate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) candidate = candidate.AddDays(1);
-        return candidate <= end ? candidate : null;
-    }
+    public static DateOnly? NextWeekday(DateOnly candidate, DateOnly end) => DiaryAlertSchedule.NextWeekday(candidate, end);
 
     public static (DateOnly? LocalDate, DateTime? Utc) CalculateNextOccurrence(DateOnly currentDate, TimeOnly localTime, string timezoneId, string repeatMode, DateOnly endDate)
     {
-        if (repeatMode == "none") return (null, null);
-        var timezone = TimeZoneInfo.FindSystemTimeZoneById(timezoneId);
-        var candidate = NextWeekday(currentDate.AddDays(1), endDate);
-        while (candidate is not null)
-        {
-            var local = candidate.Value.ToDateTime(localTime);
-            if (!timezone.IsInvalidTime(local)) return (candidate, TimeZoneInfo.ConvertTimeToUtc(local, timezone));
-            candidate = NextWeekday(candidate.Value.AddDays(1), endDate);
-        }
-        return (null, null);
+        var decision = DiaryAlertSchedule.Advance(currentDate, localTime, timezoneId, repeatMode, endDate);
+        return (decision.NextLocalDate, decision.NextUtcTrigger);
     }
 
     // Claims due diary_alerts with FOR UPDATE SKIP LOCKED (multi-instance safe), delivers each reminder through the
@@ -327,10 +302,7 @@ sealed class SecurityRequirementTransformer : IOpenApiOperationTransformer
     {
         var metadata = context.Description.ActionDescriptor.EndpointMetadata;
         if (metadata.OfType<AllowAnonymousAttribute>().Any()) return Task.CompletedTask;
-        var path = "/" + (context.Description.RelativePath ?? string.Empty);
-        var scheme = path.Contains("/internal/admin/", StringComparison.Ordinal)
-                     || path.Contains("/internal/worker/", StringComparison.Ordinal)
-                     || path.Contains("/internal/events/", StringComparison.Ordinal)
+        var scheme = metadata.OfType<IAuthorizeData>().Any(data => data.Policy == ReminderAuthorizationPolicies.ServiceKey)
             ? "serviceKey" : "bearerAuth";
         operation.Security ??= new List<OpenApiSecurityRequirement>();
         operation.Security.Add(new OpenApiSecurityRequirement
@@ -338,5 +310,35 @@ sealed class SecurityRequirementTransformer : IOpenApiOperationTransformer
             [new OpenApiSecuritySchemeReference(scheme, context.Document)] = new List<string>()
         });
         return Task.CompletedTask;
+    }
+}
+
+static class ReminderAuthorizationPolicies
+{
+    public const string ServiceKey = "serviceKey";
+}
+
+sealed class ServiceKeyRequirement : IAuthorizationRequirement { }
+
+sealed class ServiceKeyAuthorizationHandler(IConfiguration configuration) : AuthorizationHandler<ServiceKeyRequirement>
+{
+    protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, ServiceKeyRequirement requirement)
+    {
+        if (context.Resource is HttpContext httpContext && ServiceKeyAuthorization.IsValid(
+                httpContext.Request.Headers["X-Service-Key"].ToString(),
+                configuration["Internal:ServiceKey"] ?? "local-service-key"))
+            context.Succeed(requirement);
+
+        return Task.CompletedTask;
+    }
+}
+
+static class ServiceKeyAuthorization
+{
+    public static bool IsValid(string supplied, string expected)
+    {
+        var left = Encoding.UTF8.GetBytes(supplied);
+        var right = Encoding.UTF8.GetBytes(expected);
+        return left.Length == right.Length && CryptographicOperations.FixedTimeEquals(left, right);
     }
 }

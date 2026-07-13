@@ -18,7 +18,7 @@ def snapshot(values):
 
 rows = {symbol: snapshot(values) for symbol, values in prices.items()}
 assert FORMULA_VERSION == "rotation-v1"
-source = Path(__file__).parents[1] / "services/rotation-service/src/TradeDiary.Rotation/Program.cs"
+source = Path(__file__).parents[1] / "services/rotation-service/src/TradeDiary.Rotation/Workers.cs"
 assert f'const string FormulaVersion = "{FORMULA_VERSION}"' in source.read_text()
 assert isclose(rows["SPY"][1], (300 / 290 - 1) * 100, rel_tol=1e-12)
 assert [x[0] for x in sorted(rows.items(), key=lambda x: x[1][1], reverse=True)] == ["XLK", "SPY", "XLE"]

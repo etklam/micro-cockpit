@@ -85,7 +85,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "serviceKey": []
+          }
+        ]
       }
     },
     "/internal/diary-alerts": {
@@ -494,7 +499,7 @@
         },
         "security": [
           {
-            "serviceKey": []
+            "bearerAuth": []
           }
         ]
       }

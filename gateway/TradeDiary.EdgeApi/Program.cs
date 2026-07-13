@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Routing;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +15,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     options.RequireHttpsMetadata = false; // ponytail: local compose only; production uses HTTPS.
     options.Audience = "trade-diary-services";
 });
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    ProxyHeaders.ConfigureForwardedHeaders(options, builder.Configuration));
 builder.Services.AddAuthorization(options => options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 var serviceDefaults = new Dictionary<string, string>
 {
@@ -29,6 +32,10 @@ foreach (var (service, fallback) in serviceDefaults)
 }
 var app = builder.Build();
 
+// Process proxy headers before scheme/host-dependent behavior (auth redirects and cookies).
+// ProxyHeaders clears ASP.NET's loopback defaults: forwarded headers are accepted only from
+// an explicitly configured reverse proxy.
+app.UseForwardedHeaders();
 app.Use(async (context, next) =>
 {
     var supplied = context.Request.Headers["X-Correlation-ID"].FirstOrDefault();
@@ -94,54 +101,20 @@ app.MapDelete("/api/app/api-keys/{id:guid}", async (Guid id, HttpContext context
 
 app.MapGet("/api/app/dashboard", async (HttpContext context, IHttpClientFactory clients) =>
 {
-    var localDate = UserLocalDate(context.User);
-    var from = localDate.ToString("yyyy-MM-dd");
-    var calls = new[]
-    {
-        Send(clients,"journal",$"/internal/diary-day-summary?from={from}&to={from}",context),
-        Send(clients,"journal","/internal/diaries",context),
-        Send(clients,"performance",$"/internal/performance/day/{from}",context),
-        Send(clients,"discipline",$"/internal/disciplines/today?date={from}",context),
-        Send(clients,"reminder",$"/internal/diary-alerts/day-summary?date={from}",context)
-    };
-    await Task.WhenAll(calls); var journalDay = calls[0].Result; var diaries = calls[1].Result; var performance = calls[2].Result; var discipline = calls[3].Result; var alerts = calls[4].Result;
-    if (journalDay.Status != 200 || diaries.Status != 200 || performance.Status is not (200 or 404)) return Results.Problem("Required dashboard service unavailable.", statusCode: 503);
-    if (discipline.Status is 401 or 403 || alerts.Status is 401 or 403) return Results.Problem("Downstream authorization failed.", statusCode: 503);
-    var day = journalDay.Body?["items"]?.AsArray().FirstOrDefault();
-    var recent = new JsonArray(diaries.Body?["items"]?.AsArray().Take(5).Select(x => x?.DeepClone()).ToArray() ?? []);
-    return Results.Ok(new JsonObject
-    {
-        ["localDate"] = from,
-        ["diary"] = new JsonObject { ["writtenToday"] = (day?["diaryCount"]?.GetValue<long>() ?? 0) > 0, ["count"] = day?["diaryCount"]?.DeepClone() ?? 0 },
-        ["performance"] = performance.Status == 404 ? null : performance.Body?.DeepClone(),
-        ["pendingAlerts"] = alerts.Status == 200 ? alerts.Body?["count"]?.DeepClone() : null,
-        ["discipline"] = discipline.Status == 200 ? discipline.Body?.DeepClone() : null,
-        ["recentDiaries"] = recent,
-        ["capabilities"] = new JsonObject { ["alerts"] = alerts.Status == 200 ? "available" : "unavailable", ["discipline"] = discipline.Status == 200 ? "available" : discipline.Status == 404 ? "empty" : "unavailable" }
-    });
+    var result = await CockpitReadModels.ReadDashboardAsync(
+        CockpitReadModels.ResolveLocalDate(context.User, DateTimeOffset.UtcNow),
+        (service, path) => Send(clients, service, path, context));
+    return result.ToHttpResult();
 });
 
 app.MapGet("/api/app/calendar", async (int year, int month, HttpContext context, IHttpClientFactory clients) =>
 {
-    if (month is < 1 or > 12) return Results.BadRequest(new { error = "invalid_month" });
-    var start = new DateOnly(year, month, 1); var end = start.AddMonths(1).AddDays(-1);
-    var from = start.ToString("yyyy-MM-dd"); var to = end.ToString("yyyy-MM-dd");
-    var journalTask = Send(clients,"journal",$"/internal/diary-day-summary?from={from}&to={to}",context);
-    var performanceTask = Send(clients,"performance",$"/internal/daily-performances?from={from}&to={to}",context);
-    var summaryTask = Send(clients,"performance",$"/internal/performance/month-summary?year={year}&month={month}",context);
-    var alertTask = Send(clients,"reminder",$"/internal/diary-alerts/day-summaries?from={from}&to={to}",context);
-    await Task.WhenAll(journalTask,performanceTask,summaryTask,alertTask);
-    var journal = journalTask.Result; var performance = performanceTask.Result; var summary = summaryTask.Result; var alerts = alertTask.Result;
-    if (journal.Status != 200 || performance.Status != 200 || summary.Status != 200) return Results.Problem("Required calendar service unavailable.", statusCode: 503);
-    if (alerts.Status is 401 or 403) return Results.Problem("Downstream authorization failed.", statusCode: 503);
-    var journalByDate = Index(journal.Body?["items"]); var performanceByDate = Index(performance.Body?["items"]); var alertByDate = Index(alerts.Body?["items"]);
-    var days = new JsonArray();
-    for (var date = start; date <= end; date = date.AddDays(1))
-    {
-        var key = date.ToString("yyyy-MM-dd"); journalByDate.TryGetValue(key, out var journalItem); performanceByDate.TryGetValue(key, out var performanceItem); alertByDate.TryGetValue(key, out var alertItem);
-        days.Add(new JsonObject { ["date"] = key, ["performance"] = performanceItem?.DeepClone(), ["diaryCount"] = journalItem?["diaryCount"]?.DeepClone() ?? 0, ["transactionCount"] = journalItem?["transactionCount"]?.DeepClone() ?? 0, ["alertCount"] = alerts.Status == 200 ? alertItem?["count"]?.DeepClone() ?? 0 : null });
-    }
-    return Results.Ok(new JsonObject { ["year"] = year, ["month"] = month, ["summary"] = summary.Body?.DeepClone(), ["days"] = days, ["capabilities"] = new JsonObject { ["alerts"] = alerts.Status == 200 ? "available" : "unavailable" } });
+    if (!CockpitReadModels.TryCreateCalendarWindow(year, month, out var window))
+        return Results.BadRequest(new { error = "invalid_month" });
+    var result = await CockpitReadModels.ReadCalendarAsync(
+        window,
+        (service, path) => Send(clients, service, path, context));
+    return result.ToHttpResult();
 });
 
 app.MapPost("/api/app/quick-note", async (JsonElement body, HttpContext context, IHttpClientFactory clients) =>
@@ -211,8 +184,8 @@ app.MapGet("/api/app/stocks/{symbol}/page", async (string symbol, HttpContext co
     var stockTask = Send(clients, "stock-research", $"/internal/stocks/{Uri.EscapeDataString(symbol)}", context);
     var barsTask = Send(clients, "market-data", $"/internal/v1/bars/{Uri.EscapeDataString(symbol)}{context.Request.QueryString}", context);
     await Task.WhenAll(stockTask, barsTask);
-    if (stockTask.Result.Status != 200) return Results.Content(stockTask.Result.Body?.ToJsonString() ?? "", "application/json", statusCode: stockTask.Result.Status);
-    return Results.Ok(new JsonObject { ["stock"] = stockTask.Result.Body?.DeepClone(), ["bars"] = barsTask.Result.Status == 200 ? barsTask.Result.Body?.DeepClone() : null, ["capabilities"] = new JsonObject { ["marketData"] = barsTask.Result.Status == 200 ? "available" : "unavailable" } });
+    if (stockTask.Result.StatusCode != 200) return Results.Content(stockTask.Result.Body?.ToJsonString() ?? "", "application/json", statusCode: stockTask.Result.StatusCode);
+    return Results.Ok(new JsonObject { ["stock"] = stockTask.Result.Body?.DeepClone(), ["bars"] = barsTask.Result.StatusCode == 200 ? barsTask.Result.Body?.DeepClone() : null, ["capabilities"] = new JsonObject { ["marketData"] = barsTask.Result.StatusCode == 200 ? "available" : "unavailable" } });
 });
 
 app.Run();
@@ -260,22 +233,20 @@ static void SetRefreshCookie(HttpContext context, string? refreshToken)
     {
         HttpOnly = true,
         SameSite = SameSiteMode.Lax,
-        Secure = context.Request.IsHttps,
+        Secure = ProxyHeaders.ShouldUseSecureRefreshCookie(context, context.RequestServices.GetRequiredService<IHostEnvironment>()),
         IsEssential = true,
         MaxAge = TimeSpan.FromDays(30),
         Path = "/api/auth"
     });
 }
 static void ClearRefreshCookie(HttpContext context) =>
-    context.Response.Cookies.Delete("td_refresh", new CookieOptions { Path = "/api/auth" });
+    context.Response.Cookies.Delete("td_refresh", new CookieOptions
+    {
+        Path = "/api/auth",
+        Secure = ProxyHeaders.ShouldUseSecureRefreshCookie(context, context.RequestServices.GetRequiredService<IHostEnvironment>())
+    });
 
-static DateOnly UserLocalDate(System.Security.Claims.ClaimsPrincipal user)
-{
-    var id = user.FindFirst("timezone")?.Value ?? "UTC"; TimeZoneInfo timezone;
-    try { timezone = TimeZoneInfo.FindSystemTimeZoneById(id); } catch { timezone = TimeZoneInfo.Utc; }
-    return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timezone));
-}
-static async Task<ServiceResult> Send(IHttpClientFactory clients, string service, string path, HttpContext context)
+static async Task<CockpitReadModels.DownstreamResponse> Send(IHttpClientFactory clients, string service, string path, HttpContext context)
 {
     try
     {
@@ -311,5 +282,3 @@ static async Task<IResult> ForwardNoBody(IHttpClientFactory clients, string serv
     }
     catch { return Results.Problem("Service unavailable.",statusCode:503); }
 }
-static Dictionary<string,JsonNode> Index(JsonNode? node) => node?.AsArray().Where(x => x?["localDate"] is not null).ToDictionary(x => x!["localDate"]!.GetValue<string>(),x => x!) ?? [];
-record ServiceResult(int Status, JsonNode? Body);
