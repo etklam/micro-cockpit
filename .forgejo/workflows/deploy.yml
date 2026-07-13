@@ -16,58 +16,52 @@ env:
 jobs:
   build-and-deploy:
     runs-on: hk
+    container:
+      image: docker:29
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Login to Forgejo Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.REGISTRY_USER }}
-          password: ${{ secrets.REGISTRY_TOKEN }}
+        run: |
+          echo "${{ secrets.REGISTRY_TOKEN }}" | docker login $REGISTRY -u ${{ secrets.REGISTRY_USER }} --password-stdin
 
       - name: Build and push all service images
         run: |
           set -e
-          SERVICES=(
-            "identity:services/identity-service/src/TradeDiary.Identity/Dockerfile"
-            "journal:services/journal-service/src/TradeDiary.Journal/Dockerfile"
-            "performance:services/performance-service/src/TradeDiary.Performance/Dockerfile"
-            "discipline:services/discipline-service/src/TradeDiary.Discipline/Dockerfile"
-            "reminder:services/reminder-service/src/TradeDiary.Reminder/Dockerfile"
-            "stock-research:services/stock-research-service/src/TradeDiary.StockResearch/Dockerfile"
-            "market-data:services/market-data-service/src/TradeDiary.MarketData/Dockerfile"
-            "price-alert:services/price-alert-service/src/TradeDiary.PriceAlert/Dockerfile"
-            "rotation:services/rotation-service/src/TradeDiary.Rotation/Dockerfile"
-            "partner:services/partner-service/src/TradeDiary.Partner/Dockerfile"
-            "content:services/content-service/src/TradeDiary.Content/Dockerfile"
-            "tool:services/tool-service/src/TradeDiary.Tool/Dockerfile"
-            "operations:services/operations-service/src/TradeDiary.Operations/Dockerfile"
-            "edge:gateway/TradeDiary.EdgeApi/Dockerfile"
-            "frontend:frontend/Dockerfile"
-          )
+
+          SERVICES="
+            identity:services/identity-service/src/TradeDiary.Identity/Dockerfile
+            journal:services/journal-service/src/TradeDiary.Journal/Dockerfile
+            performance:services/performance-service/src/TradeDiary.Performance/Dockerfile
+            discipline:services/discipline-service/src/TradeDiary.Discipline/Dockerfile
+            reminder:services/reminder-service/src/TradeDiary.Reminder/Dockerfile
+            stock-research:services/stock-research-service/src/TradeDiary.StockResearch/Dockerfile
+            market-data:services/market-data-service/src/TradeDiary.MarketData/Dockerfile
+            price-alert:services/price-alert-service/src/TradeDiary.PriceAlert/Dockerfile
+            rotation:services/rotation-service/src/TradeDiary.Rotation/Dockerfile
+            partner:services/partner-service/src/TradeDiary.Partner/Dockerfile
+            content:services/content-service/src/TradeDiary.Content/Dockerfile
+            tool:services/tool-service/src/TradeDiary.Tool/Dockerfile
+            operations:services/operations-service/src/TradeDiary.Operations/Dockerfile
+            edge:gateway/TradeDiary.EdgeApi/Dockerfile
+            frontend:frontend/Dockerfile
+          "
 
           IMAGE_BASE="${REGISTRY}/${REPO_OWNER}/${REPO_NAME}"
 
-          for entry in "${SERVICES[@]}"; do
-            NAME="${entry%%:*}"
-            DOCKERFILE="${entry##*:}"
+          echo "$SERVICES" | while IFS=: read -r NAME DOCKERFILE; do
+            [ -z "$NAME" ] && continue
+            [ -z "$DOCKERFILE" ] && continue
+
             FULL_IMAGE="${IMAGE_BASE}/${NAME}:latest"
-
-            echo "=== Building ${NAME} ==="
-            docker buildx build \
-              --platform linux/amd64 \
-              --no-cache \
-              -t "${FULL_IMAGE}" \
-              -f "${DOCKERFILE}" \
-              --push \
-              .
-
-            echo "=== Pushed ${FULL_IMAGE} ==="
+            echo "=== Building ${NAME} (${DOCKERFILE}) ==="
+            docker build --platform linux/amd64 -t "${FULL_IMAGE}" -f "${DOCKERFILE}" .
+            echo "=== Pushing ${FULL_IMAGE} ==="
+            docker push "${FULL_IMAGE}"
+            echo "=== Done ${NAME} ==="
           done
 
       - name: Deploy to K3s
@@ -81,12 +75,10 @@ jobs:
               ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} << 'EOF'
             set -e
 
-            # Restart all deployments in the namespace to pull fresh images
             for deploy in $(kubectl get deployments -n micro-cockpit -o name); do
               kubectl rollout restart $deploy -n micro-cockpit
             done
 
-            # Wait for all to be ready
             for deploy in $(kubectl get deployments -n micro-cockpit -o custom-columns=NAME:.metadata.name --no-headers); do
               echo "Waiting for ${deploy}..."
               kubectl rollout status deployment/${deploy} -n micro-cockpit --timeout=300s
