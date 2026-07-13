@@ -1,0 +1,97 @@
+name: build-and-deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: git.913555.xyz
+  REPO_OWNER: etklam
+  REPO_NAME: micro-cockpit
+  DEPLOY_HOST: 82.22.63.196
+  DEPLOY_USER: root
+  DEPLOY_NAMESPACE: micro-cockpit
+
+jobs:
+  build-and-deploy:
+    runs-on: hk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Forgejo Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
+
+      - name: Build and push all service images
+        run: |
+          set -e
+          SERVICES=(
+            "identity:services/identity-service/src/TradeDiary.Identity/Dockerfile"
+            "journal:services/journal-service/src/TradeDiary.Journal/Dockerfile"
+            "performance:services/performance-service/src/TradeDiary.Performance/Dockerfile"
+            "discipline:services/discipline-service/src/TradeDiary.Discipline/Dockerfile"
+            "reminder:services/reminder-service/src/TradeDiary.Reminder/Dockerfile"
+            "stock-research:services/stock-research-service/src/TradeDiary.StockResearch/Dockerfile"
+            "market-data:services/market-data-service/src/TradeDiary.MarketData/Dockerfile"
+            "price-alert:services/price-alert-service/src/TradeDiary.PriceAlert/Dockerfile"
+            "rotation:services/rotation-service/src/TradeDiary.Rotation/Dockerfile"
+            "partner:services/partner-service/src/TradeDiary.Partner/Dockerfile"
+            "content:services/content-service/src/TradeDiary.Content/Dockerfile"
+            "tool:services/tool-service/src/TradeDiary.Tool/Dockerfile"
+            "operations:services/operations-service/src/TradeDiary.Operations/Dockerfile"
+            "edge:gateway/TradeDiary.EdgeApi/Dockerfile"
+            "frontend:frontend/Dockerfile"
+          )
+
+          IMAGE_BASE="${REGISTRY}/${REPO_OWNER}/${REPO_NAME}"
+
+          for entry in "${SERVICES[@]}"; do
+            NAME="${entry%%:*}"
+            DOCKERFILE="${entry##*:}"
+            FULL_IMAGE="${IMAGE_BASE}/${NAME}:latest"
+
+            echo "=== Building ${NAME} ==="
+            docker buildx build \
+              --platform linux/amd64 \
+              --no-cache \
+              -t "${FULL_IMAGE}" \
+              -f "${DOCKERFILE}" \
+              --push \
+              .
+
+            echo "=== Pushed ${FULL_IMAGE} ==="
+          done
+
+      - name: Deploy to K3s
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          ssh -o StrictHostKeyChecking=no \
+              -i ~/.ssh/deploy_key \
+              ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} << 'EOF'
+            set -e
+
+            # Restart all deployments in the namespace to pull fresh images
+            for deploy in $(kubectl get deployments -n micro-cockpit -o name); do
+              kubectl rollout restart $deploy -n micro-cockpit
+            done
+
+            # Wait for all to be ready
+            for deploy in $(kubectl get deployments -n micro-cockpit -o custom-columns=NAME:.metadata.name --no-headers); do
+              echo "Waiting for ${deploy}..."
+              kubectl rollout status deployment/${deploy} -n micro-cockpit --timeout=300s
+            done
+
+            echo "=== All deployments rolled out ==="
+            kubectl get pods -n micro-cockpit
+          EOF

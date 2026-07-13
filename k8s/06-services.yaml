@@ -1,0 +1,894 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: identity
+  template:
+    metadata:
+      labels:
+        app: identity
+    spec:
+      containers:
+        - name: identity
+          image: git.913555.xyz/etklam/micro-cockpit/identity:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__Identity
+              value: "Host=postgres;Database=trade_diary;Username=identity_service;Password=MsqA58IFkz24HoBKDa49G1xI"
+            - name: Auth__LocalRegistrationKey
+              value: "j5qtH1iI4rBBHVPzbW6jHlTz3Nwc13bA"
+            - name: Jwt__Issuer
+              value: "trade-diary-identity"
+            - name: Jwt__Audience
+              value: "trade-diary-services"
+            - name: Jwt__PrivateKeyPath
+              value: "/keys/signing-key.pem"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: identity-keys
+              mountPath: /keys
+      volumes:
+        - name: identity-keys
+          persistentVolumeClaim:
+            claimName: identity-keys
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: identity
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: journal
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: journal
+  template:
+    metadata:
+      labels:
+        app: journal
+    spec:
+      containers:
+        - name: journal
+          image: git.913555.xyz/etklam/micro-cockpit/journal:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__Journal
+              value: "Host=postgres;Database=trade_diary;Username=journal_service;Password=hFaGEJp2ZwuyrjA4Ma6JS3NM"
+            - name: Auth__MetadataAddress
+              value: "http://identity:8080/.well-known/openid-configuration"
+            - name: Services__Reminder
+              value: "http://reminder:8080"
+            - name: Internal__ServiceKey
+              value: "EiO1Dihtkcm7MTbEnnuWJqTlWhOBVKy4"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: journal
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: journal
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: performance
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: performance
+  template:
+    metadata:
+      labels:
+        app: performance
+    spec:
+      containers:
+        - name: performance
+          image: git.913555.xyz/etklam/micro-cockpit/performance:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__Performance
+              value: "Host=postgres;Database=trade_diary;Username=performance_service;Password=EgOfCLoF7vtvSXy2lcLsWJ0e"
+            - name: Auth__MetadataAddress
+              value: "http://identity:8080/.well-known/openid-configuration"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: performance
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: performance
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discipline
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discipline
+  template:
+    metadata:
+      labels:
+        app: discipline
+    spec:
+      containers:
+        - name: discipline
+          image: git.913555.xyz/etklam/micro-cockpit/discipline:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__Discipline
+              value: "Host=postgres;Database=trade_diary;Username=discipline_service;Password=Z4jiZVOMVCEW9xiDJAIIgwER"
+            - name: Auth__MetadataAddress
+              value: "http://identity:8080/.well-known/openid-configuration"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discipline
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: discipline
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reminder
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reminder
+  template:
+    metadata:
+      labels:
+        app: reminder
+    spec:
+      containers:
+        - name: reminder
+          image: git.913555.xyz/etklam/micro-cockpit/reminder:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__Reminder
+              value: "Host=postgres;Database=trade_diary;Username=reminder_service;Password=OSXw8qnOANRqGsiUNAihprwv"
+            - name: Auth__MetadataAddress
+              value: "http://identity:8080/.well-known/openid-configuration"
+            - name: Services__Journal
+              value: "http://journal:8080"
+            - name: Internal__ServiceKey
+              value: "EiO1Dihtkcm7MTbEnnuWJqTlWhOBVKy4"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reminder
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: reminder
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stock-research
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stock-research
+  template:
+    metadata:
+      labels:
+        app: stock-research
+    spec:
+      containers:
+        - name: stock-research
+          image: git.913555.xyz/etklam/micro-cockpit/stock-research:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__StockResearch
+              value: "Host=postgres;Database=trade_diary;Username=stock_research_service;Password=e2QyS5DdViqymXbRP5OhFJY9"
+            - name: Auth__MetadataAddress
+              value: "http://identity:8080/.well-known/openid-configuration"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stock-research
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: stock-research
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: market-data
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: market-data
+  template:
+    metadata:
+      labels:
+        app: market-data
+    spec:
+      containers:
+        - name: market-data
+          image: git.913555.xyz/etklam/micro-cockpit/market-data:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__MarketData
+              value: "Host=postgres;Database=trade_diary;Username=market_data_service;Password=ZAdjlqM5Zw1tmFoomNJ5toCW"
+            - name: Internal__ServiceKey
+              value: "EiO1Dihtkcm7MTbEnnuWJqTlWhOBVKy4"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: market-data
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: market-data
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: price-alert
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: price-alert
+  template:
+    metadata:
+      labels:
+        app: price-alert
+    spec:
+      containers:
+        - name: price-alert
+          image: git.913555.xyz/etklam/micro-cockpit/price-alert:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__PriceAlert
+              value: "Host=postgres;Database=trade_diary;Username=price_alert_service;Password=VYi07wWfgRdywyoif6a6csEP"
+            - name: Auth__MetadataAddress
+              value: "http://identity:8080/.well-known/openid-configuration"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: price-alert
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: price-alert
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rotation
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rotation
+  template:
+    metadata:
+      labels:
+        app: rotation
+    spec:
+      containers:
+        - name: rotation
+          image: git.913555.xyz/etklam/micro-cockpit/rotation:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__Rotation
+              value: "Host=postgres;Database=trade_diary;Username=rotation_service;Password=jPbD3vjE2JkaJZ7cu7Vpen4D"
+            - name: Auth__MetadataAddress
+              value: "http://identity:8080/.well-known/openid-configuration"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rotation
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: rotation
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: partner
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: partner
+  template:
+    metadata:
+      labels:
+        app: partner
+    spec:
+      containers:
+        - name: partner
+          image: git.913555.xyz/etklam/micro-cockpit/partner:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__Partner
+              value: "Host=postgres;Database=trade_diary;Username=partner_service;Password=ZqgEhZ86csgr30CK7Ze7G9EZ"
+            - name: Auth__MetadataAddress
+              value: "http://identity:8080/.well-known/openid-configuration"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: partner
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: partner
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: content
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: content
+  template:
+    metadata:
+      labels:
+        app: content
+    spec:
+      containers:
+        - name: content
+          image: git.913555.xyz/etklam/micro-cockpit/content:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__Content
+              value: "Host=postgres;Database=trade_diary;Username=content_service;Password=z5qwVzCMYtUVl7skqMR7S5a6"
+            - name: Auth__MetadataAddress
+              value: "http://identity:8080/.well-known/openid-configuration"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: content
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: content
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tool
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tool
+  template:
+    metadata:
+      labels:
+        app: tool
+    spec:
+      containers:
+        - name: tool
+          image: git.913555.xyz/etklam/micro-cockpit/tool:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: Auth__MetadataAddress
+              value: "http://identity:8080/.well-known/openid-configuration"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tool
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: tool
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: operations
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: operations
+  template:
+    metadata:
+      labels:
+        app: operations
+    spec:
+      containers:
+        - name: operations
+          image: git.913555.xyz/etklam/micro-cockpit/operations:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__Operations
+              value: "Host=postgres;Database=trade_diary;Username=operations_service;Password=vyjefJhinMb6ZmJvJnnkgajG"
+            - name: Auth__MetadataAddress
+              value: "http://identity:8080/.well-known/openid-configuration"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: operations
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: operations
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: edge
+  template:
+    metadata:
+      labels:
+        app: edge
+    spec:
+      containers:
+        - name: edge
+          image: git.913555.xyz/etklam/micro-cockpit/edge:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: Auth__MetadataAddress
+              value: "http://identity:8080/.well-known/openid-configuration"
+            - name: Services__Identity
+              value: "http://identity:8080"
+            - name: Services__Journal
+              value: "http://journal:8080"
+            - name: Services__Performance
+              value: "http://performance:8080"
+            - name: Services__Discipline
+              value: "http://discipline:8080"
+            - name: Services__Reminder
+              value: "http://reminder:8080"
+            - name: Services__StockResearch
+              value: "http://stock-research:8080"
+            - name: Services__MarketData
+              value: "http://market-data:8080"
+            - name: Services__PriceAlert
+              value: "http://price-alert:8080"
+            - name: Services__Rotation
+              value: "http://rotation:8080"
+            - name: Services__Partner
+              value: "http://partner:8080"
+            - name: Services__Content
+              value: "http://content:8080"
+            - name: Services__Tool
+              value: "http://tool:8080"
+            - name: Services__Operations
+              value: "http://operations:8080"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: edge
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: micro-cockpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: git.913555.xyz/etklam/micro-cockpit/frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: micro-cockpit
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 8080
+      targetPort: 8080

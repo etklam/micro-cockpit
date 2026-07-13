@@ -1,0 +1,358 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-sql
+  namespace: micro-cockpit
+data:
+  001_schemas.sql: "CREATE SCHEMA IF NOT EXISTS journal;\nCREATE SCHEMA IF NOT EXISTS\
+    \ performance;\n\nCREATE TABLE IF NOT EXISTS journal.diaries (\n  id uuid PRIMARY\
+    \ KEY,\n  user_id uuid NOT NULL,\n  local_date date NOT NULL,\n  title text NOT\
+    \ NULL CHECK (length(trim(title)) > 0),\n  content text NOT NULL DEFAULT '',\n\
+    \  created_at timestamptz NOT NULL DEFAULT now(),\n  updated_at timestamptz NOT\
+    \ NULL DEFAULT now(),\n  deleted_at timestamptz\n);\nCREATE INDEX IF NOT EXISTS\
+    \ diaries_user_date_idx ON journal.diaries (user_id, local_date DESC) WHERE deleted_at\
+    \ IS NULL;\n\nCREATE TABLE IF NOT EXISTS journal.transactions (\n  id uuid PRIMARY\
+    \ KEY,\n  diary_id uuid NOT NULL REFERENCES journal.diaries(id),\n  user_id uuid\
+    \ NOT NULL,\n  symbol text NOT NULL,\n  side text NOT NULL CHECK (side IN ('buy',\
+    \ 'sell')),\n  quantity numeric(20,8) NOT NULL CHECK (quantity > 0),\n  price\
+    \ numeric(20,8) NOT NULL CHECK (price > 0),\n  traded_at timestamptz NOT NULL,\n\
+    \  created_at timestamptz NOT NULL DEFAULT now()\n);\n\nCREATE TABLE IF NOT EXISTS\
+    \ performance.daily_performances (\n  user_id uuid NOT NULL,\n  local_date date\
+    \ NOT NULL,\n  pnl_amount numeric(20,4) NOT NULL,\n  capital_base numeric(20,4)\
+    \ CHECK (capital_base > 0),\n  note text NOT NULL DEFAULT '',\n  updated_at timestamptz\
+    \ NOT NULL DEFAULT now(),\n  PRIMARY KEY (user_id, local_date)\n);\n"
+  002_identity.sql: "CREATE SCHEMA IF NOT EXISTS identity;\n\nCREATE TABLE IF NOT\
+    \ EXISTS identity.users (\n  id uuid PRIMARY KEY,\n  email text NOT NULL,\n  display_name\
+    \ text NOT NULL,\n  timezone text NOT NULL DEFAULT 'Asia/Taipei',\n  base_currency\
+    \ char(3) NOT NULL DEFAULT 'USD',\n  role text NOT NULL DEFAULT 'user',\n  account_type\
+    \ text NOT NULL DEFAULT 'human',\n  status text NOT NULL DEFAULT 'active',\n \
+    \ status_version integer NOT NULL DEFAULT 1,\n  created_at timestamptz NOT NULL\
+    \ DEFAULT now(),\n  UNIQUE (email)\n);\n\nCREATE TABLE IF NOT EXISTS identity.user_credentials\
+    \ (\n  user_id uuid PRIMARY KEY REFERENCES identity.users(id),\n  password_salt\
+    \ bytea NOT NULL,\n  password_hash bytea NOT NULL,\n  iterations integer NOT NULL\n\
+    );\n\nCREATE TABLE IF NOT EXISTS identity.refresh_tokens (\n  id uuid PRIMARY\
+    \ KEY,\n  user_id uuid NOT NULL REFERENCES identity.users(id),\n  family_id uuid\
+    \ NOT NULL,\n  token_hash bytea NOT NULL UNIQUE,\n  expires_at timestamptz NOT\
+    \ NULL,\n  used_at timestamptz,\n  revoked_at timestamptz,\n  created_at timestamptz\
+    \ NOT NULL DEFAULT now()\n);\nCREATE INDEX IF NOT EXISTS refresh_tokens_family_idx\
+    \ ON identity.refresh_tokens(family_id);\n"
+  003_transactions.sql: "ALTER TABLE journal.transactions\n  ADD COLUMN IF NOT EXISTS\
+    \ currency char(3) NOT NULL DEFAULT 'USD',\n  ADD COLUMN IF NOT EXISTS notes text\
+    \ NOT NULL DEFAULT '',\n  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT\
+    \ NULL DEFAULT now(),\n  ADD COLUMN IF NOT EXISTS deleted_at timestamptz;\nCREATE\
+    \ INDEX IF NOT EXISTS transactions_diary_idx ON journal.transactions(user_id,\
+    \ diary_id) WHERE deleted_at IS NULL;\n"
+  004_discipline.sql: "CREATE SCHEMA IF NOT EXISTS discipline;\nCREATE TABLE IF NOT\
+    \ EXISTS discipline.disciplines (\n  id uuid PRIMARY KEY,\n  user_id uuid NOT\
+    \ NULL,\n  content text NOT NULL CHECK (length(trim(content)) > 0),\n  position\
+    \ integer NOT NULL CHECK (position >= 0),\n  created_at timestamptz NOT NULL DEFAULT\
+    \ now(),\n  updated_at timestamptz NOT NULL DEFAULT now(),\n  CONSTRAINT disciplines_user_position_key\
+    \ UNIQUE(user_id, position) DEFERRABLE INITIALLY DEFERRED\n);\n"
+  005_reminder.sql: "CREATE SCHEMA IF NOT EXISTS reminder;\nCREATE TABLE IF NOT EXISTS\
+    \ reminder.diary_alerts (\n  id uuid PRIMARY KEY,\n  user_id uuid NOT NULL,\n\
+    \  diary_id uuid NOT NULL,\n  start_local_date date NOT NULL,\n  next_local_date\
+    \ date,\n  local_time time NOT NULL,\n  timezone text NOT NULL,\n  repeat_mode\
+    \ text NOT NULL CHECK (repeat_mode IN ('none','week','month')),\n  recurrence_end_local_date\
+    \ date NOT NULL,\n  next_trigger_at timestamptz,\n  status text NOT NULL CHECK\
+    \ (status IN ('active','dismissed','expired')),\n  created_at timestamptz NOT\
+    \ NULL DEFAULT now(),\n  updated_at timestamptz NOT NULL DEFAULT now()\n);\nCREATE\
+    \ INDEX IF NOT EXISTS diary_alerts_due_idx ON reminder.diary_alerts(next_trigger_at)\
+    \ WHERE status='active';\n\nCREATE TABLE IF NOT EXISTS reminder.reminder_delivery_attempts\
+    \ (\n  id uuid PRIMARY KEY,\n  diary_alert_id uuid NOT NULL REFERENCES reminder.diary_alerts(id),\n\
+    \  scheduled_for timestamptz NOT NULL,\n  claimed_at timestamptz NOT NULL DEFAULT\
+    \ now(),\n  delivered_at timestamptz,\n  status text NOT NULL CHECK (status IN\
+    \ ('claimed','delivered','failed')),\n  error text,\n  UNIQUE(diary_alert_id,\
+    \ scheduled_for)\n);\n\nCREATE TABLE IF NOT EXISTS reminder.inbox_events (\n \
+    \ event_id uuid PRIMARY KEY,\n  event_type text NOT NULL,\n  payload jsonb NOT\
+    \ NULL,\n  received_at timestamptz NOT NULL DEFAULT now(),\n  processed_at timestamptz\n\
+    );\nCREATE TABLE IF NOT EXISTS reminder.outbox_events (\n  event_id uuid PRIMARY\
+    \ KEY,\n  event_type text NOT NULL,\n  payload jsonb NOT NULL,\n  occurred_at\
+    \ timestamptz NOT NULL DEFAULT now(),\n  published_at timestamptz\n);\n"
+  006_diary_deleted_events.sql: "CREATE TABLE IF NOT EXISTS journal.outbox_events\
+    \ (\n  event_id uuid PRIMARY KEY,\n  event_type text NOT NULL,\n  event_version\
+    \ integer NOT NULL,\n  payload jsonb NOT NULL,\n  occurred_at timestamptz NOT\
+    \ NULL DEFAULT now(),\n  published_at timestamptz\n);\nCREATE INDEX IF NOT EXISTS\
+    \ journal_outbox_unpublished_idx ON journal.outbox_events(occurred_at) WHERE published_at\
+    \ IS NULL;\n\nALTER TABLE reminder.inbox_events ADD COLUMN IF NOT EXISTS event_version\
+    \ integer NOT NULL DEFAULT 1;\n"
+  007_market_data.sql: "CREATE SCHEMA IF NOT EXISTS market;\nCREATE SCHEMA IF NOT\
+    \ EXISTS market_data_public;\n\nCREATE TABLE market.symbols (\n  symbol text PRIMARY\
+    \ KEY,\n  name text NOT NULL,\n  exchange text NOT NULL,\n  currency text NOT\
+    \ NULL,\n  timezone text NOT NULL,\n  active boolean NOT NULL DEFAULT true,\n\
+    \  updated_at timestamptz NOT NULL DEFAULT now()\n);\nCREATE TABLE market.provider_runs\
+    \ (\n  id uuid PRIMARY KEY,\n  provider text NOT NULL,\n  started_at timestamptz\
+    \ NOT NULL,\n  completed_at timestamptz,\n  status text NOT NULL CHECK (status\
+    \ IN ('running','succeeded','failed')),\n  error text,\n  rows_received integer\
+    \ NOT NULL DEFAULT 0 CHECK (rows_received >= 0)\n);\nCREATE TABLE market.daily_bars\
+    \ (\n  symbol text NOT NULL REFERENCES market.symbols(symbol),\n  trading_date\
+    \ date NOT NULL,\n  open numeric(20,8) NOT NULL CHECK (open >= 0),\n  high numeric(20,8)\
+    \ NOT NULL CHECK (high >= 0),\n  low numeric(20,8) NOT NULL CHECK (low >= 0),\n\
+    \  close numeric(20,8) NOT NULL CHECK (close >= 0),\n  volume numeric(28,8) NOT\
+    \ NULL CHECK (volume >= 0),\n  provider text NOT NULL,\n  provider_run_id uuid\
+    \ NOT NULL REFERENCES market.provider_runs(id),\n  ingested_at timestamptz NOT\
+    \ NULL DEFAULT now(),\n  published_at timestamptz,\n  PRIMARY KEY(symbol,trading_date),\n\
+    \  CHECK (high >= greatest(open,low,close) AND low <= least(open,high,close))\n\
+    );\nCREATE INDEX market_daily_bars_published_idx ON market.daily_bars(symbol,trading_date\
+    \ DESC) WHERE published_at IS NOT NULL;\n\n-- Stable read contracts: consumers\
+    \ must use these, never staging tables.\nCREATE VIEW market.published_symbols_v1\
+    \ AS\nSELECT symbol,name,exchange,currency,timezone,active,updated_at FROM market.symbols\
+    \ WHERE active;\nCREATE VIEW market.published_daily_bars_v1 AS\nSELECT symbol,trading_date,open,high,low,close,volume,provider,published_at\n\
+    FROM market.daily_bars WHERE published_at IS NOT NULL;\nCREATE VIEW market_data_public.adjusted_daily_bars_v1\
+    \ AS\nSELECT symbol,trading_date AS trade_date,close AS adjusted_close,volume\n\
+    FROM market.daily_bars WHERE published_at IS NOT NULL;\nCREATE VIEW market.published_provider_health_v1\
+    \ AS\nSELECT p.provider,\n       coalesce(last_success.completed_at, '-infinity'::timestamptz)\
+    \ AS last_success_at,\n       (latest.status='succeeded' AND last_success.completed_at\
+    \ >= now() - interval '3 days') AS healthy\nFROM (SELECT DISTINCT provider FROM\
+    \ market.provider_runs) p\nLEFT JOIN LATERAL (\n  SELECT status FROM market.provider_runs\
+    \ r\n  WHERE r.provider=p.provider ORDER BY started_at DESC LIMIT 1\n) latest\
+    \ ON true\nLEFT JOIN LATERAL (\n  SELECT completed_at FROM market.provider_runs\
+    \ r\n  WHERE r.provider=p.provider AND r.status='succeeded'\n  ORDER BY completed_at\
+    \ DESC NULLS LAST LIMIT 1\n) last_success ON true;\n"
+  007_stock_research.sql: "CREATE SCHEMA IF NOT EXISTS stock_research;\n\nCREATE TABLE\
+    \ IF NOT EXISTS stock_research.stocks (\n  id uuid PRIMARY KEY,\n  symbol text\
+    \ NOT NULL UNIQUE CHECK (symbol = upper(symbol) AND length(trim(symbol)) > 0),\n\
+    \  name text NOT NULL CHECK (length(trim(name)) > 0),\n  exchange text NOT NULL\
+    \ DEFAULT '',\n  asset_type text NOT NULL DEFAULT 'stock' CHECK (asset_type =\
+    \ 'stock'),\n  created_at timestamptz NOT NULL DEFAULT now()\n);\n\nCREATE TABLE\
+    \ IF NOT EXISTS stock_research.watchlist_items (\n  user_id uuid NOT NULL,\n \
+    \ stock_id uuid NOT NULL REFERENCES stock_research.stocks(id),\n  created_at timestamptz\
+    \ NOT NULL DEFAULT now(),\n  PRIMARY KEY (user_id, stock_id)\n);\n\nCREATE TABLE\
+    \ IF NOT EXISTS stock_research.stock_notes (\n  user_id uuid NOT NULL,\n  stock_id\
+    \ uuid NOT NULL REFERENCES stock_research.stocks(id),\n  content text NOT NULL\
+    \ DEFAULT '',\n  created_at timestamptz NOT NULL DEFAULT now(),\n  updated_at\
+    \ timestamptz NOT NULL DEFAULT now(),\n  PRIMARY KEY (user_id, stock_id)\n);\n\
+    \nCREATE TABLE IF NOT EXISTS stock_research.stock_timeline_records (\n  id uuid\
+    \ PRIMARY KEY,\n  user_id uuid NOT NULL,\n  stock_id uuid NOT NULL REFERENCES\
+    \ stock_research.stocks(id),\n  event_time timestamptz NOT NULL,\n  source_type\
+    \ text NOT NULL CHECK (length(trim(source_type)) > 0),\n  title text NOT NULL\
+    \ CHECK (length(trim(title)) > 0),\n  content text NOT NULL CHECK (length(trim(content))\
+    \ > 0),\n  diary_id uuid,\n  correction_of_id uuid REFERENCES stock_research.stock_timeline_records(id),\n\
+    \  created_at timestamptz NOT NULL DEFAULT now(),\n  CHECK (correction_of_id IS\
+    \ NULL OR correction_of_id <> id)\n);\nCREATE INDEX IF NOT EXISTS stock_timeline_user_stock_event_idx\n\
+    \  ON stock_research.stock_timeline_records(user_id, stock_id, event_time DESC,\
+    \ id);\n\nCREATE OR REPLACE FUNCTION stock_research.reject_timeline_mutation()\
+    \ RETURNS trigger\nLANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'stock timeline\
+    \ records are immutable'; END $$;\nDROP TRIGGER IF EXISTS stock_timeline_immutable\
+    \ ON stock_research.stock_timeline_records;\nCREATE TRIGGER stock_timeline_immutable\
+    \ BEFORE UPDATE OR DELETE ON stock_research.stock_timeline_records\nFOR EACH ROW\
+    \ EXECUTE FUNCTION stock_research.reject_timeline_mutation();\n"
+  008_price_alert.sql: "CREATE SCHEMA IF NOT EXISTS price_alert;\nCREATE TABLE price_alert.alerts\
+    \ (\n  id uuid PRIMARY KEY,\n  user_id uuid NOT NULL,\n  symbol text NOT NULL,\n\
+    \  condition_type text NOT NULL CHECK (condition_type IN ('above','below','percent_change','ma_crossing')),\n\
+    \  threshold numeric(20,8) NOT NULL,\n  lookback_days integer,\n  direction text\
+    \ CHECK (direction IN ('above','below')),\n  status text NOT NULL CHECK (status\
+    \ IN ('active','triggered','dismissed')),\n  baseline_close numeric(20,8),\n \
+    \ last_evaluated_date date,\n  created_at timestamptz NOT NULL DEFAULT now(),\n\
+    \  updated_at timestamptz NOT NULL DEFAULT now(),\n  CHECK ((condition_type='percent_change'\
+    \ AND baseline_close IS NOT NULL AND baseline_close > 0) OR condition_type<>'percent_change'),\n\
+    \  CHECK ((condition_type='ma_crossing' AND lookback_days BETWEEN 2 AND 250 AND\
+    \ direction IS NOT NULL) OR condition_type<>'ma_crossing')\n);\nCREATE INDEX price_alert_active_idx\
+    \ ON price_alert.alerts(symbol) WHERE status='active';\nCREATE TABLE price_alert.triggers\
+    \ (\n  id uuid PRIMARY KEY,\n  alert_id uuid NOT NULL REFERENCES price_alert.alerts(id)\
+    \ ON DELETE CASCADE,\n  trading_date date NOT NULL,\n  observed_close numeric(20,8)\
+    \ NOT NULL,\n  triggered_at timestamptz NOT NULL DEFAULT now(),\n  dismissed_at\
+    \ timestamptz,\n  UNIQUE(alert_id,trading_date)\n);\n"
+  010_rotation.sql: "CREATE SCHEMA IF NOT EXISTS rotation;\n\nCREATE TABLE IF NOT\
+    \ EXISTS rotation.market_rotation_universes (\n  id uuid PRIMARY KEY,\n  code\
+    \ text NOT NULL UNIQUE CHECK (code ~ '^[A-Z0-9_-]+$'),\n  name text NOT NULL CHECK\
+    \ (length(trim(name)) > 0),\n  rank_scope text NOT NULL DEFAULT 'universe' CHECK\
+    \ (rank_scope IN ('universe','sector')),\n  created_at timestamptz NOT NULL DEFAULT\
+    \ now(),\n  updated_at timestamptz NOT NULL DEFAULT now()\n);\nCREATE TABLE IF\
+    \ NOT EXISTS rotation.market_rotation_universe_symbols (\n  universe_id uuid NOT\
+    \ NULL REFERENCES rotation.market_rotation_universes(id) ON DELETE CASCADE,\n\
+    \  symbol text NOT NULL CHECK (symbol ~ '^[A-Z0-9.-]+$'),\n  label text NOT NULL,\n\
+    \  sector text,\n  sort_order integer NOT NULL DEFAULT 0,\n  PRIMARY KEY (universe_id,\
+    \ symbol)\n);\nCREATE TABLE IF NOT EXISTS rotation.batch_runs (\n  id uuid PRIMARY\
+    \ KEY,\n  universe_id uuid NOT NULL REFERENCES rotation.market_rotation_universes(id)\
+    \ ON DELETE CASCADE,\n  snapshot_date date NOT NULL,\n  formula_version text NOT\
+    \ NULL,\n  status text NOT NULL CHECK (status IN ('running','completed','insufficient_data','failed')),\n\
+    \  source_max_date date,\n  started_at timestamptz NOT NULL DEFAULT now(),\n \
+    \ finished_at timestamptz,\n  error text,\n  UNIQUE (universe_id, snapshot_date,\
+    \ formula_version)\n);\nCREATE TABLE IF NOT EXISTS rotation.market_rotation_snapshots\
+    \ (\n  universe_id uuid NOT NULL REFERENCES rotation.market_rotation_universes(id)\
+    \ ON DELETE CASCADE,\n  snapshot_date date NOT NULL,\n  symbol text NOT NULL,\n\
+    \  rank_scope text NOT NULL,\n  sector text,\n  close numeric,\n  return_2w numeric,\n\
+    \  return_1m numeric,\n  return_3m numeric,\n  above_ma20 boolean,\n  above_ma50\
+    \ boolean,\n  above_ma200 boolean,\n  rank_2w integer,\n  percentile_2w numeric,\n\
+    \  status text NOT NULL CHECK (status IN ('ok','insufficient_data')),\n  formula_version\
+    \ text NOT NULL,\n  calculated_at timestamptz NOT NULL DEFAULT now(),\n  PRIMARY\
+    \ KEY (universe_id, snapshot_date, symbol)\n);\nCREATE INDEX IF NOT EXISTS rotation_snapshots_lookup_idx\
+    \ ON rotation.market_rotation_snapshots(universe_id,snapshot_date,rank_scope,rank_2w);\n\
+    CREATE TABLE IF NOT EXISTS rotation.sector_breadth_snapshots (\n  universe_id\
+    \ uuid NOT NULL REFERENCES rotation.market_rotation_universes(id) ON DELETE CASCADE,\n\
+    \  snapshot_date date NOT NULL,\n  sector text NOT NULL,\n  member_count integer\
+    \ NOT NULL,\n  available_count integer NOT NULL,\n  above_ma20_percent numeric,\n\
+    \  above_ma50_percent numeric,\n  above_ma200_percent numeric,\n  status text\
+    \ NOT NULL CHECK (status IN ('ok','insufficient_data')),\n  formula_version text\
+    \ NOT NULL,\n  calculated_at timestamptz NOT NULL DEFAULT now(),\n  PRIMARY KEY\
+    \ (universe_id, snapshot_date, sector)\n);\nCREATE TABLE IF NOT EXISTS rotation.market_state_snapshots\
+    \ (\n  universe_id uuid NOT NULL REFERENCES rotation.market_rotation_universes(id)\
+    \ ON DELETE CASCADE,\n  snapshot_date date NOT NULL,\n  state text,\n  breadth_percent\
+    \ numeric,\n  benchmark_symbol text,\n  benchmark_above_ma200 boolean,\n  status\
+    \ text NOT NULL CHECK (status IN ('ok','insufficient_data')),\n  formula_version\
+    \ text NOT NULL,\n  calculated_at timestamptz NOT NULL DEFAULT now(),\n  PRIMARY\
+    \ KEY (universe_id, snapshot_date)\n);\n"
+  020_phase11_12.sql: "CREATE SCHEMA IF NOT EXISTS partner;\nCREATE TABLE IF NOT EXISTS\
+    \ partner.partner_links (\n  id uuid PRIMARY KEY, requester_user_id uuid NOT NULL,\
+    \ partner_user_id uuid NOT NULL,\n  partner_type text NOT NULL CHECK(partner_type\
+    \ IN ('human','agent')),\n  status text NOT NULL CHECK(status IN ('pending','accepted','declined','revoked')),\n\
+    \  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL\
+    \ DEFAULT now(),\n  CHECK(requester_user_id <> partner_user_id), UNIQUE(requester_user_id,partner_user_id)\n\
+    );\nCREATE TABLE IF NOT EXISTS partner.partner_share_policies (\n  link_id uuid\
+    \ NOT NULL REFERENCES partner.partner_links(id) ON DELETE CASCADE,\n  owner_user_id\
+    \ uuid NOT NULL, share_diaries boolean NOT NULL DEFAULT false,\n  share_transactions\
+    \ boolean NOT NULL DEFAULT false, share_performance boolean NOT NULL DEFAULT false,\n\
+    \  updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(link_id,owner_user_id)\n\
+    );\n\nCREATE SCHEMA IF NOT EXISTS content;\nCREATE TABLE IF NOT EXISTS content.posts\
+    \ (\n  id uuid PRIMARY KEY, author_user_id uuid NOT NULL, slug text NOT NULL UNIQUE,\n\
+    \  title text NOT NULL, body text NOT NULL, status text NOT NULL CHECK(status\
+    \ IN ('draft','published','archived')),\n  published_at timestamptz, created_at\
+    \ timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT\
+    \ now()\n);\nCREATE TABLE IF NOT EXISTS content.post_tags(post_id uuid NOT NULL\
+    \ REFERENCES content.posts(id) ON DELETE CASCADE, tag text NOT NULL, PRIMARY KEY(post_id,tag));\n\
+    \nCREATE SCHEMA IF NOT EXISTS operations;\nCREATE TABLE IF NOT EXISTS operations.audit_events\
+    \ (\n  id uuid PRIMARY KEY, actor_user_id uuid, action text NOT NULL, resource_type\
+    \ text NOT NULL,\n  resource_id text, details jsonb NOT NULL DEFAULT '{}', occurred_at\
+    \ timestamptz NOT NULL DEFAULT now()\n);\nCREATE TABLE IF NOT EXISTS operations.job_registry\
+    \ (\n  id uuid PRIMARY KEY, job_type text NOT NULL, status text NOT NULL CHECK(status\
+    \ IN ('queued','running','succeeded','failed')),\n  requested_by uuid NOT NULL,\
+    \ payload jsonb NOT NULL DEFAULT '{}', result jsonb,\n  created_at timestamptz\
+    \ NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()\n);\n\
+    CREATE TABLE IF NOT EXISTS operations.service_health_history (\n  id uuid PRIMARY\
+    \ KEY, service_name text NOT NULL, status text NOT NULL, checked_at timestamptz\
+    \ NOT NULL DEFAULT now()\n);\n"
+  021_identity_api_keys.sql: "CREATE TABLE IF NOT EXISTS identity.api_keys (\n  id\
+    \ uuid PRIMARY KEY,\n  user_id uuid NOT NULL REFERENCES identity.users(id),\n\
+    \  created_by uuid NOT NULL REFERENCES identity.users(id),\n  name text NOT NULL,\n\
+    \  key_hash bytea NOT NULL UNIQUE,\n  scopes text[] NOT NULL DEFAULT '{}',\n \
+    \ expires_at timestamptz,\n  revoked_at timestamptz,\n  created_at timestamptz\
+    \ NOT NULL DEFAULT now()\n);\nCREATE INDEX IF NOT EXISTS api_keys_user_idx ON\
+    \ identity.api_keys(user_id) WHERE revoked_at IS NULL;\n"
+  022_journal_idempotency.sql: "CREATE TABLE IF NOT EXISTS journal.idempotency_keys\
+    \ (\n  user_id uuid NOT NULL,\n  operation text NOT NULL,\n  idempotency_key text\
+    \ NOT NULL CHECK (length(idempotency_key) BETWEEN 1 AND 200),\n  request_hash\
+    \ text NOT NULL,\n  status_code integer,\n  location text,\n  response jsonb,\n\
+    \  created_at timestamptz NOT NULL DEFAULT now(),\n  PRIMARY KEY (user_id, operation,\
+    \ idempotency_key)\n);\n"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-roles-sql
+  namespace: micro-cockpit
+data:
+  001_service_roles.sql: "-- Run as the database administrator after migrations. Passwords\
+    \ are applied by apply.sh.\nDO $roles$\nDECLARE role_name text;\nBEGIN\n  FOREACH\
+    \ role_name IN ARRAY ARRAY[\n    'trade_diary_migrator',\n    'identity_service','journal_service','performance_service','discipline_service',\n\
+    \    'reminder_service','market_data_service','price_alert_service','rotation_service',\n\
+    \    'stock_research_service','partner_service','content_service','operations_service'\n\
+    \  ] LOOP\n    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = role_name)\
+    \ THEN\n      EXECUTE format('CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE\
+    \ NOINHERIT', role_name);\n    ELSE\n      EXECUTE format('ALTER ROLE %I LOGIN\
+    \ NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT', role_name);\n    END IF;\n \
+    \ END LOOP;\nEND $roles$;\n\nREVOKE CREATE ON SCHEMA public FROM PUBLIC;\n\n--\
+    \ Migration ownership is deliberately separate from every runtime identity.\n\
+    DO $ownership$\nDECLARE schema_name text;\nDECLARE object_record record;\nBEGIN\n\
+    \  FOREACH schema_name IN ARRAY ARRAY[\n    'identity','journal','performance','discipline','reminder','market','market_data_public',\n\
+    \    'price_alert','rotation','stock_research','partner','content','operations'\n\
+    \  ] LOOP\n    EXECUTE format('ALTER SCHEMA %I OWNER TO trade_diary_migrator',\
+    \ schema_name);\n\n    FOR object_record IN\n      SELECT c.relkind, c.relname\n\
+    \      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace\n      WHERE\
+    \ n.nspname = schema_name AND c.relkind IN ('r','p','v','m','S','f')\n    LOOP\n\
+    \      EXECUTE format(\n        'ALTER %s %I.%I OWNER TO trade_diary_migrator',\n\
+    \        CASE object_record.relkind\n          WHEN 'S' THEN 'SEQUENCE'\n    \
+    \      WHEN 'v' THEN 'VIEW'\n          WHEN 'm' THEN 'MATERIALIZED VIEW'\n   \
+    \       WHEN 'f' THEN 'FOREIGN TABLE'\n          ELSE 'TABLE'\n        END,\n\
+    \        schema_name, object_record.relname\n      );\n    END LOOP;\n\n    FOR\
+    \ object_record IN\n      SELECT p.oid::regprocedure AS signature\n      FROM\
+    \ pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace\n      WHERE n.nspname\
+    \ = schema_name\n    LOOP\n      EXECUTE format('ALTER FUNCTION %s OWNER TO trade_diary_migrator',\
+    \ object_record.signature);\n    END LOOP;\n  END LOOP;\nEND $ownership$;\n\n\
+    -- Start from no runtime access, so re-running this file also removes accidental\
+    \ grants.\nDO $revoke$\nDECLARE role_name text;\nDECLARE schema_name text;\nBEGIN\n\
+    \  FOREACH role_name IN ARRAY ARRAY[\n    'identity_service','journal_service','performance_service','discipline_service',\n\
+    \    'reminder_service','market_data_service','price_alert_service','rotation_service',\n\
+    \    'stock_research_service','partner_service','content_service','operations_service'\n\
+    \  ] LOOP\n    FOREACH schema_name IN ARRAY ARRAY[\n      'identity','journal','performance','discipline','reminder','market','market_data_public',\n\
+    \      'price_alert','rotation','stock_research','partner','content','operations'\n\
+    \    ] LOOP\n      EXECUTE format('REVOKE ALL ON SCHEMA %I FROM %I', schema_name,\
+    \ role_name);\n      EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA %I FROM\
+    \ %I', schema_name, role_name);\n      EXECUTE format('REVOKE ALL ON ALL SEQUENCES\
+    \ IN SCHEMA %I FROM %I', schema_name, role_name);\n      EXECUTE format('REVOKE\
+    \ ALL ON ALL FUNCTIONS IN SCHEMA %I FROM %I', schema_name, role_name);\n    END\
+    \ LOOP;\n  END LOOP;\nEND $revoke$;\n\nGRANT USAGE ON SCHEMA identity TO identity_service;\n\
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA identity TO identity_service;\n\
+    GRANT USAGE ON SCHEMA journal TO journal_service;\nGRANT SELECT, INSERT, UPDATE,\
+    \ DELETE ON ALL TABLES IN SCHEMA journal TO journal_service;\nGRANT USAGE ON SCHEMA\
+    \ performance TO performance_service;\nGRANT SELECT, INSERT, UPDATE, DELETE ON\
+    \ ALL TABLES IN SCHEMA performance TO performance_service;\nGRANT USAGE ON SCHEMA\
+    \ discipline TO discipline_service;\nGRANT SELECT, INSERT, UPDATE, DELETE ON ALL\
+    \ TABLES IN SCHEMA discipline TO discipline_service;\nGRANT USAGE ON SCHEMA reminder\
+    \ TO reminder_service;\nGRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN\
+    \ SCHEMA reminder TO reminder_service;\nGRANT USAGE ON SCHEMA price_alert TO price_alert_service;\n\
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA price_alert TO price_alert_service;\n\
+    GRANT USAGE ON SCHEMA rotation TO rotation_service;\nGRANT SELECT, INSERT, UPDATE,\
+    \ DELETE ON ALL TABLES IN SCHEMA rotation TO rotation_service;\nGRANT USAGE ON\
+    \ SCHEMA stock_research TO stock_research_service;\nGRANT SELECT, INSERT, UPDATE,\
+    \ DELETE ON ALL TABLES IN SCHEMA stock_research TO stock_research_service;\nGRANT\
+    \ USAGE ON SCHEMA partner TO partner_service;\nGRANT SELECT, INSERT, UPDATE, DELETE\
+    \ ON ALL TABLES IN SCHEMA partner TO partner_service;\nGRANT USAGE ON SCHEMA content\
+    \ TO content_service;\nGRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA\
+    \ content TO content_service;\nGRANT USAGE ON SCHEMA operations TO operations_service;\n\
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA operations TO operations_service;\n\
+    \nGRANT USAGE ON SCHEMA market TO market_data_service;\nGRANT SELECT, INSERT,\
+    \ UPDATE, DELETE ON market.symbols, market.provider_runs, market.daily_bars TO\
+    \ market_data_service;\nGRANT SELECT ON market.published_symbols_v1, market.published_daily_bars_v1,\
+    \ market.published_provider_health_v1 TO market_data_service;\nGRANT USAGE ON\
+    \ SCHEMA market_data_public TO market_data_service;\nGRANT SELECT ON market_data_public.adjusted_daily_bars_v1\
+    \ TO market_data_service;\n\n-- Cross-service market access is view-only. No consumer\
+    \ gets access to market base tables.\nGRANT USAGE ON SCHEMA market TO price_alert_service;\n\
+    GRANT SELECT ON market.published_provider_health_v1 TO price_alert_service;\n\
+    GRANT USAGE ON SCHEMA market_data_public TO price_alert_service, rotation_service;\n\
+    GRANT SELECT ON market_data_public.adjusted_daily_bars_v1 TO price_alert_service,\
+    \ rotation_service;\n\n-- Future objects created by the migration owner inherit\
+    \ the same narrow runtime grants.\nALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator\
+    \ IN SCHEMA identity GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO identity_service;\n\
+    ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA journal GRANT\
+    \ SELECT,INSERT,UPDATE,DELETE ON TABLES TO journal_service;\nALTER DEFAULT PRIVILEGES\
+    \ FOR ROLE trade_diary_migrator IN SCHEMA performance GRANT SELECT,INSERT,UPDATE,DELETE\
+    \ ON TABLES TO performance_service;\nALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator\
+    \ IN SCHEMA discipline GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO discipline_service;\n\
+    ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA reminder GRANT\
+    \ SELECT,INSERT,UPDATE,DELETE ON TABLES TO reminder_service;\nALTER DEFAULT PRIVILEGES\
+    \ FOR ROLE trade_diary_migrator IN SCHEMA price_alert GRANT SELECT,INSERT,UPDATE,DELETE\
+    \ ON TABLES TO price_alert_service;\nALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator\
+    \ IN SCHEMA rotation GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO rotation_service;\n\
+    ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA stock_research\
+    \ GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO stock_research_service;\nALTER\
+    \ DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA partner GRANT SELECT,INSERT,UPDATE,DELETE\
+    \ ON TABLES TO partner_service;\nALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator\
+    \ IN SCHEMA content GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO content_service;\n\
+    ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA operations GRANT\
+    \ SELECT,INSERT,UPDATE,DELETE ON TABLES TO operations_service;\n"
+  002_passwords.sql: "-- Values are psql variables supplied from deployment environment\
+    \ by apply.sh.\nSELECT format('ALTER ROLE %I PASSWORD %L', role_name, password)\n\
+    FROM (VALUES\n  ('trade_diary_migrator', :'migrator_password'),\n  ('identity_service',\
+    \ :'identity_password'),\n  ('journal_service', :'journal_password'),\n  ('performance_service',\
+    \ :'performance_password'),\n  ('discipline_service', :'discipline_password'),\n\
+    \  ('reminder_service', :'reminder_password'),\n  ('market_data_service', :'market_data_password'),\n\
+    \  ('price_alert_service', :'price_alert_password'),\n  ('rotation_service', :'rotation_password'),\n\
+    \  ('stock_research_service', :'stock_research_password'),\n  ('partner_service',\
+    \ :'partner_password'),\n  ('content_service', :'content_password'),\n  ('operations_service',\
+    \ :'operations_password')\n) credentials(role_name, password)\n\\gexec\n"
+  apply.sh: "#!/bin/sh\nset -eu\n\nrequired='MIGRATOR_DB_PASSWORD IDENTITY_DB_PASSWORD\
+    \ JOURNAL_DB_PASSWORD PERFORMANCE_DB_PASSWORD DISCIPLINE_DB_PASSWORD REMINDER_DB_PASSWORD\
+    \ MARKET_DATA_DB_PASSWORD PRICE_ALERT_DB_PASSWORD ROTATION_DB_PASSWORD STOCK_RESEARCH_DB_PASSWORD\
+    \ PARTNER_DB_PASSWORD CONTENT_DB_PASSWORD OPERATIONS_DB_PASSWORD'\nfor name in\
+    \ $required; do\n  eval \"value=\\${$name:-}\"\n  [ -n \"$value\" ] || { echo\
+    \ \"$name is required\" >&2; exit 1; }\ndone\n\npsql -v ON_ERROR_STOP=1 -f /roles/001_service_roles.sql\n\
+    psql -v ON_ERROR_STOP=1 \\\n  -v migrator_password=\"$MIGRATOR_DB_PASSWORD\" \\\
+    \n  -v identity_password=\"$IDENTITY_DB_PASSWORD\" \\\n  -v journal_password=\"\
+    $JOURNAL_DB_PASSWORD\" \\\n  -v performance_password=\"$PERFORMANCE_DB_PASSWORD\"\
+    \ \\\n  -v discipline_password=\"$DISCIPLINE_DB_PASSWORD\" \\\n  -v reminder_password=\"\
+    $REMINDER_DB_PASSWORD\" \\\n  -v market_data_password=\"$MARKET_DATA_DB_PASSWORD\"\
+    \ \\\n  -v price_alert_password=\"$PRICE_ALERT_DB_PASSWORD\" \\\n  -v rotation_password=\"\
+    $ROTATION_DB_PASSWORD\" \\\n  -v stock_research_password=\"$STOCK_RESEARCH_DB_PASSWORD\"\
+    \ \\\n  -v partner_password=\"$PARTNER_DB_PASSWORD\" \\\n  -v content_password=\"\
+    $CONTENT_DB_PASSWORD\" \\\n  -v operations_password=\"$OPERATIONS_DB_PASSWORD\"\
+    \ \\\n  -f /roles/002_passwords.sql\n"
