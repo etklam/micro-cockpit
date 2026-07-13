@@ -16,13 +16,19 @@ env:
 jobs:
   build-and-deploy:
     runs-on: hk
-    container:
-      image: docker:29
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install Docker CLI
+        run: |
+          apt-get update -qq && apt-get install -y -qq ca-certificates curl gnupg lsb-release > /dev/null 2>&1
+          install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+          chmod a+r /etc/apt/keyrings/docker.asc
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
+          apt-get update -qq && apt-get install -y -qq docker-ce-cli > /dev/null 2>&1
+          docker version
 
       - name: Login to Forgejo Container Registry
         run: |
@@ -32,40 +38,38 @@ jobs:
         run: |
           set -e
 
-          SERVICES="
-            identity:services/identity-service/src/TradeDiary.Identity/Dockerfile
-            journal:services/journal-service/src/TradeDiary.Journal/Dockerfile
-            performance:services/performance-service/src/TradeDiary.Performance/Dockerfile
-            discipline:services/discipline-service/src/TradeDiary.Discipline/Dockerfile
-            reminder:services/reminder-service/src/TradeDiary.Reminder/Dockerfile
-            stock-research:services/stock-research-service/src/TradeDiary.StockResearch/Dockerfile
-            market-data:services/market-data-service/src/TradeDiary.MarketData/Dockerfile
-            price-alert:services/price-alert-service/src/TradeDiary.PriceAlert/Dockerfile
-            rotation:services/rotation-service/src/TradeDiary.Rotation/Dockerfile
-            partner:services/partner-service/src/TradeDiary.Partner/Dockerfile
-            content:services/content-service/src/TradeDiary.Content/Dockerfile
-            tool:services/tool-service/src/TradeDiary.Tool/Dockerfile
-            operations:services/operations-service/src/TradeDiary.Operations/Dockerfile
-            edge:gateway/TradeDiary.EdgeApi/Dockerfile
-            frontend:frontend/Dockerfile
-          "
-
           IMAGE_BASE="${REGISTRY}/${REPO_OWNER}/${REPO_NAME}"
 
-          echo "$SERVICES" | while IFS=: read -r NAME DOCKERFILE; do
-            [ -z "$NAME" ] && continue
-            [ -z "$DOCKERFILE" ] && continue
-
+          build_and_push() {
+            NAME="$1"
+            DOCKERFILE="$2"
             FULL_IMAGE="${IMAGE_BASE}/${NAME}:latest"
             echo "=== Building ${NAME} (${DOCKERFILE}) ==="
             docker build --platform linux/amd64 -t "${FULL_IMAGE}" -f "${DOCKERFILE}" .
             echo "=== Pushing ${FULL_IMAGE} ==="
             docker push "${FULL_IMAGE}"
             echo "=== Done ${NAME} ==="
-          done
+          }
+
+          build_and_push identity     services/identity-service/src/TradeDiary.Identity/Dockerfile
+          build_and_push journal      services/journal-service/src/TradeDiary.Journal/Dockerfile
+          build_and_push performance  services/performance-service/src/TradeDiary.Performance/Dockerfile
+          build_and_push discipline   services/discipline-service/src/TradeDiary.Discipline/Dockerfile
+          build_and_push reminder     services/reminder-service/src/TradeDiary.Reminder/Dockerfile
+          build_and_push stock-research services/stock-research-service/src/TradeDiary.StockResearch/Dockerfile
+          build_and_push market-data  services/market-data-service/src/TradeDiary.MarketData/Dockerfile
+          build_and_push price-alert  services/price-alert-service/src/TradeDiary.PriceAlert/Dockerfile
+          build_and_push rotation     services/rotation-service/src/TradeDiary.Rotation/Dockerfile
+          build_and_push partner      services/partner-service/src/TradeDiary.Partner/Dockerfile
+          build_and_push content      services/content-service/src/TradeDiary.Content/Dockerfile
+          build_and_push tool         services/tool-service/src/TradeDiary.Tool/Dockerfile
+          build_and_push operations   services/operations-service/src/TradeDiary.Operations/Dockerfile
+          build_and_push edge         gateway/TradeDiary.EdgeApi/Dockerfile
+          build_and_push frontend     frontend/Dockerfile
 
       - name: Deploy to K3s
         run: |
+          apt-get install -y -qq openssh-client > /dev/null 2>&1
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
