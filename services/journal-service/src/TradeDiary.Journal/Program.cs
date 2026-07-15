@@ -9,8 +9,7 @@ using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(
-    builder.Configuration.GetConnectionString("Journal") ??
-    "Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
+    builder.Configuration.GetConnectionString("Journal") ?? throw new InvalidOperationException("Connection string 'Journal' is required.")));
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
     options.MapInboundClaims = false;
@@ -485,7 +484,7 @@ sealed class OutboxPublisher(NpgsqlDataSource db, IHttpClientFactory clients, IC
                 ?? throw new JsonException("DiaryDeleted.v1 payload is required.");
             var deleted = DiaryDeletedV1Envelope.Create(item.Id, payload.DiaryId, payload.UserId);
             using var request = new HttpRequestMessage(HttpMethod.Post, "/internal/events/diary-deleted");
-            request.Headers.Add("X-Service-Key", configuration["Internal:ServiceKey"] ?? "local-service-key");
+            request.Headers.Add("X-Service-Key", configuration["Internal:ServiceKey"] ?? throw new InvalidOperationException("Internal:ServiceKey is required."));
             request.Content = JsonContent.Create(deleted, options: JsonSerializerOptions.Web);
             using var response = await clients.CreateClient("reminder").SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode) continue;

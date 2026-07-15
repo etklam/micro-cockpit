@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
+: "${TEST_PASSWORD:?set TEST_PASSWORD}"
 edge=http://127.0.0.1:5099
 status() { curl -sS -o /dev/null -w '%{http_code}' "$@"; }
 
 test "$(status "$edge/api/app/dashboard")" = 401
-login=$(curl -sS -H 'Content-Type: application/json' -d '{"email":"owner@example.com","password":"correct-horse-battery-staple"}' "$edge/api/auth/login")
+login=$(curl -sS -H 'Content-Type: application/json' -d "{\"email\":\"owner@example.com\",\"password\":\"${TEST_PASSWORD}\"}" "$edge/api/auth/login")
 access=$(jq -r .accessToken <<<"$login"); auth="Authorization: Bearer $access"
 test "$(status -H "$auth" -H 'Content-Type: application/json' -d '{"localDate":"2026-07-11","content":"Saved through Edge API"}' "$edge/api/app/quick-note")" = 201
 

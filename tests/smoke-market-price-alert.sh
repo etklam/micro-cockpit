@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
+: "${TEST_PASSWORD:?set TEST_PASSWORD}"
+: "${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}"
 identity=${IDENTITY_URL:-http://127.0.0.1:5100}
 market=${MARKET_DATA_URL:-http://127.0.0.1:5105}
 alerts=${PRICE_ALERT_URL:-http://127.0.0.1:5106}
-key=${SERVICE_KEY:-local-service-key}
-registration_key=${REGISTRATION_KEY:-local-test}
+key=${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
+registration_key=${LOCAL_REGISTRATION_KEY:?set LOCAL_REGISTRATION_KEY}
 admin="X-Service-Key: $key"
 status() { curl -sS -o /dev/null -w '%{http_code}' "$@"; }
 rejected() { case "$1" in 401|403) return 0;; *) return 1;; esac; }
 
-access=$(curl -sS -H 'Content-Type: application/json' -d '{"email":"owner@example.com","password":"correct-horse-battery-staple"}' "$identity/internal/auth/login" | jq -r .accessToken)
+access=$(curl -sS -H 'Content-Type: application/json' -d "{\"email\":\"owner@example.com\",\"password\":\"${TEST_PASSWORD}\"}" "$identity/internal/auth/login" | jq -r .accessToken)
 owner="Authorization: Bearer $access"
 other_email="market-other-$(date +%s)@example.com"
-curl -sS -o /dev/null -H "X-Registration-Key: $registration_key" -H 'Content-Type: application/json' -d "{\"email\":\"$other_email\",\"password\":\"correct-horse-battery-staple\",\"displayName\":\"Market Other\",\"timezone\":\"UTC\",\"baseCurrency\":\"USD\"}" "$identity/internal/auth/register"
-other_access=$(curl -sS -H 'Content-Type: application/json' -d "{\"email\":\"$other_email\",\"password\":\"correct-horse-battery-staple\"}" "$identity/internal/auth/login" | jq -r .accessToken)
+curl -sS -o /dev/null -H "X-Registration-Key: $registration_key" -H 'Content-Type: application/json' -d "{\"email\":\"$other_email\",\"password\":\"${TEST_PASSWORD}\",\"displayName\":\"Market Other\",\"timezone\":\"UTC\",\"baseCurrency\":\"USD\"}" "$identity/internal/auth/register"
+other_access=$(curl -sS -H 'Content-Type: application/json' -d "{\"email\":\"$other_email\",\"password\":\"${TEST_PASSWORD}\"}" "$identity/internal/auth/login" | jq -r .accessToken)
 other="Authorization: Bearer $other_access"
 
 curl -sS -o /dev/null -H "$admin" -H 'Content-Type: application/json' -X PUT -d '{"name":"Apple Inc.","exchange":"NASDAQ","currency":"USD","timezone":"America/New_York"}' "$market/internal/admin/symbols/AAPL"
@@ -33,7 +35,7 @@ curl -sS -o /dev/null -H "$owner" -H 'Content-Type: application/json' -d '{"symb
 curl -sS -o /dev/null -H "$owner" -H 'Content-Type: application/json' -d '{"symbol":"AAPL","conditionType":"ma_crossing","threshold":0,"lookbackDays":2,"direction":"above"}' "$alerts/internal/price-alerts"
 test "$(status -H "$other" -X DELETE "$alerts/internal/price-alerts/$id")" = 404
 rejected "$(status -X POST "$alerts/internal/worker/run")"
-rejected "$(status -H 'X-Service-Key: wrong' -X POST "$alerts/internal/worker/run")"
+rejected "$(status -H "X-Service-Key: ${INTERNAL_SERVICE_KEY}" -X POST "$alerts/internal/worker/run")"
 rejected "$(status -H "$owner" -X POST "$alerts/internal/worker/run")"
 test "$(curl -sS -H "$admin" -X POST "$alerts/internal/worker/run" | jq -r .triggered)" -ge 1
 test "$(curl -sS -H "$admin" -X POST "$alerts/internal/worker/run" | jq -r .triggered)" = 0

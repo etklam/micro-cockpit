@@ -9,7 +9,7 @@ using System.Security.Cryptography;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Reminder") ?? "Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
+builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Reminder") ?? throw new InvalidOperationException("Connection string 'Reminder' is required.")));
 builder.Services.AddHttpClient("journal", client => client.BaseAddress = new Uri(builder.Configuration["Services:Journal"] ?? "http://127.0.0.1:5101"));
 // IN-APP reminder delivery channel: writes the reminder_delivery_attempts row (status='delivered') users read in-app.
 // This is the real in-app channel — NOT a stub for email/push. A future email/push channel would be a separate

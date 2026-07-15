@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
+: "${TEST_PASSWORD:?set TEST_PASSWORD}"
 identity=http://127.0.0.1:5100
 journal=http://127.0.0.1:5101
 status() { curl -sS -o /dev/null -w '%{http_code}' "$@"; }
 
-login=$(curl -sS -H 'Content-Type: application/json' -d '{"email":"owner@example.com","password":"correct-horse-battery-staple"}' "$identity/internal/auth/login")
+login=$(curl -sS -H 'Content-Type: application/json' -d "{\"email\":\"owner@example.com\",\"password\":\"${TEST_PASSWORD}\"}" "$identity/internal/auth/login")
 access=$(jq -r .accessToken <<<"$login")
 auth="Authorization: Bearer $access"
 diary=$(curl -sS -H "$auth" -H 'Content-Type: application/json' -d '{"localDate":"2026-07-11","title":"Transaction check","content":""}' "$journal/internal/diaries")

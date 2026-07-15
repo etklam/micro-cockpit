@@ -9,7 +9,7 @@ using System.Security.Cryptography;
 using System.Text;
 
 var builder=WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton(_=>NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Operations")??"Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
+builder.Services.AddSingleton(_=>NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Operations") ?? throw new InvalidOperationException("Connection string 'Operations' is required.")));
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o=>{o.MapInboundClaims=false;o.MetadataAddress=builder.Configuration["Auth:MetadataAddress"]??"http://127.0.0.1:5100/.well-known/openid-configuration";o.RequireHttpsMetadata=false;o.Audience="trade-diary-services";});
 builder.Services.AddSingleton<IAuthorizationHandler, ServiceKeyAuthorizationHandler>();
 builder.Services.AddAuthorization(o=>

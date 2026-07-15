@@ -3,3 +3,8 @@
 node_modules/
 dist/
 .env
+k8s/*.local.yaml
+k8s/*secret*.local.yaml
+.secrets/
+*.secret.env
+__pycache__/

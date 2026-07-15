@@ -11,6 +11,22 @@ import { randomBytes } from 'node:crypto'
 const root = resolve(import.meta.dirname, '..')
 const outDir = resolve(root, 'contracts/openapi')
 const check = process.argv.includes('--check')
+const documentationEnvironment = {
+  ConnectionStrings__Identity: 'Host=127.0.0.1;Database=trade_diary;Username=identity_service',
+  ConnectionStrings__Journal: 'Host=127.0.0.1;Database=trade_diary;Username=journal_service',
+  ConnectionStrings__Performance: 'Host=127.0.0.1;Database=trade_diary;Username=performance_service',
+  ConnectionStrings__Discipline: 'Host=127.0.0.1;Database=trade_diary;Username=discipline_service',
+  ConnectionStrings__Reminder: 'Host=127.0.0.1;Database=trade_diary;Username=reminder_service',
+  ConnectionStrings__StockResearch: 'Host=127.0.0.1;Database=trade_diary;Username=stock_research_service',
+  ConnectionStrings__MarketData: 'Host=127.0.0.1;Database=trade_diary;Username=market_data_service',
+  ConnectionStrings__PriceAlert: 'Host=127.0.0.1;Database=trade_diary;Username=price_alert_service',
+  ConnectionStrings__Rotation: 'Host=127.0.0.1;Database=trade_diary;Username=rotation_service',
+  ConnectionStrings__Partner: 'Host=127.0.0.1;Database=trade_diary;Username=partner_service',
+  ConnectionStrings__Content: 'Host=127.0.0.1;Database=trade_diary;Username=content_service',
+  ConnectionStrings__Operations: 'Host=127.0.0.1;Database=trade_diary;Username=operations_service',
+  Auth__LocalRegistrationKey: 'TEST-ONLY-NOT-A-SECRET',
+  Internal__ServiceKey: 'TEST-ONLY-NOT-A-SECRET',
+}
 
 // name -> { project, port }. Ports are throwaway localhost ports for doc generation only.
 const services = [
@@ -49,7 +65,12 @@ async function fetchDoc({ name, project, port }) {
   const dll = resolve(project, `bin/Debug/net10.0/${assembly}.dll`)
   if (!existsSync(dll)) throw new Error(`${name}: build output not found at ${dll}`)
   const child = spawn('dotnet', [dll, '--urls', `http://127.0.0.1:${port}`], {
-    env: { ...process.env, ASPNETCORE_URLS: `http://127.0.0.1:${port}`, ASPNETCORE_ENVIRONMENT: 'Development' },
+    env: {
+      ...process.env,
+      ...documentationEnvironment,
+      ASPNETCORE_URLS: `http://127.0.0.1:${port}`,
+      ASPNETCORE_ENVIRONMENT: 'Development',
+    },
     stdio: 'ignore',
     detached: true,
   })

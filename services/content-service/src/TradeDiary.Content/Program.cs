@@ -6,7 +6,7 @@ using Microsoft.OpenApi;
 using Npgsql;
 
 var builder=WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton(_=>NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Content")??"Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
+builder.Services.AddSingleton(_=>NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Content") ?? throw new InvalidOperationException("Connection string 'Content' is required.")));
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o=>{o.MapInboundClaims=false;o.MetadataAddress=builder.Configuration["Auth:MetadataAddress"]??"http://127.0.0.1:5100/.well-known/openid-configuration";o.RequireHttpsMetadata=false;o.Audience="trade-diary-services";});
 builder.Services.AddAuthorization(o=>{var humanOnly=new AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireAssertion(context=>context.User.FindFirst("account_type")?.Value!="agent").Build();o.DefaultPolicy=humanOnly;o.FallbackPolicy=humanOnly;});
 builder.Services.AddOpenApi(options=>{options.AddDocumentTransformer<SecuritySchemesTransformer>();options.AddOperationTransformer<SecurityRequirementTransformer>();});

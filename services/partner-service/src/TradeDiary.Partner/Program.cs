@@ -6,7 +6,7 @@ using Microsoft.OpenApi;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Partner") ?? "Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
+builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Partner") ?? throw new InvalidOperationException("Connection string 'Partner' is required.")));
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
 {
     o.MapInboundClaims = false;

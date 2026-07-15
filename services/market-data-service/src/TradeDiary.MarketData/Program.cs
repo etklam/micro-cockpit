@@ -6,7 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("MarketData") ?? "Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
+builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("MarketData") ?? throw new InvalidOperationException("Connection string 'MarketData' is required.")));
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<SecuritySchemesTransformer>();

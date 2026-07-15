@@ -7,8 +7,7 @@ using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(
-    builder.Configuration.GetConnectionString("Performance") ??
-    "Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
+    builder.Configuration.GetConnectionString("Performance") ?? throw new InvalidOperationException("Connection string 'Performance' is required.")));
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
     options.MapInboundClaims = false;

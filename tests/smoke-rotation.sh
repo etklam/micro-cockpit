@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+: "${TEST_PASSWORD:?set TEST_PASSWORD}"
 identity=http://127.0.0.1:5100
 rotation=http://127.0.0.1:5107
 psql=(docker exec -i micro-cockpit-postgres-1 psql -U trade_diary -d trade_diary -v ON_ERROR_STOP=1)
@@ -8,7 +9,7 @@ cleanup() {
   "${psql[@]}" -c "DELETE FROM rotation.market_rotation_universes WHERE code='ROTATION_SMOKE'; DELETE FROM market.daily_bars WHERE provider_run_id='$run_id'; DELETE FROM market.provider_runs WHERE id='$run_id'; DELETE FROM market.symbols WHERE symbol IN ('ROTSPY','ROTXLK','ROTXLE') AND NOT EXISTS (SELECT 1 FROM market.daily_bars b WHERE b.symbol=market.symbols.symbol);" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
-access=$(curl -sS -H 'Content-Type: application/json' -d '{"email":"owner@example.com","password":"correct-horse-battery-staple"}' "$identity/internal/auth/login" | jq -r .accessToken)
+access=$(curl -sS -H 'Content-Type: application/json' -d "{\"email\":\"owner@example.com\",\"password\":\"${TEST_PASSWORD}\"}" "$identity/internal/auth/login" | jq -r .accessToken)
 auth="Authorization: Bearer $access"
 
 "${psql[@]}" -f /docker-entrypoint-initdb.d/010_rotation.sql >/dev/null

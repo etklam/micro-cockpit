@@ -17,8 +17,7 @@ var rsa = LoadSigningKey(builder.Configuration["Jwt:PrivateKeyPath"]);
 // so the same persisted key yields the same kid across restarts; only a key rotation changes it.
 var signingKey = new RsaSecurityKey(rsa) { KeyId = SigningKeyIdentity.GetKeyId(rsa) };
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(
-    builder.Configuration.GetConnectionString("Identity") ??
-    "Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
+    builder.Configuration.GetConnectionString("Identity") ?? throw new InvalidOperationException("Connection string 'Identity' is required.")));
 builder.Services.AddSingleton(new RefreshTokenFamilyOptions(signingKey, issuer, audience));
 builder.Services.AddSingleton<RefreshTokenFamily>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>

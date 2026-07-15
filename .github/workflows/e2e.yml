@@ -13,7 +13,16 @@ jobs:
           python-version: '3.x'
 
       - name: Prepare .env from template (ephemeral E2E secrets)
-        run: cp .env.example .env
+        run: |
+          set -eu
+          umask 077
+          : >.env
+          for key in POSTGRES_PASSWORD MIGRATOR_DB_PASSWORD IDENTITY_DB_PASSWORD JOURNAL_DB_PASSWORD PERFORMANCE_DB_PASSWORD DISCIPLINE_DB_PASSWORD REMINDER_DB_PASSWORD STOCK_RESEARCH_DB_PASSWORD MARKET_DATA_DB_PASSWORD PRICE_ALERT_DB_PASSWORD ROTATION_DB_PASSWORD PARTNER_DB_PASSWORD CONTENT_DB_PASSWORD OPERATIONS_DB_PASSWORD LOCAL_REGISTRATION_KEY INTERNAL_SERVICE_KEY; do
+            value=$(openssl rand -hex 32)
+            printf '%s=%s\n' "$key" "$value" >>.env
+            printf '%s=%s\n' "$key" "$value" >>"$GITHUB_ENV"
+          done
+          printf '%s=%s\n' TEST_PASSWORD "$(openssl rand -hex 32)" >>"$GITHUB_ENV"
 
       - name: Validate Compose configuration
         run: docker compose config --quiet
@@ -30,9 +39,7 @@ jobs:
       - name: Register ephemeral smoke user
         env:
           EDGE_URL: http://127.0.0.1:5099
-          LOCAL_REGISTRATION_KEY: change-me-registration-key
           TEST_EMAIL: owner@example.com
-          TEST_PASSWORD: correct-horse-battery-staple
         run: |
           code=$(curl -sS -o /dev/null -w '%{http_code}' \
             -H "X-Registration-Key: $LOCAL_REGISTRATION_KEY" \
@@ -45,10 +52,7 @@ jobs:
       - name: Smoke tests (Edge auth, BFF, events, reminders, rotation, degradation)
         env:
           EDGE_URL: http://127.0.0.1:5099
-          LOCAL_REGISTRATION_KEY: change-me-registration-key
-          INTERNAL_SERVICE_KEY: change-me-internal-service-key
           TEST_EMAIL: owner@example.com
-          TEST_PASSWORD: correct-horse-battery-staple
         run: |
           set -a
           source .env

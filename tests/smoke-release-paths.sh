@@ -3,7 +3,7 @@ set -euo pipefail
 
 edge=${EDGE_URL:-http://127.0.0.1:5099}
 email=${TEST_EMAIL:-owner@example.com}
-password=${TEST_PASSWORD:-correct-horse-battery-staple}
+password=${TEST_PASSWORD:?set TEST_PASSWORD}
 
 for command in curl docker jq python3; do
   command -v "$command" >/dev/null || { echo "missing command: $command" >&2; exit 1; }

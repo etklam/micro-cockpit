@@ -25,9 +25,15 @@ spec:
             - name: ASPNETCORE_URLS
               value: http://+:8080
             - name: ConnectionStrings__Identity
-              value: "Host=postgres;Database=trade_diary;Username=identity_service;Password=MsqA58IFkz24HoBKDa49G1xI"
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: "IDENTITY_CONNECTION_STRING"
             - name: Auth__LocalRegistrationKey
-              value: "j5qtH1iI4rBBHVPzbW6jHlTz3Nwc13bA"
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: LOCAL_REGISTRATION_KEY
             - name: Jwt__Issuer
               value: "trade-diary-identity"
             - name: Jwt__Audience
@@ -96,13 +102,19 @@ spec:
             - name: ASPNETCORE_URLS
               value: http://+:8080
             - name: ConnectionStrings__Journal
-              value: "Host=postgres;Database=trade_diary;Username=journal_service;Password=hFaGEJp2ZwuyrjA4Ma6JS3NM"
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: "JOURNAL_CONNECTION_STRING"
             - name: Auth__MetadataAddress
               value: "http://identity:8080/.well-known/openid-configuration"
             - name: Services__Reminder
               value: "http://reminder:8080"
             - name: Internal__ServiceKey
-              value: "EiO1Dihtkcm7MTbEnnuWJqTlWhOBVKy4"
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: INTERNAL_SERVICE_KEY
           readinessProbe:
             httpGet:
               path: /health/ready
@@ -158,7 +170,10 @@ spec:
             - name: ASPNETCORE_URLS
               value: http://+:8080
             - name: ConnectionStrings__Performance
-              value: "Host=postgres;Database=trade_diary;Username=performance_service;Password=EgOfCLoF7vtvSXy2lcLsWJ0e"
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: "PERFORMANCE_CONNECTION_STRING"
             - name: Auth__MetadataAddress
               value: "http://identity:8080/.well-known/openid-configuration"
           readinessProbe:
@@ -216,7 +231,10 @@ spec:
             - name: ASPNETCORE_URLS
               value: http://+:8080
             - name: ConnectionStrings__Discipline
-              value: "Host=postgres;Database=trade_diary;Username=discipline_service;Password=Z4jiZVOMVCEW9xiDJAIIgwER"
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: "DISCIPLINE_CONNECTION_STRING"
             - name: Auth__MetadataAddress
               value: "http://identity:8080/.well-known/openid-configuration"
           readinessProbe:
@@ -274,13 +292,19 @@ spec:
             - name: ASPNETCORE_URLS
               value: http://+:8080
             - name: ConnectionStrings__Reminder
-              value: "Host=postgres;Database=trade_diary;Username=reminder_service;Password=OSXw8qnOANRqGsiUNAihprwv"
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: "REMINDER_CONNECTION_STRING"
             - name: Auth__MetadataAddress
               value: "http://identity:8080/.well-known/openid-configuration"
             - name: Services__Journal
               value: "http://journal:8080"
             - name: Internal__ServiceKey
-              value: "EiO1Dihtkcm7MTbEnnuWJqTlWhOBVKy4"
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: INTERNAL_SERVICE_KEY
           readinessProbe:
             httpGet:
               path: /health/ready
@@ -336,7 +360,10 @@ spec:
             - name: ASPNETCORE_URLS
               value: http://+:8080
             - name: ConnectionStrings__StockResearch
-              value: "Host=postgres;Database=trade_diary;Username=stock_research_service;Password=e2QyS5DdViqymXbRP5OhFJY9"
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: "STOCK_RESEARCH_CONNECTION_STRING"
             - name: Auth__MetadataAddress
               value: "http://identity:8080/.well-known/openid-configuration"
           readinessProbe:
@@ -394,9 +421,15 @@ spec:
             - name: ASPNETCORE_URLS
               value: http://+:8080
             - name: ConnectionStrings__MarketData
-              value: "Host=postgres;Database=trade_diary;Username=market_data_service;Password=ZAdjlqM5Zw1tmFoomNJ5toCW"
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: "MARKET_DATA_CONNECTION_STRING"
             - name: Internal__ServiceKey
-              value: "EiO1Dihtkcm7MTbEnnuWJqTlWhOBVKy4"
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: INTERNAL_SERVICE_KEY
           readinessProbe:
             httpGet:
               path: /health/ready
@@ -452,9 +485,17 @@ spec:
             - name: ASPNETCORE_URLS
               value: http://+:8080
             - name: ConnectionStrings__PriceAlert
-              value: "Host=postgres;Database=trade_diary;Username=price_alert_service;Password=VYi07wWfgRdywyoif6a6csEP"
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: "PRICE_ALERT_CONNECTION_STRING"
             - name: Auth__MetadataAddress
               value: "http://identity:8080/.well-known/openid-configuration"
+            - name: Internal__ServiceKey
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: INTERNAL_SERVICE_KEY
           readinessProbe:
             httpGet:
               path: /health/ready
@@ -510,7 +551,10 @@ spec:
             - name: ASPNETCORE_URLS
               value: http://+:8080
             - name: ConnectionStrings__Rotation
-              value: "Host=postgres;Database=trade_diary;Username=rotation_service;Password=jPbD3vjE2JkaJZ7cu7Vpen4D"
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: "ROTATION_CONNECTION_STRING"
             - name: Auth__MetadataAddress
               value: "http://identity:8080/.well-known/openid-configuration"
           readinessProbe:
@@ -568,7 +612,10 @@ spec:
             - name: ASPNETCORE_URLS
               value: http://+:8080
             - name: ConnectionStrings__Partner
-              value: "Host=postgres;Database=trade_diary;Username=partner_service;Password=ZqgEhZ86csgr30CK7Ze7G9EZ"
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: "PARTNER_CONNECTION_STRING"
             - name: Auth__MetadataAddress
               value: "http://identity:8080/.well-known/openid-configuration"
           readinessProbe:
@@ -626,7 +673,10 @@ spec:
             - name: ASPNETCORE_URLS
               value: http://+:8080
             - name: ConnectionStrings__Content
-              value: "Host=postgres;Database=trade_diary;Username=content_service;Password=z5qwVzCMYtUVl7skqMR7S5a6"
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: "CONTENT_CONNECTION_STRING"
             - name: Auth__MetadataAddress
               value: "http://identity:8080/.well-known/openid-configuration"
           readinessProbe:
@@ -740,9 +790,17 @@ spec:
             - name: ASPNETCORE_URLS
               value: http://+:8080
             - name: ConnectionStrings__Operations
-              value: "Host=postgres;Database=trade_diary;Username=operations_service;Password=vyjefJhinMb6ZmJvJnnkgajG"
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: "OPERATIONS_CONNECTION_STRING"
             - name: Auth__MetadataAddress
               value: "http://identity:8080/.well-known/openid-configuration"
+            - name: Internal__ServiceKey
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: INTERNAL_SERVICE_KEY
           readinessProbe:
             httpGet:
               path: /health/ready

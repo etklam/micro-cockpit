@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
+: "${TEST_PASSWORD:?set TEST_PASSWORD}"
+: "${LOCAL_REGISTRATION_KEY:?set LOCAL_REGISTRATION_KEY}"
 
 identity=${IDENTITY_URL:-http://127.0.0.1:5100}
 stock=${STOCK_RESEARCH_URL:-http://127.0.0.1:5105}
 status() { curl -sS -o /dev/null -w '%{http_code}' "$@"; }
-login() { curl -sS -H 'Content-Type: application/json' -d "{\"email\":\"$1\",\"password\":\"correct-horse-battery-staple\"}" "$identity/internal/auth/login"; }
+login() { curl -sS -H 'Content-Type: application/json' -d "{\"email\":\"$1\",\"password\":\"${TEST_PASSWORD}\"}" "$identity/internal/auth/login"; }
 
 owner_access=$(login owner@example.com | jq -r .accessToken)
 owner_auth="Authorization: Bearer $owner_access"
@@ -30,8 +32,8 @@ test "$(status -H "$owner_auth" -X PUT -H 'Content-Type: application/json' -d '{
 test "$(status -H "$owner_auth" -X DELETE "$stock/internal/timeline/$original_id")" = 405
 
 other_email="stock-smoke-$(date +%s)@example.com"
-curl -sS -H 'X-Registration-Key: change-me-before-exposing' -H 'Content-Type: application/json' -d \
-  "{\"email\":\"$other_email\",\"password\":\"correct-horse-battery-staple\",\"displayName\":\"Other\",\"timezone\":\"UTC\",\"baseCurrency\":\"USD\"}" \
+curl -sS -H "X-Registration-Key: ${LOCAL_REGISTRATION_KEY}" -H 'Content-Type: application/json' -d \
+  "{\"email\":\"$other_email\",\"password\":\"${TEST_PASSWORD}\",\"displayName\":\"Other\",\"timezone\":\"UTC\",\"baseCurrency\":\"USD\"}" \
   "$identity/internal/auth/register" >/dev/null
 other_access=$(login "$other_email" | jq -r .accessToken); other_auth="Authorization: Bearer $other_access"
 test "$(status -H "$other_auth" "$stock/internal/timeline/$original_id")" = 404

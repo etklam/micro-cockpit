@@ -17,12 +17,22 @@ jobs:
   build-and-deploy:
     runs-on: hk
     steps:
-      - name: Checkout
+      - name: Checkout exact commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ forgejo.sha }}
+          fetch-depth: 0
+
+      - name: Validate repository secrets
+        run: |
+          set -eu
+          bash -n scripts/provision-k8s-secrets.sh scripts/rotate-k8s-credentials.sh scripts/apply-k8s-manifests.sh
+          python3 scripts/verify-no-plaintext-k8s-secrets.py
+          ./tests/verify-secret-handling.sh
 
       - name: Install Docker CLI
         run: |
-          apt-get update -qq && apt-get install -y -qq ca-certificates curl gnupg lsb-release > /dev/null 2>&1
+          apt-get update -qq && apt-get install -y -qq ca-certificates curl gnupg lsb-release openssh-client > /dev/null 2>&1
           install -m 0755 -d /etc/apt/keyrings
           curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
           chmod a+r /etc/apt/keyrings/docker.asc
@@ -30,64 +40,113 @@ jobs:
           apt-get update -qq && apt-get install -y -qq docker-ce-cli > /dev/null 2>&1
           docker version
 
+      - name: Scan current tree with gitleaks
+        run: |
+          set -eu
+          tools=$(mktemp -d)
+          trap 'rm -rf "$tools"' EXIT HUP INT TERM
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_linux_x64.tar.gz -o "$tools/gitleaks.tgz"
+          printf '%s  %s\n' 'fa0500f6b7e41d28791ebc680f5dd9899cd42b58629218a5f041efa899151a8e' "$tools/gitleaks.tgz" | sha256sum --check --status
+          tar -xzf "$tools/gitleaks.tgz" -C "$tools" gitleaks
+          PATH="$tools:$PATH"
+          gitleaks dir . --redact
+
       - name: Login to Forgejo Container Registry
         run: |
-          echo "${{ secrets.REGISTRY_TOKEN }}" | docker login $REGISTRY -u ${{ secrets.REGISTRY_USER }} --password-stdin
+          printf '%s' "${{ secrets.REGISTRY_TOKEN }}" | docker login "$REGISTRY" -u "${{ secrets.REGISTRY_USER }}" --password-stdin
 
       - name: Build and push all service images
         run: |
-          set -e
-
+          set -eu
           IMAGE_BASE="${REGISTRY}/${REPO_OWNER}/${REPO_NAME}"
-
           build_and_push() {
-            NAME="$1"
-            DOCKERFILE="$2"
-            FULL_IMAGE="${IMAGE_BASE}/${NAME}:latest"
-            echo "=== Building ${NAME} (${DOCKERFILE}) ==="
-            docker build --platform linux/amd64 -t "${FULL_IMAGE}" -f "${DOCKERFILE}" .
-            echo "=== Pushing ${FULL_IMAGE} ==="
-            docker push "${FULL_IMAGE}"
-            echo "=== Done ${NAME} ==="
+            name="$1"
+            dockerfile="$2"
+            image="${IMAGE_BASE}/${name}:latest"
+            docker build --platform linux/amd64 -t "$image" -f "$dockerfile" .
+            docker push "$image"
           }
-
-          build_and_push identity     services/identity-service/src/TradeDiary.Identity/Dockerfile
-          build_and_push journal      services/journal-service/src/TradeDiary.Journal/Dockerfile
-          build_and_push performance  services/performance-service/src/TradeDiary.Performance/Dockerfile
-          build_and_push discipline   services/discipline-service/src/TradeDiary.Discipline/Dockerfile
-          build_and_push reminder     services/reminder-service/src/TradeDiary.Reminder/Dockerfile
+          build_and_push identity services/identity-service/src/TradeDiary.Identity/Dockerfile
+          build_and_push journal services/journal-service/src/TradeDiary.Journal/Dockerfile
+          build_and_push performance services/performance-service/src/TradeDiary.Performance/Dockerfile
+          build_and_push discipline services/discipline-service/src/TradeDiary.Discipline/Dockerfile
+          build_and_push reminder services/reminder-service/src/TradeDiary.Reminder/Dockerfile
           build_and_push stock-research services/stock-research-service/src/TradeDiary.StockResearch/Dockerfile
-          build_and_push market-data  services/market-data-service/src/TradeDiary.MarketData/Dockerfile
-          build_and_push price-alert  services/price-alert-service/src/TradeDiary.PriceAlert/Dockerfile
-          build_and_push rotation     services/rotation-service/src/TradeDiary.Rotation/Dockerfile
-          build_and_push partner      services/partner-service/src/TradeDiary.Partner/Dockerfile
-          build_and_push content      services/content-service/src/TradeDiary.Content/Dockerfile
-          build_and_push tool         services/tool-service/src/TradeDiary.Tool/Dockerfile
-          build_and_push operations   services/operations-service/src/TradeDiary.Operations/Dockerfile
-          build_and_push edge         gateway/TradeDiary.EdgeApi/Dockerfile
-          build_and_push frontend     frontend/Dockerfile
+          build_and_push market-data services/market-data-service/src/TradeDiary.MarketData/Dockerfile
+          build_and_push price-alert services/price-alert-service/src/TradeDiary.PriceAlert/Dockerfile
+          build_and_push rotation services/rotation-service/src/TradeDiary.Rotation/Dockerfile
+          build_and_push partner services/partner-service/src/TradeDiary.Partner/Dockerfile
+          build_and_push content services/content-service/src/TradeDiary.Content/Dockerfile
+          build_and_push tool services/tool-service/src/TradeDiary.Tool/Dockerfile
+          build_and_push operations services/operations-service/src/TradeDiary.Operations/Dockerfile
+          build_and_push edge gateway/TradeDiary.EdgeApi/Dockerfile
+          build_and_push frontend frontend/Dockerfile
 
-      - name: Deploy to K3s
+      - name: Provision secrets and deploy exact manifests
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          MIGRATOR_DB_PASSWORD: ${{ secrets.MIGRATOR_DB_PASSWORD }}
+          IDENTITY_DB_PASSWORD: ${{ secrets.IDENTITY_DB_PASSWORD }}
+          JOURNAL_DB_PASSWORD: ${{ secrets.JOURNAL_DB_PASSWORD }}
+          PERFORMANCE_DB_PASSWORD: ${{ secrets.PERFORMANCE_DB_PASSWORD }}
+          DISCIPLINE_DB_PASSWORD: ${{ secrets.DISCIPLINE_DB_PASSWORD }}
+          REMINDER_DB_PASSWORD: ${{ secrets.REMINDER_DB_PASSWORD }}
+          STOCK_RESEARCH_DB_PASSWORD: ${{ secrets.STOCK_RESEARCH_DB_PASSWORD }}
+          MARKET_DATA_DB_PASSWORD: ${{ secrets.MARKET_DATA_DB_PASSWORD }}
+          PRICE_ALERT_DB_PASSWORD: ${{ secrets.PRICE_ALERT_DB_PASSWORD }}
+          ROTATION_DB_PASSWORD: ${{ secrets.ROTATION_DB_PASSWORD }}
+          PARTNER_DB_PASSWORD: ${{ secrets.PARTNER_DB_PASSWORD }}
+          CONTENT_DB_PASSWORD: ${{ secrets.CONTENT_DB_PASSWORD }}
+          OPERATIONS_DB_PASSWORD: ${{ secrets.OPERATIONS_DB_PASSWORD }}
+          LOCAL_REGISTRATION_KEY: ${{ secrets.LOCAL_REGISTRATION_KEY }}
+          INTERNAL_SERVICE_KEY: ${{ secrets.INTERNAL_SERVICE_KEY }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          apt-get install -y -qq openssh-client > /dev/null 2>&1
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-
-          ssh -o StrictHostKeyChecking=no \
-              -i ~/.ssh/deploy_key \
-              ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} << 'EOF'
-            set -e
-
-            for deploy in $(kubectl get deployments -n micro-cockpit -o name); do
-              kubectl rollout restart $deploy -n micro-cockpit
-            done
-
-            for deploy in $(kubectl get deployments -n micro-cockpit -o custom-columns=NAME:.metadata.name --no-headers); do
-              echo "Waiting for ${deploy}..."
-              kubectl rollout status deployment/${deploy} -n micro-cockpit --timeout=300s
-            done
-
-            echo "=== All deployments rolled out ==="
-            kubectl get pods -n micro-cockpit
-          EOF
+          set -euo pipefail
+          set +x
+          work=$(mktemp -d)
+          remote=""
+          cleanup() {
+            if [ -n "$remote" ]; then
+              ssh -o StrictHostKeyChecking=no -i "$work/deploy_key" "${DEPLOY_USER}@${DEPLOY_HOST}" "rm -rf '$remote'" >/dev/null 2>&1 || true
+            fi
+            rm -rf "$work"
+          }
+          trap cleanup EXIT HUP INT TERM
+          umask 077
+          printf '%s' "$DEPLOY_SSH_KEY" >"$work/deploy_key"
+          chmod 600 "$work/deploy_key"
+          secrets_file="$work/deployment.secret.env"
+          : >"$secrets_file"
+          chmod 600 "$secrets_file"
+          for key in POSTGRES_PASSWORD MIGRATOR_DB_PASSWORD IDENTITY_DB_PASSWORD JOURNAL_DB_PASSWORD PERFORMANCE_DB_PASSWORD DISCIPLINE_DB_PASSWORD REMINDER_DB_PASSWORD STOCK_RESEARCH_DB_PASSWORD MARKET_DATA_DB_PASSWORD PRICE_ALERT_DB_PASSWORD ROTATION_DB_PASSWORD PARTNER_DB_PASSWORD CONTENT_DB_PASSWORD OPERATIONS_DB_PASSWORD LOCAL_REGISTRATION_KEY INTERNAL_SERVICE_KEY; do
+            value=$(printenv "$key" || true)
+            [ -n "$value" ] || { echo "Missing Forgejo Actions secret: $key" >&2; exit 1; }
+            printf '%s=%s\n' "$key" "$value" >>"$secrets_file"
+          done
+          tar -czf "$work/deploy.tgz" k8s scripts/provision-k8s-secrets.sh scripts/apply-k8s-manifests.sh
+          remote=$(ssh -o StrictHostKeyChecking=no -i "$work/deploy_key" "${DEPLOY_USER}@${DEPLOY_HOST}" 'mktemp -d /tmp/micro-cockpit-deploy.XXXXXX')
+          scp -q -o StrictHostKeyChecking=no -i "$work/deploy_key" "$work/deploy.tgz" "$secrets_file" "${DEPLOY_USER}@${DEPLOY_HOST}:$remote/"
+          ssh -o StrictHostKeyChecking=no -i "$work/deploy_key" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "REMOTE_DIR='$remote' DEPLOY_NAMESPACE='$DEPLOY_NAMESPACE' bash -s" <<'REMOTE'
+          set -euo pipefail
+          set +x
+          cleanup_remote() { rm -rf "$REMOTE_DIR"; }
+          trap cleanup_remote EXIT HUP INT TERM
+          chmod 600 "$REMOTE_DIR/deployment.secret.env"
+          cd "$REMOTE_DIR"
+          tar -xzf deploy.tgz
+          chmod 700 scripts/provision-k8s-secrets.sh scripts/apply-k8s-manifests.sh
+          kubectl apply -f k8s/00-namespace.yaml >/dev/null
+          scripts/provision-k8s-secrets.sh --env-file "$REMOTE_DIR/deployment.secret.env" --namespace "$DEPLOY_NAMESPACE"
+          scripts/apply-k8s-manifests.sh --namespace "$DEPLOY_NAMESPACE"
+          for deployment in $(kubectl get deployments -n "$DEPLOY_NAMESPACE" -o name); do
+            [ "${deployment##*/}" = "postgres" ] && continue
+            kubectl rollout restart "$deployment" -n "$DEPLOY_NAMESPACE" >/dev/null
+          done
+          for deployment in $(kubectl get deployments -n "$DEPLOY_NAMESPACE" -o name); do
+            kubectl rollout status "$deployment" -n "$DEPLOY_NAMESPACE" --timeout=300s
+          done
+          kubectl wait --for=condition=Available deployment --all -n "$DEPLOY_NAMESPACE" --timeout=300s
+          REMOTE
+          remote=""
