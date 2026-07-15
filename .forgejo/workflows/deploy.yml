@@ -28,9 +28,15 @@ jobs:
       - name: Validate repository secrets
         run: |
           set -eu
+          base_ref='${{ forgejo.event.before }}'
+          if [ -z "$base_ref" ] || [ "$base_ref" = 0000000000000000000000000000000000000000 ]; then
+            base_ref=$(git rev-parse HEAD^)
+          fi
           bash -n scripts/*.sh
           python3 scripts/validate-migrations.py
           python3 scripts/audit-migrations.py
+          python3 scripts/validate-migration-append-only.py --base-ref "$base_ref"
+          python3 tests/verify-migration-append-only.py
           python3 scripts/verify-no-plaintext-k8s-secrets.py
           ./tests/verify-secret-handling.sh
           ./tests/verify-deployment-safety.sh
@@ -127,7 +133,7 @@ jobs:
           trap cleanup EXIT HUP INT TERM
           printf '%s' "$DEPLOY_SSH_KEY" >"$work/deploy_key"
           chmod 600 "$work/deploy_key"
-          tar -czf "$work/deploy.tgz" k8s scripts/apply-k8s-manifests.sh scripts/deploy-k8s-release.sh scripts/run-k8s-database-upgrade.sh scripts/verify-k8s-runtime-secrets.sh scripts/with-k8s-operation-lock.sh
+          tar -czf "$work/deploy.tgz" k8s scripts/apply-k8s-manifests.sh scripts/deploy-k8s-release.sh scripts/run-k8s-database-upgrade.sh scripts/k8s-database-job.py scripts/k8s-database-job-lib.sh scripts/verify-k8s-runtime-secrets.sh scripts/with-k8s-operation-lock.sh
           remote=$(ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" 'mktemp -d /tmp/micro-cockpit-deploy.XXXXXX')
           scp -q "${ssh_options[@]}" "$work/deploy.tgz" "${DEPLOY_USER}@${DEPLOY_HOST}:$remote/"
           ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
@@ -138,7 +144,7 @@ jobs:
           trap cleanup_remote EXIT HUP INT TERM
           cd "$REMOTE_DIR"
           tar -xzf deploy.tgz
-          chmod 700 scripts/apply-k8s-manifests.sh scripts/deploy-k8s-release.sh scripts/run-k8s-database-upgrade.sh scripts/verify-k8s-runtime-secrets.sh scripts/with-k8s-operation-lock.sh
+          chmod 700 scripts/apply-k8s-manifests.sh scripts/deploy-k8s-release.sh scripts/run-k8s-database-upgrade.sh scripts/k8s-database-job.py scripts/verify-k8s-runtime-secrets.sh scripts/with-k8s-operation-lock.sh
           scripts/with-k8s-operation-lock.sh --namespace "$DEPLOY_NAMESPACE" --timeout 900 -- bash -c '
             set -euo pipefail
             scripts/verify-k8s-runtime-secrets.sh --namespace "$DEPLOY_NAMESPACE"

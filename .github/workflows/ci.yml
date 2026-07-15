@@ -53,9 +53,13 @@ jobs:
       - name: Architecture boundary checks
         run: ./tests/verify-architecture.sh
       - name: Migration ownership audit
+        env:
+          BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           python3 scripts/validate-migrations.py
           python3 scripts/audit-migrations.py
+          python3 scripts/validate-migration-append-only.py --base-ref "$BASE_REF"
+          python3 tests/verify-migration-append-only.py
       - name: Validate Kubernetes secret handling
         run: |
           set -eu

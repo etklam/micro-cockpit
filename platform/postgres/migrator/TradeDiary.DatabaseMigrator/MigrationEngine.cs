@@ -15,9 +15,10 @@ public sealed class MigrationEngine(string connectionString, string migrationsPa
 
     public async Task<int> RunAsync(string command, BaselineOptions? baseline = null, CancellationToken cancellationToken = default)
     {
-        var migrations = MigrationFile.Load(migrationsPath);
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
+        await VerifyDatabaseIdentityAsync(connection, cancellationToken);
+        var migrations = MigrationFile.Load(migrationsPath);
         await AcquireLockAsync(connection, cancellationToken);
         try
         {
@@ -35,6 +36,22 @@ public sealed class MigrationEngine(string connectionString, string migrationsPa
             unlock.Parameters.AddWithValue(AdvisoryLockKey);
             await unlock.ExecuteNonQueryAsync(CancellationToken.None);
         }
+    }
+
+    private static async Task VerifyDatabaseIdentityAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
+    {
+        const string requiredRole = "trade_diary_migrator";
+        await using var command = new NpgsqlCommand("SELECT current_user, session_user", connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+        var currentUser = reader.GetString(0);
+        var sessionUser = reader.GetString(1);
+        var unexpected = new[] { currentUser, sessionUser }
+            .Where(role => role != requiredRole)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (unexpected.Length != 0)
+            throw new MigrationException($"Unexpected database role: {string.Join(',', unexpected)}");
     }
 
     private async Task AcquireLockAsync(NpgsqlConnection connection, CancellationToken cancellationToken)

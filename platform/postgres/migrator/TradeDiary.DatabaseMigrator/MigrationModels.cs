@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace TradeDiary.DatabaseMigrator;
@@ -46,9 +48,47 @@ public sealed record MigrationFile(
                 Convert.ToHexStringLower(SHA256.HashData(bytes)), bytes));
         }
         if (result.Count == 0) throw new MigrationException("No migration files were found.");
+        var expectedIds = Enumerable.Range(1, result.Count).Select(value => value.ToString("D4", System.Globalization.CultureInfo.InvariantCulture));
+        if (!result.Select(item => item.Id).SequenceEqual(expectedIds, StringComparer.Ordinal))
+            throw new MigrationException("Migration IDs must be contiguous and start at 0001.");
+        ValidateManifest(directory, result);
         return result;
     }
+
+    private static void ValidateManifest(string directory, IReadOnlyList<MigrationFile> migrations)
+    {
+        var manifestPath = System.IO.Path.Combine(directory, "manifest.json");
+        if (!File.Exists(manifestPath)) throw new MigrationException("Migration manifest is missing.");
+        MigrationManifest manifest;
+        try
+        {
+            manifest = JsonSerializer.Deserialize<MigrationManifest>(File.ReadAllBytes(manifestPath))
+                ?? throw new MigrationException("Migration manifest is invalid.");
+        }
+        catch (JsonException)
+        {
+            throw new MigrationException("Migration manifest is invalid.");
+        }
+        if (manifest.Format != 1 || manifest.Migrations is null) throw new MigrationException("Migration manifest format is unsupported.");
+        if (manifest.Migrations.Count != migrations.Count)
+            throw new MigrationException("Migration manifest entry count does not match SQL file count.");
+        for (var index = 0; index < migrations.Count; index++)
+        {
+            var file = migrations[index];
+            var entry = manifest.Migrations[index];
+            if (entry is null || entry.Id != file.Id || entry.Filename != file.Filename || entry.Sha256 != file.Checksum)
+                throw new MigrationException($"Migration manifest does not match exact file bytes and order: {file.Filename}");
+        }
+    }
 }
+
+public sealed record MigrationManifest(
+    [property: JsonPropertyName("format")] int Format,
+    [property: JsonPropertyName("migrations")] IReadOnlyList<MigrationManifestEntry> Migrations);
+public sealed record MigrationManifestEntry(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("filename")] string Filename,
+    [property: JsonPropertyName("sha256")] string Sha256);
 
 public sealed record HistoryRow(string Id, string Filename, string Checksum, bool Baseline);
 public sealed class MigrationException(string message) : Exception(message);

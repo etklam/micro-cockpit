@@ -29,6 +29,8 @@ docker compose run --rm db-migrate status
 
 See [database-migrations.md](database-migrations.md) for canonical migration creation, existing-volume baseline, failure handling, and production adoption.
 
+The shared PostgreSQL database has one deployment-time runner and one ordered migration ledger. Individual services own their schema design and migration metadata, but runtime service processes never apply migrations. Before first production adoption, run the documented read-only Kubernetes database status command; baseline and failed-Job retry remain explicit operator actions.
+
 `frontend` is served at `http://localhost:8080` and proxies `/api` to Edge.
 Edge is also bound at `http://localhost:5099`. PostgreSQL is reachable only
 from the host at `127.0.0.1:5433`; the other services stay on the private

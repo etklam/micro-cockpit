@@ -10,7 +10,17 @@
 -- description: Add a nullable journal attribute
 ```
 
-Legacy multi-schema files retain `platform-legacy`; new migrations normally name one service owner. `manifest.json` records exact filenames, order, and SHA-256 checksums. Never edit an applied migration or its history row. Add a new file at the end, update the manifest in review, and run both migration validators.
+Legacy multi-schema files retain `platform-legacy`; new migrations normally name one service owner. `manifest.json` records exact filenames, order, and SHA-256 checksums. Never edit an applied migration or its history row. Add a new file at the end, update the manifest in review, and run:
+
+```sh
+python3 scripts/validate-migrations.py
+python3 scripts/audit-migrations.py
+python3 scripts/validate-migration-append-only.py --base-ref IMMUTABLE_BASE_COMMIT
+```
+
+The append-only check reads the base catalog directly from Git and requires the current manifest to begin with the complete, byte-identical historical catalog. Updating both an old SQL file and its current manifest checksum cannot bypass it.
+
+GitHub pull requests use the pull-request base commit; pushes to `main` use the event's previous commit. Forgejo pushes use the previous commit and manual deployment uses `HEAD^`. Both checkouts retain full history. An invalid or unavailable base fails; only a real base commit with no canonical migration directory is treated as initial adoption.
 
 ## Legacy filename mapping
 
@@ -34,7 +44,9 @@ The mapping changes names and metadata only; legacy execution order and schema s
 
 ## Runner guarantees
 
-`TradeDiary.DatabaseMigrator` supports `migrate`, `status`, and explicit `baseline`. It holds one PostgreSQL session and a stable advisory lock for validation and execution. Every pending migration and its `platform_migrations.schema_history` row commit in one transaction. History records ID, description, filename, exact-byte SHA-256, timestamp, database identity, duration, release SHA, and baseline state.
+`TradeDiary.DatabaseMigrator` supports `migrate`, `status`, and explicit `baseline`. Before inspecting database migration state, every command requires both `current_user` and `session_user` to equal `trade_diary_migrator`; `SET ROLE` from an administrator session is rejected. The runtime loads `manifest.json` and verifies its count, IDs, filenames, order, and exact-byte SHA-256 values against all bundled SQL files.
+
+The runner holds one PostgreSQL session and a stable advisory lock for validation and execution. Every pending migration and its `platform_migrations.schema_history` row commit in one transaction. History records ID, description, filename, exact-byte SHA-256, timestamp, database identity, duration, release SHA, and baseline state.
 
 The runner fails on invalid metadata, missing applied files, changed checksums, duplicate IDs, out-of-order additions, or transaction-breaking SQL. Static validation also rejects destructive automatic DDL. It never repairs history or performs a downgrade.
 
@@ -70,7 +82,21 @@ docker compose run --rm db-migrate status
 
 ## Kubernetes database upgrade
 
-Forgejo builds `db-migrator:<full-commit-sha>`. Under the host namespace operation lock, release deployment verifies runtime Secrets, applies PostgreSQL infrastructure, and runs `scripts/run-k8s-database-upgrade.sh`. It waits for PostgreSQL, then executes immutable SHA-named bootstrap, migration, and finalization Jobs. Credentials enter Jobs only through `secretKeyRef`. Completed Jobs are accepted idempotently; failed Jobs and safe status remain available for diagnosis. Application images are not applied until all three Jobs complete.
+Forgejo builds `db-migrator:<full-commit-sha>`. Under the host namespace operation lock, release deployment verifies runtime Secrets, applies PostgreSQL infrastructure, and runs `scripts/run-k8s-database-upgrade.sh`. It waits for PostgreSQL, then executes immutable SHA-named bootstrap, migration, and finalization Jobs. Credentials enter Jobs only through `secretKeyRef`.
+
+Each Job records the full release SHA, database step, and a SHA-256 of its security-relevant specification. Existing Jobs are reused only after verifying the exact image, command, arguments, database identity, Secret names/keys, release SHA, step, and specification hash. Failed Jobs remain evidence and stop normal deployment. An operator may explicitly use `--retry-failed-jobs`; this preserves earlier attempts and creates the next deterministic immutable name such as `db-migrate-<sha-prefix>-a2`. Forgejo never supplies the retry option automatically.
+
+Before production adoption, inspect read-only database and Job readiness:
+
+```sh
+scripts/status-k8s-database.sh \
+  --context EXPECTED_CONTEXT \
+  --namespace micro-cockpit \
+  --image-registry REGISTRY/PROJECT \
+  --image-tag FULL_COMMIT_SHA
+```
+
+The status command reports history presence, whether baseline is required, current and pending IDs, catalog drift, ordering, and matching completed or failed Job attempts. It does not create Jobs, baseline, or migrations and does not print credentials or connection strings.
 
 ## Production baseline
 
@@ -88,6 +114,25 @@ scripts/baseline-k8s-database.sh \
 
 This wrapper takes the same host namespace lock as deployment and rotation. The runner then takes the PostgreSQL advisory lock, requires absent/empty history, validates the complete `legacy-v1-schema.json` fingerprint, and records all legacy migrations in one transaction. It never runs automatically. A matching completed baseline rerun is a no-op; partial, fresh, unexpected, or conflicting states fail.
 
+If a matching baseline Job failed, preserve it and repeat the verified backup/context command with `--retry-failed-job`. After baseline succeeds, rerun the database upgrade under the namespace operation lock with `--retry-failed-jobs`:
+
+```sh
+scripts/with-k8s-operation-lock.sh --namespace micro-cockpit --timeout 900 -- \
+  scripts/run-k8s-database-upgrade.sh \
+    --namespace micro-cockpit \
+    --image-registry REGISTRY/PROJECT \
+    --image-tag FULL_COMMIT_SHA \
+    --retry-failed-jobs
+```
+
+The new migration attempt uses the same release SHA with a new attempt name. A later normal release rerun recognizes that completed matching attempt and proceeds without deleting evidence or creating another source commit.
+
+The complete first-adoption sequence is: status, diagnose the preserved migration failure, verify backup, explicit baseline, explicit failed-Job retry, normal release rerun. Never edit history or delete the failed Job to advance the release.
+
+## Architecture decision
+
+Micro Cockpit uses one physical PostgreSQL database, one deployment-time migration runner, and one immutable ordered ledger. Services retain ownership of their schema and migration design through metadata. Runtime services never execute migrations. The centralized runner provides deterministic cross-schema ordering and one release gate; it is deployment infrastructure and contains no shared business/domain code. See [ADR: centralized database migration runner](decisions/ADR-database-migration-runner.md).
+
 ## Expand-first policy
 
 Automatic pre-deployment migrations must remain compatible with the currently running release.
@@ -104,4 +149,4 @@ Dropping tables/schemas/columns, truncation, renaming live columns, incompatible
 - Production baseline: pending operator execution.
 - Live Kubernetes migration Job verification: pending.
 - Credential rotation: pending operator execution.
-- Git history rewrite: pending.
+- Git history rewrite: not part of migration adoption and is not required.

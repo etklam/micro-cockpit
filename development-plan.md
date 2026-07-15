@@ -353,26 +353,21 @@ tool
 operations
 ```
 
-Each service receives:
+The shared PostgreSQL database receives:
 
 ```text
-- One schema owner role
-- One runtime role
-- One migration role
-- Access only to its owned schema
-- Explicit read access to approved published views
+- One deployment migration role: trade_diary_migrator
+- One runtime role per service
+- Migrator ownership of managed schemas and objects
+- Runtime access only to the service-owned schema and documented published views
 ```
 
 Example roles:
 
 ```text
-journal_owner
-journal_runtime
-journal_migrator
-
-performance_owner
-performance_runtime
-performance_migrator
+journal_service
+performance_service
+trade_diary_migrator
 ```
 
 ## 7.2 Schema Ownership Rules
@@ -382,21 +377,14 @@ performance_migrator
 - Journal Service writes only journal.*
 - Performance Service writes only performance.*
 - Reminder Service writes only reminder.*
-- No service may run migrations against another schema.
+- Runtime services never execute migrations.
 - No shared EF Core DbContext exists.
-- No global migration project exists.
-- Every service has its own migration history table in its own schema.
+- One deployment-time runner applies one immutable, ordered migration ledger to the shared database.
+- Every migration identifies its owning service in metadata; that service owns the schema design and review.
+- The runner is deployment infrastructure, not shared runtime domain code.
 ```
 
-Example EF Core migration history:
-
-```text
-journal.__ef_migrations_history
-performance.__ef_migrations_history
-identity.__ef_migrations_history
-```
-
-A future Go or Java rewrite may stop using EF Core while keeping the same service-owned schema and API contract.
+A future Go or Java rewrite keeps the same service-owned schema and API contract and appends canonical migrations without rewriting history.
 
 ## 7.3 Cross-Service Foreign Keys
 
@@ -1584,7 +1572,7 @@ Avoid:
 - Unversioned database views
 - Frontend calls to service-specific URLs
 - One giant Worker controlling every domain
-- One global migration pipeline
+- A migration system embedded in runtime service/domain libraries
 - Distributed transaction coordinator
 - Service-to-service calls for every small read
 - Splitting entities that require one transaction boundary

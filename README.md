@@ -34,6 +34,8 @@ Backup, restore, reset, and signing-key handling (full commands in [docs/operati
 - **Signing key backup** — Identity's RSA private key lives in the `identity-keys` volume (`/keys/signing-key.pem`). Back it up; losing it invalidates all outstanding refresh tokens and forces re-login. The JWT `kid` is derived from the public key, so it is stable across restarts and only changes on key rotation.
 - **Database migrations** — Versioned, checksummed, forward-only migration and baseline procedures are in [docs/database-migrations.md](docs/database-migrations.md).
 
+The system uses one shared PostgreSQL database and one deployment-time migration runner with an immutable ordered ledger. Services retain ownership of their schema design through migration metadata; runtime services never execute migrations, and the runner contains no shared business/domain code.
+
 ## Run for development
 
 ```sh
