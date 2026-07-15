@@ -5,11 +5,19 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using Npgsql;
+using System.Security.Cryptography;
+using System.Text;
 
 var builder=WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton(_=>NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("PriceAlert")??"Host=localhost;Port=5433;Database=trade_diary;Username=trade_diary;Password=local_only"));
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o=>{o.MapInboundClaims=false;o.MetadataAddress=builder.Configuration["Auth:MetadataAddress"]??"http://127.0.0.1:5100/.well-known/openid-configuration";o.RequireHttpsMetadata=false;o.Audience="trade-diary-services";});
-builder.Services.AddAuthorization(o=>o.FallbackPolicy=new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddSingleton<IAuthorizationHandler, ServiceKeyAuthorizationHandler>();
+builder.Services.AddAuthorization(o=>
+{
+    var humanOnly=new AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireAssertion(context => context.User.FindFirst("account_type")?.Value != "agent").Build();
+    o.DefaultPolicy=humanOnly;o.FallbackPolicy=humanOnly;
+    o.AddPolicy("serviceKey", policy => policy.AddRequirements(new ServiceKeyRequirement()));
+});
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<SecuritySchemesTransformer>();
@@ -55,6 +63,7 @@ app.MapGet("/internal/price-alerts/{id:guid}/triggers",async(Guid id,HttpRequest
 .Produces<CollectionResponse<TriggerResponse>>(200).ProducesProblem(401).ProducesProblem(404);
 
 app.MapPost("/internal/worker/run",async(NpgsqlDataSource db)=>Results.Ok(new WorkerRunResponse(await PriceAlertEngine.Evaluate(db,100))))
+.RequireAuthorization("serviceKey")
 .Produces<WorkerRunResponse>(200);
 app.Run();
 
@@ -218,10 +227,7 @@ sealed class SecurityRequirementTransformer : IOpenApiOperationTransformer
     {
         var metadata = context.Description.ActionDescriptor.EndpointMetadata;
         if (metadata.OfType<AllowAnonymousAttribute>().Any()) return Task.CompletedTask;
-        var path = "/" + (context.Description.RelativePath ?? string.Empty);
-        var scheme = path.Contains("/internal/admin/", StringComparison.Ordinal)
-                     || path.Contains("/internal/worker/", StringComparison.Ordinal)
-                     || path.Contains("/internal/events/", StringComparison.Ordinal)
+        var scheme = metadata.OfType<IAuthorizeData>().Any(data => data.Policy == "serviceKey")
             ? "serviceKey" : "bearerAuth";
         operation.Security ??= new List<OpenApiSecurityRequirement>();
         operation.Security.Add(new OpenApiSecurityRequirement
@@ -229,5 +235,27 @@ sealed class SecurityRequirementTransformer : IOpenApiOperationTransformer
             [new OpenApiSecuritySchemeReference(scheme, context.Document)] = new List<string>()
         });
         return Task.CompletedTask;
+    }
+}
+
+sealed class ServiceKeyRequirement : IAuthorizationRequirement { }
+sealed class ServiceKeyAuthorizationHandler(IConfiguration configuration) : AuthorizationHandler<ServiceKeyRequirement>
+{
+    protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, ServiceKeyRequirement requirement)
+    {
+        if (context.Resource is HttpContext httpContext
+            && ServiceKeyAuthorization.IsValid(httpContext.Request.Headers["X-Service-Key"].FirstOrDefault(), configuration["Internal:ServiceKey"] ?? ""))
+            context.Succeed(requirement);
+        return Task.CompletedTask;
+    }
+}
+public static class ServiceKeyAuthorization
+{
+    public static bool IsValid(string? supplied, string expected)
+    {
+        if (string.IsNullOrEmpty(supplied) || string.IsNullOrEmpty(expected)) return false;
+        var suppliedBytes = Encoding.UTF8.GetBytes(supplied);
+        var expectedBytes = Encoding.UTF8.GetBytes(expected);
+        return suppliedBytes.Length == expectedBytes.Length && CryptographicOperations.FixedTimeEquals(suppliedBytes, expectedBytes);
     }
 }

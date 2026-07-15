@@ -55,11 +55,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DiaryDeletedEvent"
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DiaryDeletedV1Envelope"
+                  }
+                ]
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "204": {
@@ -499,7 +505,7 @@
         },
         "security": [
           {
-            "bearerAuth": []
+            "serviceKey": []
           }
         ]
       }
@@ -677,7 +683,24 @@
           }
         }
       },
-      "DiaryDeletedEvent": {
+      "DiaryDeletedV1": {
+        "required": [
+          "diaryId",
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "diaryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "DiaryDeletedV1Envelope": {
         "required": [
           "eventId",
           "eventType",
@@ -702,24 +725,14 @@
             "format": "int32"
           },
           "payload": {
-            "$ref": "#/components/schemas/DiaryDeletedPayload"
-          }
-        }
-      },
-      "DiaryDeletedPayload": {
-        "required": [
-          "diaryId",
-          "userId"
-        ],
-        "type": "object",
-        "properties": {
-          "diaryId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "userId": {
-            "type": "string",
-            "format": "uuid"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DiaryDeletedV1"
+              }
+            ]
           }
         }
       },

@@ -2266,42 +2266,6 @@
           }
         ],
         "operationId": "get_api_admin_operations_audit"
-      },
-      "post": {
-        "tags": [
-          "TradeDiary.Operations"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AuditWrite"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "operationId": "post_api_admin_operations_audit"
       }
     },
     "/api/admin/operations/jobs": {
@@ -2519,11 +2483,7 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "security": [],
         "operationId": "post_api_auth_api_key_token"
       }
     },
@@ -4074,32 +4034,6 @@
           "occurredAt": {
             "type": "string",
             "format": "date-time"
-          }
-        }
-      },
-      "AuditWrite": {
-        "required": [
-          "action",
-          "resourceType",
-          "resourceId",
-          "details"
-        ],
-        "type": "object",
-        "properties": {
-          "action": {
-            "type": "string"
-          },
-          "resourceType": {
-            "type": "string"
-          },
-          "resourceId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "details": {
-            "$ref": "#/components/schemas/JsonElement"
           }
         }
       },

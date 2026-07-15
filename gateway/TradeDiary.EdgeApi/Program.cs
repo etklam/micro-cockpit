@@ -17,7 +17,30 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 });
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
     ProxyHeaders.ConfigureForwardedHeaders(options, builder.Configuration));
-builder.Services.AddAuthorization(options => options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddAuthorization(options =>
+{
+    var humanOnly = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .RequireAssertion(context => context.User.FindFirst("account_type")?.Value != "agent")
+        .Build();
+    options.DefaultPolicy = humanOnly;
+    options.FallbackPolicy = humanOnly;
+    options.AddPolicy("diaryAccess", policy => policy.RequireAuthenticatedUser().RequireAssertion(context =>
+    {
+        if (context.User.FindFirst("account_type")?.Value != "agent") return true;
+        var method = (context.Resource as HttpContext)?.Request.Method;
+        var requiredScope = method == HttpMethods.Get ? "diary:read" : "diary:write";
+        return context.User.FindAll("scope").Any(claim => claim.Value == requiredScope);
+    }));
+    options.AddPolicy("researchAccess", policy => policy.RequireAuthenticatedUser().RequireAssertion(context =>
+    {
+        if (context.User.FindFirst("account_type")?.Value != "agent") return true;
+        var request = (context.Resource as HttpContext)?.Request;
+        return request?.Method == HttpMethods.Get
+            && context.User.FindAll("scope").Any(claim => claim.Value == "research:read");
+    }));
+    options.AddPolicy("admin", policy => policy.RequireRole("admin"));
+});
 var serviceDefaults = new Dictionary<string, string>
 {
     ["identity"]="http://127.0.0.1:5100", ["journal"]="http://127.0.0.1:5101", ["performance"]="http://127.0.0.1:5102",
@@ -118,16 +141,16 @@ app.MapGet("/api/app/calendar", async (int year, int month, HttpContext context,
 });
 
 app.MapPost("/api/app/quick-note", async (JsonElement body, HttpContext context, IHttpClientFactory clients) =>
-    await Forward(clients,"journal","/internal/quick-note",HttpMethod.Post,body,context));
-app.MapGet("/api/app/diaries", async (HttpContext context, IHttpClientFactory clients) => await ForwardNoBody(clients,"journal","/internal/diaries",HttpMethod.Get,context));
+    await Forward(clients,"journal","/internal/quick-note",HttpMethod.Post,body,context)).RequireAuthorization("diaryAccess");
+app.MapGet("/api/app/diaries", async (HttpContext context, IHttpClientFactory clients) => await ForwardNoBody(clients,"journal","/internal/diaries",HttpMethod.Get,context)).RequireAuthorization("diaryAccess");
 app.MapPost("/api/app/diaries", async (JsonElement body, HttpContext context, IHttpClientFactory clients) =>
-    await Forward(clients,"journal","/internal/diaries",HttpMethod.Post,body,context));
-app.MapPut("/api/app/diaries/{id:guid}", async (Guid id, JsonElement body, HttpContext context, IHttpClientFactory clients) => await Forward(clients,"journal",$"/internal/diaries/{id}",HttpMethod.Put,body,context));
-app.MapDelete("/api/app/diaries/{id:guid}", async (Guid id, HttpContext context, IHttpClientFactory clients) => await ForwardNoBody(clients,"journal",$"/internal/diaries/{id}",HttpMethod.Delete,context));
-app.MapGet("/api/app/diaries/{diaryId:guid}/transactions", async (Guid diaryId, HttpContext context, IHttpClientFactory clients) => await ForwardNoBody(clients,"journal",$"/internal/diaries/{diaryId}/transactions",HttpMethod.Get,context));
-app.MapPost("/api/app/diaries/{diaryId:guid}/transactions", async (Guid diaryId, JsonElement body, HttpContext context, IHttpClientFactory clients) => await Forward(clients,"journal",$"/internal/diaries/{diaryId}/transactions",HttpMethod.Post,body,context));
-app.MapPut("/api/app/diaries/{diaryId:guid}/transactions/{id:guid}", async (Guid diaryId, Guid id, JsonElement body, HttpContext context, IHttpClientFactory clients) => await Forward(clients,"journal",$"/internal/diaries/{diaryId}/transactions/{id}",HttpMethod.Put,body,context));
-app.MapDelete("/api/app/diaries/{diaryId:guid}/transactions/{id:guid}", async (Guid diaryId, Guid id, HttpContext context, IHttpClientFactory clients) => await ForwardNoBody(clients,"journal",$"/internal/diaries/{diaryId}/transactions/{id}",HttpMethod.Delete,context));
+    await Forward(clients,"journal","/internal/diaries",HttpMethod.Post,body,context)).RequireAuthorization("diaryAccess");
+app.MapPut("/api/app/diaries/{id:guid}", async (Guid id, JsonElement body, HttpContext context, IHttpClientFactory clients) => await Forward(clients,"journal",$"/internal/diaries/{id}",HttpMethod.Put,body,context)).RequireAuthorization("diaryAccess");
+app.MapDelete("/api/app/diaries/{id:guid}", async (Guid id, HttpContext context, IHttpClientFactory clients) => await ForwardNoBody(clients,"journal",$"/internal/diaries/{id}",HttpMethod.Delete,context)).RequireAuthorization("diaryAccess");
+app.MapGet("/api/app/diaries/{diaryId:guid}/transactions", async (Guid diaryId, HttpContext context, IHttpClientFactory clients) => await ForwardNoBody(clients,"journal",$"/internal/diaries/{diaryId}/transactions",HttpMethod.Get,context)).RequireAuthorization("diaryAccess");
+app.MapPost("/api/app/diaries/{diaryId:guid}/transactions", async (Guid diaryId, JsonElement body, HttpContext context, IHttpClientFactory clients) => await Forward(clients,"journal",$"/internal/diaries/{diaryId}/transactions",HttpMethod.Post,body,context)).RequireAuthorization("diaryAccess");
+app.MapPut("/api/app/diaries/{diaryId:guid}/transactions/{id:guid}", async (Guid diaryId, Guid id, JsonElement body, HttpContext context, IHttpClientFactory clients) => await Forward(clients,"journal",$"/internal/diaries/{diaryId}/transactions/{id}",HttpMethod.Put,body,context)).RequireAuthorization("diaryAccess");
+app.MapDelete("/api/app/diaries/{diaryId:guid}/transactions/{id:guid}", async (Guid diaryId, Guid id, HttpContext context, IHttpClientFactory clients) => await ForwardNoBody(clients,"journal",$"/internal/diaries/{diaryId}/transactions/{id}",HttpMethod.Delete,context)).RequireAuthorization("diaryAccess");
 app.MapPut("/api/app/daily-performance/{date}", async (string date, JsonElement body, HttpContext context, IHttpClientFactory clients) =>
     await Forward(clients,"performance",$"/internal/daily-performances/{date}",HttpMethod.Put,body,context));
 app.MapGet("/api/app/disciplines", async (HttpContext context, IHttpClientFactory clients) => await ForwardNoBody(clients,"discipline","/internal/disciplines",HttpMethod.Get,context));
@@ -140,14 +163,14 @@ app.MapPost("/api/app/diary-alerts/{id:guid}/dismiss", async (Guid id, HttpConte
 app.MapDelete("/api/app/diary-alerts/{id:guid}", async (Guid id, HttpContext context, IHttpClientFactory clients) => await ForwardNoBody(clients,"reminder",$"/internal/diary-alerts/{id}",HttpMethod.Delete,context));
 
 // Late services stay deliberately thin: Edge owns the public path and transport headers, services own behavior.
-MapProxy(app, "/api/app/stocks", "stock-research", "/internal/stocks", [HttpMethods.Get, HttpMethods.Post]);
-MapProxy(app, "/api/app/stocks/{symbol}", "stock-research", "/internal/stocks/{symbol}", [HttpMethods.Get]);
-MapProxy(app, "/api/app/watchlist", "stock-research", "/internal/watchlist", [HttpMethods.Get]);
-MapProxy(app, "/api/app/watchlist/{stockId:guid}", "stock-research", "/internal/watchlist/{stockId}", [HttpMethods.Post, HttpMethods.Delete]);
-MapProxy(app, "/api/app/stocks/{stockId:guid}/note", "stock-research", "/internal/stocks/{stockId}/note", [HttpMethods.Get, HttpMethods.Put]);
-MapProxy(app, "/api/app/stocks/{stockId:guid}/timeline", "stock-research", "/internal/stocks/{stockId}/timeline", [HttpMethods.Get, HttpMethods.Post]);
-MapProxy(app, "/api/app/timeline/{id:guid}", "stock-research", "/internal/timeline/{id}", [HttpMethods.Get]);
-MapProxy(app, "/api/app/timeline/{originalId:guid}/corrections", "stock-research", "/internal/timeline/{originalId}/corrections", [HttpMethods.Post]);
+MapProxy(app, "/api/app/stocks", "stock-research", "/internal/stocks", [HttpMethods.Get, HttpMethods.Post]).RequireAuthorization("researchAccess");
+MapProxy(app, "/api/app/stocks/{symbol}", "stock-research", "/internal/stocks/{symbol}", [HttpMethods.Get]).RequireAuthorization("researchAccess");
+MapProxy(app, "/api/app/watchlist", "stock-research", "/internal/watchlist", [HttpMethods.Get]).RequireAuthorization("researchAccess");
+MapProxy(app, "/api/app/watchlist/{stockId:guid}", "stock-research", "/internal/watchlist/{stockId}", [HttpMethods.Post, HttpMethods.Delete]).RequireAuthorization("researchAccess");
+MapProxy(app, "/api/app/stocks/{stockId:guid}/note", "stock-research", "/internal/stocks/{stockId}/note", [HttpMethods.Get, HttpMethods.Put]).RequireAuthorization("researchAccess");
+MapProxy(app, "/api/app/stocks/{stockId:guid}/timeline", "stock-research", "/internal/stocks/{stockId}/timeline", [HttpMethods.Get, HttpMethods.Post]).RequireAuthorization("researchAccess");
+MapProxy(app, "/api/app/timeline/{id:guid}", "stock-research", "/internal/timeline/{id}", [HttpMethods.Get]).RequireAuthorization("researchAccess");
+MapProxy(app, "/api/app/timeline/{originalId:guid}/corrections", "stock-research", "/internal/timeline/{originalId}/corrections", [HttpMethods.Post]).RequireAuthorization("researchAccess");
 MapProxy(app, "/api/app/market/symbols", "market-data", "/internal/v1/symbols", [HttpMethods.Get]);
 MapProxy(app, "/api/app/market/bars/{symbol}", "market-data", "/internal/v1/bars/{symbol}", [HttpMethods.Get]);
 MapProxy(app, "/api/app/market/providers/health", "market-data", "/internal/v1/providers/health", [HttpMethods.Get]);
@@ -171,11 +194,11 @@ MapProxy(app, "/api/app/tools/risk-reward", "tool", "/internal/tools/risk-reward
 MapProxy(app, "/api/app/tools/fire", "tool", "/internal/tools/fire", [HttpMethods.Post]);
 MapProxy(app, "/api/app/tools/relative-value", "tool", "/internal/tools/relative-value", [HttpMethods.Post]);
 MapProxy(app, "/api/app/tools/seasonality", "tool", "/internal/tools/seasonality", [HttpMethods.Post]);
-MapProxy(app, "/api/admin/posts", "content", "/internal/admin/posts", [HttpMethods.Post]);
-MapProxy(app, "/api/admin/posts/{id:guid}", "content", "/internal/admin/posts/{id}", [HttpMethods.Put, HttpMethods.Delete]);
-MapProxy(app, "/api/admin/operations/audit", "operations", "/internal/operations/audit", [HttpMethods.Get, HttpMethods.Post]);
-MapProxy(app, "/api/admin/operations/jobs", "operations", "/internal/operations/jobs", [HttpMethods.Get, HttpMethods.Post]);
-MapProxy(app, "/api/admin/operations/health", "operations", "/internal/operations/health", [HttpMethods.Post]);
+MapProxy(app, "/api/admin/posts", "content", "/internal/admin/posts", [HttpMethods.Post]).RequireAuthorization("admin");
+MapProxy(app, "/api/admin/posts/{id:guid}", "content", "/internal/admin/posts/{id}", [HttpMethods.Put, HttpMethods.Delete]).RequireAuthorization("admin");
+MapProxy(app, "/api/admin/operations/audit", "operations", "/internal/operations/audit", [HttpMethods.Get]).RequireAuthorization("admin");
+MapProxy(app, "/api/admin/operations/jobs", "operations", "/internal/operations/jobs", [HttpMethods.Get, HttpMethods.Post]).RequireAuthorization("admin");
+MapProxy(app, "/api/admin/operations/health", "operations", "/internal/operations/health", [HttpMethods.Post]).RequireAuthorization("admin");
 MapProxy(app, "/api/content/posts", "content", "/internal/posts", [HttpMethods.Get]).AllowAnonymous();
 MapProxy(app, "/api/content/posts/{slug}", "content", "/internal/posts/{slug}", [HttpMethods.Get]).AllowAnonymous();
 
@@ -186,7 +209,7 @@ app.MapGet("/api/app/stocks/{symbol}/page", async (string symbol, HttpContext co
     await Task.WhenAll(stockTask, barsTask);
     if (stockTask.Result.StatusCode != 200) return Results.Content(stockTask.Result.Body?.ToJsonString() ?? "", "application/json", statusCode: stockTask.Result.StatusCode);
     return Results.Ok(new JsonObject { ["stock"] = stockTask.Result.Body?.DeepClone(), ["bars"] = barsTask.Result.StatusCode == 200 ? barsTask.Result.Body?.DeepClone() : null, ["capabilities"] = new JsonObject { ["marketData"] = barsTask.Result.StatusCode == 200 ? "available" : "unavailable" } });
-});
+}).RequireAuthorization("researchAccess");
 
 app.Run();
 

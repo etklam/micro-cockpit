@@ -32,7 +32,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         ValidateLifetime = true, ClockSkew = TimeSpan.FromSeconds(30)
     };
 });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options => { var humanOnly = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireAssertion(context => context.User.FindFirst("account_type")?.Value != "agent").Build(); options.DefaultPolicy = humanOnly; options.FallbackPolicy = humanOnly; });
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<SecuritySchemesTransformer>();
@@ -51,6 +51,7 @@ app.MapGet("/health/ready", async (NpgsqlDataSource db) =>
 }).AllowAnonymous();
 app.MapGet("/version", () => Results.Ok(new { service = "identity-service", version = "0.1.0" })).AllowAnonymous();
 app.MapGet("/internal/auth/sso/providers", () => Results.Ok(new SsoProvidersResponse(Array.Empty<string>())))
+    .AllowAnonymous()
     .Produces<SsoProvidersResponse>(200);
 app.MapGet("/.well-known/openid-configuration", (HttpRequest request) => Results.Ok(new
 {
@@ -105,6 +106,7 @@ app.MapPost("/internal/auth/register", async (RegisterRequest input, HttpRequest
         return Results.Problem("email_exists", statusCode: 409);
     }
 })
+.AllowAnonymous()
 .Produces<RegisterResponse>(201).ProducesProblem(400).ProducesProblem(404).ProducesProblem(409);
 
 app.MapPost("/internal/auth/login", async (LoginRequest input, NpgsqlDataSource db, RefreshTokenFamily refreshTokens) =>
@@ -123,6 +125,7 @@ app.MapPost("/internal/auth/login", async (LoginRequest input, NpgsqlDataSource 
     await reader.CloseAsync();
     return Results.Ok(await refreshTokens.IssueAsync(user, Guid.NewGuid()));
 })
+.AllowAnonymous()
 .Produces<AuthTokens>(200).ProducesProblem(401);
 
 app.MapPost("/internal/auth/refresh", async (RefreshRequest input, RefreshTokenFamily refreshTokens) =>
@@ -132,6 +135,7 @@ app.MapPost("/internal/auth/refresh", async (RefreshRequest input, RefreshTokenF
         ? Results.Ok(result.Tokens)
         : Results.Unauthorized();
 })
+.AllowAnonymous()
 .Produces<AuthTokens>(200).ProducesProblem(401);
 
 app.MapPost("/internal/auth/logout", async (RefreshRequest input, RefreshTokenFamily refreshTokens) =>
@@ -139,6 +143,7 @@ app.MapPost("/internal/auth/logout", async (RefreshRequest input, RefreshTokenFa
     await refreshTokens.RevokeFamilyAsync(input.RefreshToken);
     return Results.NoContent();
 })
+.AllowAnonymous()
 .Produces(204);
 
 app.MapPost("/internal/auth/agents", async (AgentRequest input, ClaimsPrincipal principal, NpgsqlDataSource db) =>
@@ -245,10 +250,7 @@ sealed class SecurityRequirementTransformer : IOpenApiOperationTransformer
     {
         var metadata = context.Description.ActionDescriptor.EndpointMetadata;
         if (metadata.OfType<AllowAnonymousAttribute>().Any()) return Task.CompletedTask;
-        var path = "/" + (context.Description.RelativePath ?? string.Empty);
-        var scheme = path.Contains("/internal/admin/", StringComparison.Ordinal)
-                     || path.Contains("/internal/worker/", StringComparison.Ordinal)
-                     || path.Contains("/internal/events/", StringComparison.Ordinal)
+        var scheme = metadata.OfType<IAuthorizeData>().Any(data => data.Policy == "serviceKey")
             ? "serviceKey" : "bearerAuth";
         operation.Security ??= new List<OpenApiSecurityRequirement>();
         operation.Security.Add(new OpenApiSecurityRequirement

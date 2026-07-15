@@ -5,7 +5,6 @@ export type AgentResponse = { "userId": string; "keyId": string; "apiKey": strin
 export type ApiKeyTokenRequest = { "apiKey": string }
 export type ApiKeyTokenResponse = { "accessToken": string; "expiresAt": string }
 export type AuditResponse = { "id": string; "actorUserId": null | string; "action": string; "resourceType": string; "resourceId": null | string; "details": JsonElement; "occurredAt": string }
-export type AuditWrite = { "action": string; "resourceType": string; "resourceId": null | string; "details": JsonElement }
 export type AuthorizationResponse = { "allowed": boolean }
 export type BarsResponse = { "contractVersion": number | string; "symbol": string; "items": Array<PublishedBarResponse> }
 export type CalculateResponse = { "universeId": string; "snapshotDate": string; "status": string; "formulaVersion": string }
@@ -161,7 +160,6 @@ export const postApiAdminPosts = (body: PostWrite, extra?: RequestInit) => reque
 export const putApiAdminPostsId = (id: string, body: PostWrite, extra?: RequestInit) => request<unknown>(`/api/admin/posts/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const deleteApiAdminPostsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/admin/posts/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const getApiAdminOperationsAudit = (query: { "limit"?: number | string }, extra?: RequestInit) => request<CollectionResponseOfAuditResponse>("/api/admin/operations/audit" + withQuery(query), { method: "GET", ...extra })
-export const postApiAdminOperationsAudit = (body: AuditWrite, extra?: RequestInit) => request<unknown>("/api/admin/operations/audit", { method: "POST", body: JSON.stringify(body), ...extra })
 export const getApiAdminOperationsJobs = (extra?: RequestInit) => request<CollectionResponseOfJobResponse>("/api/admin/operations/jobs", { method: "GET", ...extra })
 export const postApiAdminOperationsJobs = (body: JobWrite, extra?: RequestInit) => request<JobAcceptedResponse>("/api/admin/operations/jobs", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAdminOperationsHealth = (body: HealthWrite, extra?: RequestInit) => request<unknown>("/api/admin/operations/health", { method: "POST", body: JSON.stringify(body), ...extra })

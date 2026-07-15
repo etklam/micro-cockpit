@@ -63,6 +63,9 @@
   <Folder Name="/tests/TradeDiary.Performance.Tests/">
     <Project Path="tests/TradeDiary.Performance.Tests/TradeDiary.Performance.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/TradeDiary.Operations.Tests/">
+    <Project Path="tests/TradeDiary.Operations.Tests/TradeDiary.Operations.Tests.csproj" />
+  </Folder>
   <Folder Name="/tests/TradeDiary.Reminder.Tests/">
     <Project Path="tests/TradeDiary.Reminder.Tests/TradeDiary.Reminder.Tests.csproj" />
   </Folder>

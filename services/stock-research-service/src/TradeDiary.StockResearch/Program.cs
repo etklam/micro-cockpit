@@ -14,7 +14,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     options.RequireHttpsMetadata = false; // ponytail: local compose only; production config must use HTTPS.
     options.Audience = "trade-diary-services";
 });
-builder.Services.AddAuthorization(options => options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddAuthorization(options =>
+{
+    var humanOnly = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireAssertion(context => context.User.FindFirst("account_type")?.Value != "agent").Build();
+    options.DefaultPolicy = humanOnly;
+    options.FallbackPolicy = humanOnly;
+    options.AddPolicy("researchAccess", policy => policy.RequireAuthenticatedUser().RequireAssertion(context =>
+    {
+        if (context.User.FindFirst("account_type")?.Value != "agent") return true;
+        var request = (context.Resource as HttpContext)?.Request;
+        return request?.Method == HttpMethods.Get
+            && context.User.FindAll("scope").Any(claim => claim.Value == "research:read");
+    }));
+});
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<SecuritySchemesTransformer>();
@@ -28,7 +40,9 @@ app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAn
 app.MapGet("/health/ready", async (NpgsqlDataSource db) => { try { await db.OpenConnectionAsync(); return Results.Ok(new { status = "ready" }); } catch { return Results.Json(new { status = "not_ready" }, statusCode: 503); } }).AllowAnonymous();
 app.MapGet("/version", () => Results.Ok(new { service = "stock-research-service", version = "0.1.0" })).AllowAnonymous();
 
-app.MapGet("/internal/stocks", async (string? query, NpgsqlDataSource db) =>
+var research = app.MapGroup("/internal").RequireAuthorization("researchAccess");
+
+research.MapGet("/stocks", async (string? query, NpgsqlDataSource db) =>
 {
     await using var command = db.CreateCommand("SELECT id,symbol,name,exchange,asset_type,created_at FROM stock_research.stocks WHERE $1='' OR symbol ILIKE '%'||$1||'%' OR name ILIKE '%'||$1||'%' ORDER BY symbol LIMIT 100");
     command.Parameters.AddWithValue(query?.Trim() ?? "");
@@ -38,7 +52,7 @@ app.MapGet("/internal/stocks", async (string? query, NpgsqlDataSource db) =>
 })
 .Produces<CollectionResponse<StockResponse>>(200).ProducesProblem(401);
 
-app.MapGet("/internal/stocks/{symbol}", async Task<IResult> (string symbol, NpgsqlDataSource db) =>
+research.MapGet("/stocks/{symbol}", async Task<IResult> (string symbol, NpgsqlDataSource db) =>
 {
     await using var command = db.CreateCommand("SELECT id,symbol,name,exchange,asset_type,created_at FROM stock_research.stocks WHERE symbol=$1");
     command.Parameters.AddWithValue(symbol.Trim().ToUpperInvariant()); await using var reader = await command.ExecuteReaderAsync();
@@ -46,7 +60,7 @@ app.MapGet("/internal/stocks/{symbol}", async Task<IResult> (string symbol, Npgs
 })
 .Produces<StockResponse>(200).ProducesProblem(401).ProducesProblem(404);
 
-app.MapPost("/internal/stocks", async Task<IResult> (StockWrite input, NpgsqlDataSource db) =>
+research.MapPost("/stocks", async Task<IResult> (StockWrite input, NpgsqlDataSource db) =>
 {
     var symbol = input.Symbol?.Trim().ToUpperInvariant() ?? ""; var name = input.Name?.Trim() ?? ""; var exchange = input.Exchange?.Trim() ?? "";
     if (symbol.Length is 0 or > 20 || name.Length is 0 or > 200) return Results.Problem("symbol_and_name_required", statusCode: 400);
@@ -59,7 +73,7 @@ app.MapPost("/internal/stocks", async Task<IResult> (StockWrite input, NpgsqlDat
 })
 .Produces<StockResponse>(201).ProducesProblem(400).ProducesProblem(401).ProducesProblem(409);
 
-app.MapGet("/internal/watchlist", async Task<IResult> (HttpRequest request, NpgsqlDataSource db) =>
+research.MapGet("/watchlist", async Task<IResult> (HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     await using var command = db.CreateCommand("""
@@ -75,7 +89,7 @@ app.MapGet("/internal/watchlist", async Task<IResult> (HttpRequest request, Npgs
 })
 .Produces<CollectionResponse<WatchlistResponse>>(200).ProducesProblem(401);
 
-app.MapPost("/internal/watchlist/{stockId:guid}", async Task<IResult> (Guid stockId, HttpRequest request, NpgsqlDataSource db) =>
+research.MapPost("/watchlist/{stockId:guid}", async Task<IResult> (Guid stockId, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     await using var command = db.CreateCommand("INSERT INTO stock_research.watchlist_items(user_id,stock_id) SELECT $1,id FROM stock_research.stocks WHERE id=$2 ON CONFLICT DO NOTHING RETURNING stock_id");
@@ -86,7 +100,7 @@ app.MapPost("/internal/watchlist/{stockId:guid}", async Task<IResult> (Guid stoc
 })
 .Produces<WatchlistItemCreatedResponse>(201).Produces(204).ProducesProblem(401).ProducesProblem(404);
 
-app.MapDelete("/internal/watchlist/{stockId:guid}", async Task<IResult> (Guid stockId, HttpRequest request, NpgsqlDataSource db) =>
+research.MapDelete("/watchlist/{stockId:guid}", async Task<IResult> (Guid stockId, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     await using var command = db.CreateCommand("DELETE FROM stock_research.watchlist_items WHERE user_id=$1 AND stock_id=$2");
@@ -95,7 +109,7 @@ app.MapDelete("/internal/watchlist/{stockId:guid}", async Task<IResult> (Guid st
 })
 .Produces(204).ProducesProblem(401).ProducesProblem(404);
 
-app.MapGet("/internal/stocks/{stockId:guid}/note", async Task<IResult> (Guid stockId, HttpRequest request, NpgsqlDataSource db) =>
+research.MapGet("/stocks/{stockId:guid}/note", async Task<IResult> (Guid stockId, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     await using var command = db.CreateCommand("SELECT stock_id,content,created_at,updated_at FROM stock_research.stock_notes WHERE user_id=$1 AND stock_id=$2");
@@ -104,7 +118,7 @@ app.MapGet("/internal/stocks/{stockId:guid}/note", async Task<IResult> (Guid sto
 })
 .Produces<NoteResponse>(200).ProducesProblem(401).ProducesProblem(404);
 
-app.MapPut("/internal/stocks/{stockId:guid}/note", async Task<IResult> (Guid stockId, NoteWrite input, HttpRequest request, NpgsqlDataSource db) =>
+research.MapPut("/stocks/{stockId:guid}/note", async Task<IResult> (Guid stockId, NoteWrite input, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized(); var content = input.Content?.Trim() ?? "";
     await using var command = db.CreateCommand("""
@@ -118,7 +132,7 @@ app.MapPut("/internal/stocks/{stockId:guid}/note", async Task<IResult> (Guid sto
 })
 .Produces<NoteResponse>(200).ProducesProblem(401).ProducesProblem(404);
 
-app.MapGet("/internal/stocks/{stockId:guid}/timeline", async Task<IResult> (Guid stockId, HttpRequest request, NpgsqlDataSource db) =>
+research.MapGet("/stocks/{stockId:guid}/timeline", async Task<IResult> (Guid stockId, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     await using var exists = db.CreateCommand("SELECT EXISTS(SELECT 1 FROM stock_research.stocks WHERE id=$1)"); exists.Parameters.AddWithValue(stockId);
@@ -129,7 +143,7 @@ app.MapGet("/internal/stocks/{stockId:guid}/timeline", async Task<IResult> (Guid
 })
 .Produces<CollectionResponse<TimelineResponse>>(200).ProducesProblem(401).ProducesProblem(404);
 
-app.MapGet("/internal/timeline/{id:guid}", async Task<IResult> (Guid id, HttpRequest request, NpgsqlDataSource db) =>
+research.MapGet("/timeline/{id:guid}", async Task<IResult> (Guid id, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     await using var command = db.CreateCommand("SELECT id,stock_id,event_time,source_type,title,content,diary_id,correction_of_id,created_at FROM stock_research.stock_timeline_records WHERE id=$1 AND user_id=$2");
@@ -138,14 +152,14 @@ app.MapGet("/internal/timeline/{id:guid}", async Task<IResult> (Guid id, HttpReq
 })
 .Produces<TimelineResponse>(200).ProducesProblem(401).ProducesProblem(404);
 
-app.MapPost("/internal/stocks/{stockId:guid}/timeline", async Task<IResult> (Guid stockId, TimelineWrite input, HttpRequest request, NpgsqlDataSource db) =>
+research.MapPost("/stocks/{stockId:guid}/timeline", async Task<IResult> (Guid stockId, TimelineWrite input, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     return await AppendTimeline(db, userId, stockId, null, input);
 })
 .Produces<TimelineResponse>(201).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
 
-app.MapPost("/internal/timeline/{originalId:guid}/corrections", async Task<IResult> (Guid originalId, TimelineWrite input, HttpRequest request, NpgsqlDataSource db) =>
+research.MapPost("/timeline/{originalId:guid}/corrections", async Task<IResult> (Guid originalId, TimelineWrite input, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     await using var command = db.CreateCommand("SELECT stock_id FROM stock_research.stock_timeline_records WHERE id=$1 AND user_id=$2");
@@ -216,10 +230,7 @@ sealed class SecurityRequirementTransformer : IOpenApiOperationTransformer
     {
         var metadata = context.Description.ActionDescriptor.EndpointMetadata;
         if (metadata.OfType<AllowAnonymousAttribute>().Any()) return Task.CompletedTask;
-        var path = "/" + (context.Description.RelativePath ?? string.Empty);
-        var scheme = path.Contains("/internal/admin/", StringComparison.Ordinal)
-                     || path.Contains("/internal/worker/", StringComparison.Ordinal)
-                     || path.Contains("/internal/events/", StringComparison.Ordinal)
+        var scheme = metadata.OfType<IAuthorizeData>().Any(data => data.Policy == "serviceKey")
             ? "serviceKey" : "bearerAuth";
         operation.Security ??= new List<OpenApiSecurityRequirement>();
         operation.Security.Add(new OpenApiSecurityRequirement

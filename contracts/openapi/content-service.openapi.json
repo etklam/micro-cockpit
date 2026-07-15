@@ -163,7 +163,7 @@
         },
         "security": [
           {
-            "serviceKey": []
+            "bearerAuth": []
           }
         ]
       }
@@ -221,7 +221,7 @@
         },
         "security": [
           {
-            "serviceKey": []
+            "bearerAuth": []
           }
         ]
       },
@@ -257,7 +257,7 @@
         },
         "security": [
           {
-            "serviceKey": []
+            "bearerAuth": []
           }
         ]
       }

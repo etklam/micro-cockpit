@@ -5,7 +5,7 @@ using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o => { o.MapInboundClaims=false; o.MetadataAddress=builder.Configuration["Auth:MetadataAddress"]??"http://127.0.0.1:5100/.well-known/openid-configuration"; o.RequireHttpsMetadata=false; o.Audience="trade-diary-services"; });
-builder.Services.AddAuthorization(o => o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddAuthorization(o => { var humanOnly = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireAssertion(context => context.User.FindFirst("account_type")?.Value != "agent").Build(); o.DefaultPolicy = humanOnly; o.FallbackPolicy = humanOnly; });
 builder.Services.AddOpenApi(options=>{options.AddDocumentTransformer<SecuritySchemesTransformer>();options.AddOperationTransformer<SecurityRequirementTransformer>();});
 var app=builder.Build(); app.UseAuthentication(); app.UseAuthorization();
 app.MapOpenApi("/openapi.json").AllowAnonymous();
@@ -63,8 +63,7 @@ sealed class SecurityRequirementTransformer : IOpenApiOperationTransformer
     {
         var metadata = context.Description.ActionDescriptor.EndpointMetadata;
         if (metadata.OfType<AllowAnonymousAttribute>().Any()) return Task.CompletedTask;
-        var path = "/" + (context.Description.RelativePath ?? string.Empty);
-        var scheme = path.Contains("/internal/admin/", StringComparison.Ordinal) || path.Contains("/internal/worker/", StringComparison.Ordinal) || path.Contains("/internal/events/", StringComparison.Ordinal) ? "serviceKey" : "bearerAuth";
+        var scheme = metadata.OfType<IAuthorizeData>().Any(data => data.Policy == "serviceKey") ? "serviceKey" : "bearerAuth";
         operation.Security ??= new List<OpenApiSecurityRequirement>();
         operation.Security.Add(new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference(scheme, context.Document)] = new List<string>() });
         return Task.CompletedTask;

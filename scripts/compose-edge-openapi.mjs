@@ -22,7 +22,7 @@ const norm = (p) => p.replace(/\{([^}:]+):[^}]+\}/g, '{$1}')
 // Structural form ignores param NAMES so e.g. Edge's {symbol} matches the service's {raw}.
 const struct = (p) => p.replace(/\{[^}]+\}/g, '{_}')
 const pathParams = (p) => (p.match(/\{([^}]+)\}/g) || []).map((x) => x.slice(1, -1))
-const ANON_PUBLIC = (p) => p.startsWith('/api/content/') || ['/api/auth/register', '/api/auth/login', '/api/auth/refresh', '/api/auth/logout'].includes(p)
+const ANON_PUBLIC = (p) => p.startsWith('/api/content/') || ['/api/auth/register', '/api/auth/login', '/api/auth/refresh', '/api/auth/logout', '/api/auth/api-key/token'].includes(p)
 // Deterministic operationId from public method+path so the generated client has stable names
 // (matches the prior contract's naming, e.g. postApiAppDiaries, putApiAppDiariesId).
 const opId = (method, path) => `${method}_${path}`.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')

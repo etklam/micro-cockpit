@@ -124,7 +124,7 @@
         },
         "security": [
           {
-            "bearerAuth": []
+            "serviceKey": []
           }
         ]
       }

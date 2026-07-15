@@ -26,7 +26,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 builder.Services.AddSingleton<IAuthorizationHandler, ServiceKeyAuthorizationHandler>();
 builder.Services.AddAuthorization(options =>
 {
-    options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+    var humanOnly = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireAssertion(context => context.User.FindFirst("account_type")?.Value != "agent").Build();
+    options.DefaultPolicy = humanOnly;
+    options.FallbackPolicy = humanOnly;
     options.AddPolicy(ReminderAuthorizationPolicies.ServiceKey, policy => policy.AddRequirements(new ServiceKeyRequirement()));
 });
 builder.Services.AddOpenApi(options =>
@@ -147,7 +149,7 @@ app.MapGet("/internal/diary-alerts/day-summaries", async (DateOnly from, DateOnl
 .Produces<CollectionResponse<DayCountResponse>>(200).ProducesProblem(400).ProducesProblem(401);
 
 app.MapPost("/internal/worker/run", async (NpgsqlDataSource db, IReminderDeliveryChannel delivery) => Results.Ok(new WorkerRunResult(await ReminderEngine.RunWorker(db, delivery, 50))))
-.RequireAuthorization()
+.RequireAuthorization(ReminderAuthorizationPolicies.ServiceKey)
 .Produces<WorkerRunResult>(200);
 
 app.Run();
@@ -326,14 +328,14 @@ sealed class ServiceKeyAuthorizationHandler(IConfiguration configuration) : Auth
     {
         if (context.Resource is HttpContext httpContext && ServiceKeyAuthorization.IsValid(
                 httpContext.Request.Headers["X-Service-Key"].ToString(),
-                configuration["Internal:ServiceKey"] ?? "local-service-key"))
+                configuration["Internal:ServiceKey"] ?? ""))
             context.Succeed(requirement);
 
         return Task.CompletedTask;
     }
 }
 
-static class ServiceKeyAuthorization
+public static class ServiceKeyAuthorization
 {
     public static bool IsValid(string supplied, string expected)
     {

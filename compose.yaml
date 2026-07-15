@@ -152,6 +152,7 @@ services:
     environment:
       <<: *dotnet-env
       ConnectionStrings__PriceAlert: Host=postgres;Database=trade_diary;Username=price_alert_service;Password=${PRICE_ALERT_DB_PASSWORD:?set PRICE_ALERT_DB_PASSWORD}
+      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
     depends_on:
       identity: { condition: service_healthy }
@@ -200,6 +201,7 @@ services:
     environment:
       <<: *dotnet-env
       ConnectionStrings__Operations: Host=postgres;Database=trade_diary;Username=operations_service;Password=${OPERATIONS_DB_PASSWORD:?set OPERATIONS_DB_PASSWORD}
+      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
     depends_on: { identity: { condition: service_healthy } }
 

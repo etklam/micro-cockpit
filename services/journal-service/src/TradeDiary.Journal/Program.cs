@@ -18,7 +18,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     options.RequireHttpsMetadata = false; // ponytail: local compose only; production config must use HTTPS.
     options.Audience = "trade-diary-services";
 });
-builder.Services.AddAuthorization(options => options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddAuthorization(options =>
+{
+    var humanOnly = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireAssertion(context => context.User.FindFirst("account_type")?.Value != "agent").Build();
+    options.DefaultPolicy = humanOnly;
+    options.FallbackPolicy = humanOnly;
+    options.AddPolicy("diaryAccess", policy => policy.RequireAuthenticatedUser().RequireAssertion(context =>
+    {
+        if (context.User.FindFirst("account_type")?.Value != "agent") return true;
+        var method = (context.Resource as HttpContext)?.Request.Method;
+        var requiredScope = method == HttpMethods.Get ? "diary:read" : "diary:write";
+        return context.User.FindAll("scope").Any(claim => claim.Value == requiredScope);
+    }));
+});
 builder.Services.AddHttpClient("reminder", client => client.BaseAddress = new Uri(builder.Configuration["Services:Reminder"] ?? "http://127.0.0.1:5104"));
 builder.Services.AddHostedService<OutboxPublisher>();
 builder.Services.AddOpenApi(options =>
@@ -29,15 +41,6 @@ builder.Services.AddOpenApi(options =>
 });
 var app = builder.Build();
 app.UseAuthentication();
-app.Use(async (context, next) =>
-{
-    if (context.User.FindFirst("account_type")?.Value == "agent" && context.Request.Path.StartsWithSegments("/internal"))
-    {
-        var required = context.Request.Method == HttpMethods.Get ? "diary:read" : "diary:write";
-        if (!context.User.FindAll("scope").Any(claim => claim.Value == required)) { context.Response.StatusCode = StatusCodes.Status403Forbidden; return; }
-    }
-    await next();
-});
 app.UseAuthorization();
 app.MapOpenApi("/openapi.json").AllowAnonymous();
 
@@ -49,7 +52,9 @@ app.MapGet("/health/ready", async (NpgsqlDataSource db) =>
 }).AllowAnonymous();
 app.MapGet("/version", () => Results.Ok(new { service = "journal-service", version = "0.1.0" })).AllowAnonymous();
 
-app.MapGet("/internal/diaries", async (HttpRequest request, NpgsqlDataSource db) =>
+var diary = app.MapGroup("/internal").RequireAuthorization("diaryAccess");
+
+diary.MapGet("/diaries", async (HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     await using var command = db.CreateCommand("""
@@ -65,7 +70,7 @@ app.MapGet("/internal/diaries", async (HttpRequest request, NpgsqlDataSource db)
 })
 .Produces<CollectionResponse<DiaryResponse>>(200).ProducesProblem(401);
 
-app.MapGet("/internal/diaries/{id:guid}", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
+diary.MapGet("/diaries/{id:guid}", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     await using var command = db.CreateCommand("""
@@ -79,7 +84,7 @@ app.MapGet("/internal/diaries/{id:guid}", async (Guid id, HttpRequest request, N
 })
 .Produces<DiaryResponse>(200).ProducesProblem(401).ProducesProblem(404);
 
-app.MapGet("/internal/diary-day-summary", async (DateOnly from, DateOnly to, HttpRequest request, NpgsqlDataSource db) =>
+diary.MapGet("/diary-day-summary", async (DateOnly from, DateOnly to, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     if (to < from || to.DayNumber - from.DayNumber > 62) return Results.Problem("invalid_date_range", statusCode: 400);
@@ -102,7 +107,7 @@ app.MapGet("/internal/diary-day-summary", async (DateOnly from, DateOnly to, Htt
 })
 .Produces<CollectionResponse<DiaryDaySummaryItem>>(200).ProducesProblem(400).ProducesProblem(401);
 
-app.MapPost("/internal/diaries", async (DiaryWrite input, HttpRequest request, NpgsqlDataSource db) =>
+diary.MapPost("/diaries", async (DiaryWrite input, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     if (string.IsNullOrWhiteSpace(input.Title)) return Results.Problem("title_required", statusCode: 400);
@@ -125,7 +130,7 @@ app.MapPost("/internal/diaries", async (DiaryWrite input, HttpRequest request, N
 .Produces<DiaryResponse>(201).ProducesProblem(400).ProducesProblem(401).ProducesProblem(409)
 .WithMetadata(new IdempotencyKeyHeaderMarker());
 
-app.MapPut("/internal/diaries/{id:guid}", async (Guid id, DiaryWrite input, HttpRequest request, NpgsqlDataSource db) =>
+diary.MapPut("/diaries/{id:guid}", async (Guid id, DiaryWrite input, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     if (string.IsNullOrWhiteSpace(input.Title)) return Results.Problem("title_required", statusCode: 400);
@@ -142,7 +147,7 @@ app.MapPut("/internal/diaries/{id:guid}", async (Guid id, DiaryWrite input, Http
 })
 .Produces(204).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
 
-app.MapDelete("/internal/diaries/{id:guid}", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
+diary.MapDelete("/diaries/{id:guid}", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     await using var connection = await db.OpenConnectionAsync();
@@ -161,7 +166,7 @@ app.MapDelete("/internal/diaries/{id:guid}", async (Guid id, HttpRequest request
 })
 .Produces(204).ProducesProblem(401).ProducesProblem(404);
 
-app.MapPost("/internal/quick-note", async (QuickNote input, HttpRequest request, NpgsqlDataSource db) =>
+diary.MapPost("/quick-note", async (QuickNote input, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     if (string.IsNullOrWhiteSpace(input.Content)) return Results.Problem("content_required", statusCode: 400);
@@ -189,7 +194,7 @@ app.MapPost("/internal/quick-note", async (QuickNote input, HttpRequest request,
 .Produces<QuickNoteResponse>(200).Produces<QuickNoteResponse>(201).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404).ProducesProblem(409)
 .WithMetadata(new IdempotencyKeyHeaderMarker());
 
-app.MapGet("/internal/diaries/{diaryId:guid}/transactions", async (Guid diaryId, HttpRequest request, NpgsqlDataSource db) =>
+diary.MapGet("/diaries/{diaryId:guid}/transactions", async (Guid diaryId, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     if (!await OwnsDiary(db, diaryId, userId)) return Results.Problem("not_found", statusCode: 404);
@@ -205,7 +210,7 @@ app.MapGet("/internal/diaries/{diaryId:guid}/transactions", async (Guid diaryId,
 })
 .Produces<CollectionResponse<TransactionResponse>>(200).ProducesProblem(401).ProducesProblem(404);
 
-app.MapPost("/internal/diaries/{diaryId:guid}/transactions", async (Guid diaryId, TransactionWrite input, HttpRequest request, NpgsqlDataSource db) =>
+diary.MapPost("/diaries/{diaryId:guid}/transactions", async (Guid diaryId, TransactionWrite input, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     var error = ValidateTransaction(input);
@@ -231,7 +236,7 @@ app.MapPost("/internal/diaries/{diaryId:guid}/transactions", async (Guid diaryId
 .Produces<TransactionResponse>(201).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404).ProducesProblem(409)
 .WithMetadata(new IdempotencyKeyHeaderMarker());
 
-app.MapPut("/internal/diaries/{diaryId:guid}/transactions/{id:guid}", async (Guid diaryId, Guid id, TransactionWrite input, HttpRequest request, NpgsqlDataSource db) =>
+diary.MapPut("/diaries/{diaryId:guid}/transactions/{id:guid}", async (Guid diaryId, Guid id, TransactionWrite input, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     var error = ValidateTransaction(input);
@@ -250,7 +255,7 @@ app.MapPut("/internal/diaries/{diaryId:guid}/transactions/{id:guid}", async (Gui
 })
 .Produces(204).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
 
-app.MapDelete("/internal/diaries/{diaryId:guid}/transactions/{id:guid}", async (Guid diaryId, Guid id, HttpRequest request, NpgsqlDataSource db) =>
+diary.MapDelete("/diaries/{diaryId:guid}/transactions/{id:guid}", async (Guid diaryId, Guid id, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!TryUser(request, out var userId)) return Results.Unauthorized();
     await using var command = db.CreateCommand("""
@@ -444,10 +449,7 @@ sealed class SecurityRequirementTransformer : IOpenApiOperationTransformer
     {
         var metadata = context.Description.ActionDescriptor.EndpointMetadata;
         if (metadata.OfType<AllowAnonymousAttribute>().Any()) return Task.CompletedTask;
-        var path = "/" + (context.Description.RelativePath ?? string.Empty);
-        var scheme = path.Contains("/internal/admin/", StringComparison.Ordinal)
-                     || path.Contains("/internal/worker/", StringComparison.Ordinal)
-                     || path.Contains("/internal/events/", StringComparison.Ordinal)
+        var scheme = metadata.OfType<IAuthorizeData>().Any(data => data.Policy == "serviceKey")
             ? "serviceKey" : "bearerAuth";
         operation.Security ??= new List<OpenApiSecurityRequirement>();
         operation.Security.Add(new OpenApiSecurityRequirement
