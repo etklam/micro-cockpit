@@ -47,6 +47,14 @@ counter=$((counter + 1)); printf '%s' "$counter" >"$counter_file"
 printf 'TEST-ONLY-NEW-MATERIAL-%02d' "$counter"
 EOF
 
+  cat >"$directory/bin/flock" <<'EOF'
+#!/usr/bin/env python3
+import fcntl
+import sys
+
+fcntl.flock(int(sys.argv[3]), fcntl.LOCK_EX)
+EOF
+
   cat >"$directory/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 set -eu
@@ -120,7 +128,7 @@ case "${1:-} ${2:-}" in
 esac
 exit 0
 EOF
-  chmod 700 "$directory/bin/openssl" "$directory/bin/curl" "$directory/bin/kubectl"
+  chmod 700 "$directory/bin/openssl" "$directory/bin/curl" "$directory/bin/kubectl" "$directory/bin/flock"
 }
 
 run_case() {

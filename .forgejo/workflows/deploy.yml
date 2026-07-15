@@ -33,6 +33,8 @@ jobs:
           ./tests/verify-secret-handling.sh
           ./tests/verify-deployment-safety.sh
           ./tests/verify-rotation-safety.sh
+          ./tests/verify-runtime-secret-source.sh
+          ./tests/verify-k8s-operation-lock.sh
 
       - name: Resolve immutable image tag
         run: |
@@ -93,24 +95,8 @@ jobs:
           build_and_push edge gateway/TradeDiary.EdgeApi/Dockerfile
           build_and_push frontend frontend/Dockerfile
 
-      - name: Provision secrets and deploy exact manifests
+      - name: Deploy exact manifests using existing runtime Secrets
         env:
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          MIGRATOR_DB_PASSWORD: ${{ secrets.MIGRATOR_DB_PASSWORD }}
-          IDENTITY_DB_PASSWORD: ${{ secrets.IDENTITY_DB_PASSWORD }}
-          JOURNAL_DB_PASSWORD: ${{ secrets.JOURNAL_DB_PASSWORD }}
-          PERFORMANCE_DB_PASSWORD: ${{ secrets.PERFORMANCE_DB_PASSWORD }}
-          DISCIPLINE_DB_PASSWORD: ${{ secrets.DISCIPLINE_DB_PASSWORD }}
-          REMINDER_DB_PASSWORD: ${{ secrets.REMINDER_DB_PASSWORD }}
-          STOCK_RESEARCH_DB_PASSWORD: ${{ secrets.STOCK_RESEARCH_DB_PASSWORD }}
-          MARKET_DATA_DB_PASSWORD: ${{ secrets.MARKET_DATA_DB_PASSWORD }}
-          PRICE_ALERT_DB_PASSWORD: ${{ secrets.PRICE_ALERT_DB_PASSWORD }}
-          ROTATION_DB_PASSWORD: ${{ secrets.ROTATION_DB_PASSWORD }}
-          PARTNER_DB_PASSWORD: ${{ secrets.PARTNER_DB_PASSWORD }}
-          CONTENT_DB_PASSWORD: ${{ secrets.CONTENT_DB_PASSWORD }}
-          OPERATIONS_DB_PASSWORD: ${{ secrets.OPERATIONS_DB_PASSWORD }}
-          LOCAL_REGISTRATION_KEY: ${{ secrets.LOCAL_REGISTRATION_KEY }}
-          INTERNAL_SERVICE_KEY: ${{ secrets.INTERNAL_SERVICE_KEY }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
@@ -137,29 +123,22 @@ jobs:
           trap cleanup EXIT HUP INT TERM
           printf '%s' "$DEPLOY_SSH_KEY" >"$work/deploy_key"
           chmod 600 "$work/deploy_key"
-          secrets_file="$work/deployment.secret.env"
-          : >"$secrets_file"
-          chmod 600 "$secrets_file"
-          for key in POSTGRES_PASSWORD MIGRATOR_DB_PASSWORD IDENTITY_DB_PASSWORD JOURNAL_DB_PASSWORD PERFORMANCE_DB_PASSWORD DISCIPLINE_DB_PASSWORD REMINDER_DB_PASSWORD STOCK_RESEARCH_DB_PASSWORD MARKET_DATA_DB_PASSWORD PRICE_ALERT_DB_PASSWORD ROTATION_DB_PASSWORD PARTNER_DB_PASSWORD CONTENT_DB_PASSWORD OPERATIONS_DB_PASSWORD LOCAL_REGISTRATION_KEY INTERNAL_SERVICE_KEY; do
-            value=$(printenv "$key" || true)
-            [ -n "$value" ] || { echo "Missing Forgejo Actions secret: $key" >&2; exit 1; }
-            printf '%s=%s\n' "$key" "$value" >>"$secrets_file"
-          done
-          tar -czf "$work/deploy.tgz" k8s scripts/provision-k8s-secrets.sh scripts/apply-k8s-manifests.sh scripts/deploy-k8s-release.sh
+          tar -czf "$work/deploy.tgz" k8s scripts/apply-k8s-manifests.sh scripts/deploy-k8s-release.sh scripts/verify-k8s-runtime-secrets.sh scripts/with-k8s-operation-lock.sh
           remote=$(ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" 'mktemp -d /tmp/micro-cockpit-deploy.XXXXXX')
-          scp -q "${ssh_options[@]}" "$work/deploy.tgz" "$secrets_file" "${DEPLOY_USER}@${DEPLOY_HOST}:$remote/"
+          scp -q "${ssh_options[@]}" "$work/deploy.tgz" "${DEPLOY_USER}@${DEPLOY_HOST}:$remote/"
           ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "REMOTE_DIR='$remote' DEPLOY_NAMESPACE='$DEPLOY_NAMESPACE' IMAGE_REGISTRY='${REGISTRY}/${REPO_OWNER}/${REPO_NAME}' IMAGE_TAG='$IMAGE_TAG' flock -w 900 '/tmp/micro-cockpit-${DEPLOY_NAMESPACE}.deploy.lock' bash -s" <<'REMOTE'
+            "REMOTE_DIR='$remote' DEPLOY_NAMESPACE='$DEPLOY_NAMESPACE' IMAGE_REGISTRY='${REGISTRY}/${REPO_OWNER}/${REPO_NAME}' IMAGE_TAG='$IMAGE_TAG' bash -s" <<'REMOTE'
           set -euo pipefail
           set +x
           cleanup_remote() { rm -rf "$REMOTE_DIR"; }
           trap cleanup_remote EXIT HUP INT TERM
-          chmod 600 "$REMOTE_DIR/deployment.secret.env"
           cd "$REMOTE_DIR"
           tar -xzf deploy.tgz
-          chmod 700 scripts/provision-k8s-secrets.sh scripts/apply-k8s-manifests.sh scripts/deploy-k8s-release.sh
-          kubectl apply -f k8s/00-namespace.yaml >/dev/null
-          scripts/provision-k8s-secrets.sh --env-file "$REMOTE_DIR/deployment.secret.env" --namespace "$DEPLOY_NAMESPACE"
-          scripts/deploy-k8s-release.sh --namespace "$DEPLOY_NAMESPACE" --image-registry "$IMAGE_REGISTRY" --image-tag "$IMAGE_TAG"
+          chmod 700 scripts/apply-k8s-manifests.sh scripts/deploy-k8s-release.sh scripts/verify-k8s-runtime-secrets.sh scripts/with-k8s-operation-lock.sh
+          scripts/with-k8s-operation-lock.sh --namespace "$DEPLOY_NAMESPACE" --timeout 900 -- bash -c '
+            set -euo pipefail
+            scripts/verify-k8s-runtime-secrets.sh --namespace "$DEPLOY_NAMESPACE"
+            scripts/deploy-k8s-release.sh --namespace "$DEPLOY_NAMESPACE" --image-registry "$IMAGE_REGISTRY" --image-tag "$IMAGE_TAG"
+          '
           REMOTE
           remote=""

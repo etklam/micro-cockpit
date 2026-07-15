@@ -16,7 +16,7 @@ This record intentionally contains metadata only. Credential values must always 
 
 The current tree and all reachable Git commits were inspected using metadata-only `git grep`, `git log -p`-equivalent history traversal, and the repository validator. Kubernetes manifests, both CI systems, environment templates, Compose, documentation, service configuration, and shell scripts were included. References to registry, SSH, and CI credentials already resolve from action secret stores and were not classified as exposed values. The Identity RSA signing key was excluded because it was not part of this plaintext incident.
 
-Implementation status: completed. Recoverable rotation, old-credential negative verification, pinned deployment-host trust, immutable release tags, and deployment serialization are implemented and covered by mocked failure-path tests.
+Implementation status: completed. Kubernetes Secrets are the production runtime credential source of truth. Normal Forgejo releases contain deployment infrastructure credentials only, verify the existing runtime Secrets without changing them, and share one namespace operation lock with recoverable rotation. Bootstrap replacement requires explicit operator confirmation. These controls, old-credential negative verification, pinned deployment-host trust, immutable release tags, and rollback paths are covered by static and mocked failure-path tests.
 
 Live rotation status: pending operator execution. No exposed credential is claimed revoked without cluster evidence. Run `scripts/rotate-k8s-credentials.sh` only after recording a verified backup reference and confirming the intended Kubernetes context and namespace.
 

@@ -69,6 +69,8 @@ jobs:
           ./tests/verify-secret-handling.sh
           ./tests/verify-deployment-safety.sh
           ./tests/verify-rotation-safety.sh
+          ./tests/verify-runtime-secret-source.sh
+          ./tests/verify-k8s-operation-lock.sh
       - name: Validate Docker Compose config
         env:
           # Placeholder secrets are sufficient for `compose config` substitution validation.

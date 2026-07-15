@@ -4,22 +4,44 @@ set +x
 
 namespace="${K8S_NAMESPACE:-micro-cockpit}"
 source_file="${SECRET_ENV_FILE:-}"
+confirmed=false
+replace_existing=false
 
 usage() {
-  echo "Usage: $0 --env-file PATH [--namespace NAME]" >&2
+  echo "Usage: $0 --env-file PATH [--namespace NAME] --confirm-create-or-replace [--replace-existing]" >&2
 }
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --env-file) source_file=${2:?missing env-file path}; shift 2 ;;
     --namespace) namespace=${2:?missing namespace}; shift 2 ;;
+    --confirm-create-or-replace) confirmed=true; shift ;;
+    --replace-existing) replace_existing=true; shift ;;
     *) usage; exit 2 ;;
   esac
 done
 
 [ -n "$source_file" ] || { usage; exit 2; }
+[ "$confirmed" = true ] || {
+  echo "Refusing to create production runtime credentials without --confirm-create-or-replace." >&2
+  exit 1
+}
+[[ "$namespace" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]] || { echo "Invalid namespace." >&2; exit 1; }
 [ -r "$source_file" ] || { echo "Secret input file is not readable." >&2; exit 1; }
 command -v kubectl >/dev/null 2>&1 || { echo "kubectl is required." >&2; exit 1; }
+kubectl get namespace "$namespace" >/dev/null
+
+existing=""
+for name in db-credentials service-connection-strings app-secrets; do
+  if kubectl get secret "$name" -n "$namespace" >/dev/null 2>&1; then
+    existing="$existing $name"
+  fi
+done
+if [ -n "$existing" ] && [ "$replace_existing" = false ]; then
+  echo "Refusing to overwrite existing production runtime Secret(s):${existing}" >&2
+  echo "Use --replace-existing only for an explicit operator-controlled update." >&2
+  exit 1
+fi
 
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/micro-cockpit-secrets.XXXXXX")
 cleanup() {
@@ -87,7 +109,6 @@ do
     "$prefix" "$role" "$password" >>"$connections_file"
 done
 
-kubectl get namespace "$namespace" >/dev/null
 for item in db-credentials:"$db_file" service-connection-strings:"$connections_file" app-secrets:"$app_file"; do
   name=${item%%:*}
   file=${item#*:}
@@ -96,4 +117,4 @@ for item in db-credentials:"$db_file" service-connection-strings:"$connections_f
     kubectl apply --namespace "$namespace" -f - >/dev/null
 done
 
-echo "Kubernetes secrets were provisioned in namespace $namespace."
+echo "Production runtime Secrets were created or replaced in namespace $namespace."

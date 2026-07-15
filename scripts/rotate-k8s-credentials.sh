@@ -5,9 +5,11 @@ set +x
 namespace="${K8S_NAMESPACE:-micro-cockpit}"
 backup_reference="${BACKUP_CONFIRMED:-}"
 expected_context="${K8S_CONTEXT:-}"
+lock_timeout="${K8S_OPERATION_LOCK_TIMEOUT:-900}"
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 
 usage() {
-  echo "Usage: $0 [--namespace NAME] --context CONTEXT --backup-confirmed REFERENCE" >&2
+  echo "Usage: $0 [--namespace NAME] --context CONTEXT --backup-confirmed REFERENCE [--lock-timeout SECONDS]" >&2
 }
 
 while [ "$#" -gt 0 ]; do
@@ -15,6 +17,7 @@ while [ "$#" -gt 0 ]; do
     --namespace) namespace=${2:?missing namespace}; shift 2 ;;
     --context) expected_context=${2:?missing context}; shift 2 ;;
     --backup-confirmed) backup_reference=${2:?missing backup reference}; shift 2 ;;
+    --lock-timeout) lock_timeout=${2:?missing timeout}; shift 2 ;;
     *) usage; exit 2 ;;
   esac
 done
@@ -22,12 +25,19 @@ done
 [ -n "$expected_context" ] || { echo "An explicit Kubernetes context is required." >&2; exit 1; }
 [ -n "$backup_reference" ] || { echo "A verified backup reference is required." >&2; exit 1; }
 [[ "$namespace" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]] || { echo "Invalid namespace." >&2; exit 1; }
+[[ "$lock_timeout" =~ ^[0-9]+$ ]] || { echo "Lock timeout must be a non-negative integer." >&2; exit 1; }
 for command in kubectl openssl python3 curl; do
   command -v "$command" >/dev/null 2>&1 || { echo "$command is required." >&2; exit 1; }
 done
 
 current_context=$(kubectl config current-context)
 [ "$current_context" = "$expected_context" ] || { echo "Kubernetes context does not match the operator confirmation." >&2; exit 1; }
+
+if [ "${MICRO_COCKPIT_OPERATION_LOCK_NAMESPACE:-}" != "$namespace" ]; then
+  exec "$script_dir/with-k8s-operation-lock.sh" --namespace "$namespace" --timeout "$lock_timeout" -- \
+    "$0" --namespace "$namespace" --context "$expected_context" --backup-confirmed "$backup_reference" --lock-timeout "$lock_timeout"
+fi
+
 kubectl get namespace "$namespace" >/dev/null
 kubectl rollout status deployment/postgres -n "$namespace" --timeout=300s
 
@@ -304,7 +314,8 @@ for deployment in "${internal_key_deployments[@]}"; do
   kubectl wait --for=delete pod -n "$namespace" -l "app=$deployment" --timeout=300s >/dev/null
 done
 
-scripts/provision-k8s-secrets.sh --env-file "$new_file" --namespace "$namespace"
+"$script_dir/provision-k8s-secrets.sh" --env-file "$new_file" --namespace "$namespace" \
+  --confirm-create-or-replace --replace-existing
 fault after-secrets
 restore_internal_replicas
 for deployment in "${deployments[@]}"; do

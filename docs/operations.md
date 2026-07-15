@@ -76,11 +76,32 @@ docker compose up -d
 
 Forgejo builds every application image with the full checked-out commit SHA and deploys that same SHA through `scripts/deploy-k8s-release.sh`. The helper renders a temporary Kustomize overlay, so tracked manifests are not edited. Base application manifests deliberately contain `REQUIRED_IMAGE_TAG` and cannot be deployed through the generic manifest helper. The release helper rejects mutable or shortened tags, applies all 15 application images together, records the SHA in `app.kubernetes.io/version` and `micro-cockpit/deployed-sha`, and then verifies live images, annotations, availability, and the absence of `CrashLoopBackOff`.
 
+Production runtime credentials have one authoritative source: the current `db-credentials`, `service-connection-strings`, and `app-secrets` Kubernetes Secrets in the production namespace. Forgejo Actions stores deployment infrastructure credentials only: registry credentials, the SSH key, the pinned known-hosts entry, and deployment host/user configuration. A normal release never receives, transfers, creates, patches, or replaces application runtime credentials. While holding the namespace operation lock, it verifies that all required Secrets and keys are present, applies non-secret infrastructure, and deploys the immutable application images.
+
 Configure `DEPLOY_HOST` and `DEPLOY_USER` as Forgejo variables. Configure `DEPLOY_SSH_KEY` and `DEPLOY_KNOWN_HOSTS` as Forgejo secrets. Obtain the known-hosts entry independently from the deployment host administrator and verify its fingerprint out of band; never populate it with deployment-time `ssh-keyscan`. Missing host, user, or known-hosts data fails closed. Every SSH, SCP, and cleanup path uses strict host checking, the pinned file, and `IdentitiesOnly=yes`.
 
-Use a dedicated deployment account rather than `root`. Its Kubernetes permissions should be restricted to creating and updating this namespace's Secrets, applying project manifests, restarting project Deployments, and reading rollout and Pod status. It also needs access to the namespace-scoped deployment lock file on the host.
+Use a dedicated deployment account rather than `root`. Its Kubernetes permissions should be restricted to reading the required Secret metadata/keys, applying project non-secret manifests, restarting project Deployments, and reading rollout and Pod status. Normal deployment does not need permission to create, patch, or replace Secrets. Bootstrap and rotation should use a separately controlled operator identity. The deployment account also needs access to the namespace-scoped operation lock file on the host.
 
-Forgejo serializes production deployments with a concurrency group. The remote host additionally takes an exclusive `flock` before secret provisioning and holds it through manifest rendering, image update, rollout, and final verification. A second deployment waits rather than operating concurrently.
+Forgejo serializes production deployments with a concurrency group. The remote host additionally uses `scripts/with-k8s-operation-lock.sh`, which takes `/tmp/micro-cockpit-<namespace>.operation.lock` before runtime Secret verification and holds it through manifest rendering, image update, rollout, and final verification. Credential rotation uses the same lock for its entire operation, so a release and rotation cannot modify the namespace concurrently.
+
+## Kubernetes runtime Secret bootstrap
+
+Bootstrap, rotation, and release are separate operations:
+
+- Bootstrap creates the three production runtime Secrets for the first time as an explicit operator action.
+- Rotation updates PostgreSQL roles and those Secrets together during a maintenance window under the shared namespace lock.
+- Release deployment changes application images and non-secret manifests without changing runtime Secrets.
+
+Bootstrap requires protected operator-supplied input and explicit confirmation:
+
+```sh
+scripts/provision-k8s-secrets.sh \
+  --namespace micro-cockpit \
+  --env-file /secure/path/production.secret.env \
+  --confirm-create-or-replace
+```
+
+This command creates production runtime credentials. Do not run it during a normal application release. If any target Secret already exists, the command fails without making changes. `--replace-existing` permits replacement only as a deliberate operator-controlled update; verify the database/runtime coordination procedure before using it. The tool never generates production credentials.
 
 ## Kubernetes credential rotation
 
@@ -93,7 +114,7 @@ scripts/rotate-k8s-credentials.sh \
   --backup-confirmed BACKUP_REFERENCE
 ```
 
-The script captures all three current Secrets in a mode-0700 temporary directory, verifies every current PostgreSQL role login, and generates new credentials. Role changes use a fixed role allowlist and protected `psql` stdin. After PostgreSQL commits, any later failure activates rollback. Journal, Reminder, Market Data, Price Alert, and Operations are stopped together while the shared internal key changes, preventing mixed-key event delivery.
+Run rotation on the same deployment host used by Forgejo so both operations contend on the same lock filesystem. The public rotation command validates the context and backup reference, acquires the shared namespace operation lock, and then runs the complete rotation inside it. The script captures all three current Secrets in a mode-0700 temporary directory, verifies every current PostgreSQL role login, and generates new credentials. Role changes use a fixed role allowlist and protected `psql` stdin. After PostgreSQL commits, any later failure activates rollback. Journal, Reminder, Market Data, Price Alert, and Operations are stopped together while the shared internal key changes, preventing mixed-key event delivery.
 
 Successful rotation requires all new database logins to succeed, every old database login to fail, the old internal key to receive `403`, and the new key to pass authentication and reach a non-mutating `400` validation response. Temporary credentials and probe headers are removed on every exit.
 
