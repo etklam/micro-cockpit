@@ -1,4 +1,9 @@
 <Solution>
+  <Folder Name="/platform/" />
+  <Folder Name="/platform/postgres/" />
+  <Folder Name="/platform/postgres/migrator/">
+    <Project Path="platform/postgres/migrator/TradeDiary.DatabaseMigrator/TradeDiary.DatabaseMigrator.csproj" />
+  </Folder>
   <Folder Name="/gateway/">
     <Project Path="gateway/TradeDiary.EdgeApi/TradeDiary.EdgeApi.csproj" />
   </Folder>
@@ -53,7 +58,9 @@
   <Folder Name="/services/rotation-service/src/">
     <Project Path="services/rotation-service/src/TradeDiary.Rotation/TradeDiary.Rotation.csproj" />
   </Folder>
-  <Folder Name="/tests/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/TradeDiary.DatabaseMigrator.Tests/TradeDiary.DatabaseMigrator.Tests.csproj" />
+  </Folder>
   <Folder Name="/tests/TradeDiary.Identity.Tests/">
     <Project Path="tests/TradeDiary.Identity.Tests/TradeDiary.Identity.Tests.csproj" />
   </Folder>

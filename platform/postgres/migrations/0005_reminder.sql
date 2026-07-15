@@ -1,3 +1,7 @@
+-- migration-id: 0005
+-- owner: platform-legacy
+-- description: Initial reminder schema
+
 CREATE SCHEMA IF NOT EXISTS reminder;
 CREATE TABLE IF NOT EXISTS reminder.diary_alerts (
   id uuid PRIMARY KEY,

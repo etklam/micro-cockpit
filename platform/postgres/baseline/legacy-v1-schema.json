@@ -1,0 +1,34 @@
+{
+  "requiredObjects": [
+    "journal.diaries", "journal.transactions", "performance.daily_performances",
+    "identity.users", "identity.user_credentials", "identity.refresh_tokens",
+    "discipline.disciplines", "reminder.diary_alerts", "reminder.reminder_delivery_attempts",
+    "reminder.inbox_events", "reminder.outbox_events", "journal.outbox_events",
+    "market.symbols", "market.provider_runs", "market.daily_bars",
+    "market.published_symbols_v1", "market.published_daily_bars_v1",
+    "market.published_provider_health_v1", "market_data_public.adjusted_daily_bars_v1",
+    "stock_research.stocks", "stock_research.watchlist_items", "stock_research.stock_notes",
+    "stock_research.stock_timeline_records", "price_alert.alerts", "price_alert.triggers",
+    "rotation.market_rotation_universes", "rotation.market_rotation_universe_symbols",
+    "rotation.batch_runs", "rotation.market_rotation_snapshots", "rotation.sector_breadth_snapshots",
+    "rotation.market_state_snapshots", "partner.partner_links", "partner.partner_share_policies",
+    "content.posts", "content.post_tags", "operations.audit_events", "operations.job_registry",
+    "operations.service_health_history", "identity.api_keys", "journal.idempotency_keys"
+  ],
+  "requiredColumns": [
+    { "schema": "journal", "table": "transactions", "column": "currency" },
+    { "schema": "journal", "table": "transactions", "column": "deleted_at" },
+    { "schema": "reminder", "table": "inbox_events", "column": "event_version" },
+    { "schema": "stock_research", "table": "stock_timeline_records", "column": "correction_of_id" },
+    { "schema": "identity", "table": "api_keys", "column": "key_hash" },
+    { "schema": "journal", "table": "idempotency_keys", "column": "request_hash" },
+    { "schema": "operations", "table": "job_registry", "column": "result" },
+    { "schema": "rotation", "table": "market_state_snapshots", "column": "benchmark_above_ma200" }
+  ],
+  "requiredCatalogChecks": [
+    "SELECT count(*) = 40 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname = ANY(ARRAY['identity','journal','performance','discipline','reminder','market','market_data_public','price_alert','rotation','stock_research','partner','content','operations']) AND c.relkind IN ('r','p','v','m')",
+    "SELECT count(*) = 10 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='i' AND c.relname = ANY(ARRAY['api_keys_user_idx','diaries_user_date_idx','diary_alerts_due_idx','journal_outbox_unpublished_idx','market_daily_bars_published_idx','price_alert_active_idx','refresh_tokens_family_idx','rotation_snapshots_lookup_idx','stock_timeline_user_stock_event_idx','transactions_diary_idx'])",
+    "SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='stock_research' AND p.proname='reject_timeline_mutation')",
+    "SELECT EXISTS(SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='stock_research' AND c.relname='stock_timeline_records' AND t.tgname='stock_timeline_immutable' AND NOT t.tgisinternal)"
+  ]
+}

@@ -32,11 +32,12 @@ Backup, restore, reset, and signing-key handling (full commands in [docs/operati
 - **Restore** — `pg_restore --clean --if-exists` into the target database; verify application tables.
 - **Destructive reset** — `docker compose down -v` removes the data volume; the next `up` re-runs migrations on an empty database.
 - **Signing key backup** — Identity's RSA private key lives in the `identity-keys` volume (`/keys/signing-key.pem`). Back it up; losing it invalidates all outstanding refresh tokens and forces re-login. The JWT `kid` is derived from the public key, so it is stable across restarts and only changes on key rotation.
+- **Database migrations** — Versioned, checksummed, forward-only migration and baseline procedures are in [docs/database-migrations.md](docs/database-migrations.md).
 
 ## Run for development
 
 ```sh
-docker compose up -d postgres
+docker compose up --build db-role-finalize
 dotnet build TradeDiary.slnx
 cd frontend && npm install && npm run dev
 dotnet run --project gateway/TradeDiary.EdgeApi

@@ -1,3 +1,7 @@
+-- migration-id: 0002
+-- owner: platform-legacy
+-- description: Initial identity schema
+
 CREATE SCHEMA IF NOT EXISTS identity;
 
 CREATE TABLE IF NOT EXISTS identity.users (

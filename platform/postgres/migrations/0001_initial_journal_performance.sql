@@ -1,3 +1,7 @@
+-- migration-id: 0001
+-- owner: platform-legacy
+-- description: Initial journal and performance schemas
+
 CREATE SCHEMA IF NOT EXISTS journal;
 CREATE SCHEMA IF NOT EXISTS performance;
 

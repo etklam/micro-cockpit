@@ -1,3 +1,7 @@
+-- migration-id: 0006
+-- owner: platform-legacy
+-- description: Journal deletion event delivery
+
 CREATE TABLE IF NOT EXISTS journal.outbox_events (
   event_id uuid PRIMARY KEY,
   event_type text NOT NULL,

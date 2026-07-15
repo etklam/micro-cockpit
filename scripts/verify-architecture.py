@@ -15,7 +15,7 @@ for service, rules in ownership.items():
     for endpoint in ("/health/live", "/health/ready", "/version"):
         if endpoint not in source: errors.append(f"{service}: missing {endpoint}")
     for schema in rules["owns"]:
-        migrations = "\n".join(p.read_text(errors="ignore") for p in (root / "platform/postgres/init").glob("*.sql"))
+        migrations = "\n".join(p.read_text(errors="ignore") for p in (root / "platform/postgres/migrations").glob("*.sql"))
         if not re.search(rf"CREATE\s+SCHEMA\s+(?:IF\s+NOT\s+EXISTS\s+)?{re.escape(schema)}\b", migrations, re.I):
             errors.append(f"{service}: no migration creates schema {schema}")
     allowed = set(rules["owns"])

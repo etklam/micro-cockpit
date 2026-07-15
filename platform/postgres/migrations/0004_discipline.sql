@@ -1,3 +1,7 @@
+-- migration-id: 0004
+-- owner: platform-legacy
+-- description: Initial discipline schema
+
 CREATE SCHEMA IF NOT EXISTS discipline;
 CREATE TABLE IF NOT EXISTS discipline.disciplines (
   id uuid PRIMARY KEY,

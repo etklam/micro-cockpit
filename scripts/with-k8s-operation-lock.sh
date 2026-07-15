@@ -22,8 +22,18 @@ done
 [ "$#" -gt 0 ] || { usage; exit 2; }
 command -v flock >/dev/null 2>&1 || { echo "flock is required." >&2; exit 1; }
 
-lock_path="/tmp/micro-cockpit-${namespace}.operation.lock"
+lock_dir="${MICRO_COCKPIT_LOCK_DIR:-/run/lock/micro-cockpit}"
+[ ! -L "$lock_dir" ] || { echo "Kubernetes operation lock directory must not be a symbolic link." >&2; exit 1; }
+[ -d "$lock_dir" ] || { echo "Kubernetes operation lock directory is not a directory: $lock_dir" >&2; exit 1; }
+mode=$(stat -c '%a' "$lock_dir" 2>/dev/null || stat -f '%Lp' "$lock_dir")
+mode=$((8#$mode))
+[ $((mode & 2)) -eq 0 ] || { echo "Kubernetes operation lock directory must not be world-writable." >&2; exit 1; }
+
+umask 0007
+lock_path="$lock_dir/micro-cockpit-${namespace}.operation.lock"
+[ ! -L "$lock_path" ] || { echo "Kubernetes operation lock file must not be a symbolic link." >&2; exit 1; }
 exec 9>"$lock_path"
+chmod 0660 "$lock_path"
 if ! flock -w "$timeout" 9; then
   echo "Timed out waiting for the Kubernetes operation lock for namespace $namespace." >&2
   exit 1

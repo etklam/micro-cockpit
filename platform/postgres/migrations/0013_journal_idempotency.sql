@@ -1,3 +1,7 @@
+-- migration-id: 0013
+-- owner: platform-legacy
+-- description: Journal idempotency keys
+
 CREATE TABLE IF NOT EXISTS journal.idempotency_keys (
   user_id uuid NOT NULL,
   operation text NOT NULL,

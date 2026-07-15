@@ -29,12 +29,15 @@ jobs:
         run: |
           set -eu
           bash -n scripts/*.sh
+          python3 scripts/validate-migrations.py
+          python3 scripts/audit-migrations.py
           python3 scripts/verify-no-plaintext-k8s-secrets.py
           ./tests/verify-secret-handling.sh
           ./tests/verify-deployment-safety.sh
           ./tests/verify-rotation-safety.sh
           ./tests/verify-runtime-secret-source.sh
           ./tests/verify-k8s-operation-lock.sh
+          ./tests/verify-migration-safety.sh
 
       - name: Resolve immutable image tag
         run: |
@@ -79,6 +82,7 @@ jobs:
             docker build --platform linux/amd64 -t "$image" -f "$dockerfile" .
             docker push "$image"
           }
+          build_and_push db-migrator platform/postgres/Dockerfile
           build_and_push identity services/identity-service/src/TradeDiary.Identity/Dockerfile
           build_and_push journal services/journal-service/src/TradeDiary.Journal/Dockerfile
           build_and_push performance services/performance-service/src/TradeDiary.Performance/Dockerfile
@@ -123,7 +127,7 @@ jobs:
           trap cleanup EXIT HUP INT TERM
           printf '%s' "$DEPLOY_SSH_KEY" >"$work/deploy_key"
           chmod 600 "$work/deploy_key"
-          tar -czf "$work/deploy.tgz" k8s scripts/apply-k8s-manifests.sh scripts/deploy-k8s-release.sh scripts/verify-k8s-runtime-secrets.sh scripts/with-k8s-operation-lock.sh
+          tar -czf "$work/deploy.tgz" k8s scripts/apply-k8s-manifests.sh scripts/deploy-k8s-release.sh scripts/run-k8s-database-upgrade.sh scripts/verify-k8s-runtime-secrets.sh scripts/with-k8s-operation-lock.sh
           remote=$(ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" 'mktemp -d /tmp/micro-cockpit-deploy.XXXXXX')
           scp -q "${ssh_options[@]}" "$work/deploy.tgz" "${DEPLOY_USER}@${DEPLOY_HOST}:$remote/"
           ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
@@ -134,11 +138,13 @@ jobs:
           trap cleanup_remote EXIT HUP INT TERM
           cd "$REMOTE_DIR"
           tar -xzf deploy.tgz
-          chmod 700 scripts/apply-k8s-manifests.sh scripts/deploy-k8s-release.sh scripts/verify-k8s-runtime-secrets.sh scripts/with-k8s-operation-lock.sh
+          chmod 700 scripts/apply-k8s-manifests.sh scripts/deploy-k8s-release.sh scripts/run-k8s-database-upgrade.sh scripts/verify-k8s-runtime-secrets.sh scripts/with-k8s-operation-lock.sh
           scripts/with-k8s-operation-lock.sh --namespace "$DEPLOY_NAMESPACE" --timeout 900 -- bash -c '
             set -euo pipefail
             scripts/verify-k8s-runtime-secrets.sh --namespace "$DEPLOY_NAMESPACE"
-            scripts/deploy-k8s-release.sh --namespace "$DEPLOY_NAMESPACE" --image-registry "$IMAGE_REGISTRY" --image-tag "$IMAGE_TAG"
+            scripts/apply-k8s-manifests.sh --namespace "$DEPLOY_NAMESPACE" --skip-services
+            scripts/run-k8s-database-upgrade.sh --namespace "$DEPLOY_NAMESPACE" --image-registry "$IMAGE_REGISTRY" --image-tag "$IMAGE_TAG"
+            scripts/deploy-k8s-release.sh --namespace "$DEPLOY_NAMESPACE" --image-registry "$IMAGE_REGISTRY" --image-tag "$IMAGE_TAG" --skip-infrastructure
           '
           REMOTE
           remote=""

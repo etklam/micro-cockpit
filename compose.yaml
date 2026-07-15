@@ -22,7 +22,6 @@ services:
     ports: ["127.0.0.1:5433:5432"]
     volumes:
       - trade-diary-data:/var/lib/postgresql/data
-      - ./platform/postgres/init:/docker-entrypoint-initdb.d:ro
     networks: [backend]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U trade_diary -d trade_diary"]
@@ -30,8 +29,10 @@ services:
       timeout: 3s
       retries: 10
 
-  db-init:
-    image: postgres:17-alpine
+  db-role-bootstrap:
+    build:
+      context: .
+      dockerfile: platform/postgres/Dockerfile
     restart: "no"
     environment:
       PGHOST: postgres
@@ -51,12 +52,43 @@ services:
       PARTNER_DB_PASSWORD: ${PARTNER_DB_PASSWORD:?set PARTNER_DB_PASSWORD}
       CONTENT_DB_PASSWORD: ${CONTENT_DB_PASSWORD:?set CONTENT_DB_PASSWORD}
       OPERATIONS_DB_PASSWORD: ${OPERATIONS_DB_PASSWORD:?set OPERATIONS_DB_PASSWORD}
-    volumes:
-      - ./platform/postgres/roles:/roles:ro
-    command: ["/roles/apply.sh"]
+    entrypoint: ["/roles/apply.sh"]
+    command: ["bootstrap"]
     networks: [backend]
     depends_on:
       postgres: { condition: service_healthy }
+
+  db-migrate:
+    build:
+      context: .
+      dockerfile: platform/postgres/Dockerfile
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGDATABASE: trade_diary
+      PGUSER: trade_diary_migrator
+      PGPASSWORD: ${MIGRATOR_DB_PASSWORD:?set MIGRATOR_DB_PASSWORD}
+      RELEASE_SHA: compose-development
+    command: ["migrate"]
+    networks: [backend]
+    depends_on:
+      db-role-bootstrap: { condition: service_completed_successfully }
+
+  db-role-finalize:
+    build:
+      context: .
+      dockerfile: platform/postgres/Dockerfile
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGDATABASE: trade_diary
+      PGUSER: trade_diary
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    entrypoint: ["/roles/apply.sh"]
+    command: ["finalize"]
+    networks: [backend]
+    depends_on:
+      db-migrate: { condition: service_completed_successfully }
 
   identity:
     <<: *dotnet
@@ -73,7 +105,7 @@ services:
     volumes:
       - identity-keys:/keys
     depends_on:
-      db-init: { condition: service_completed_successfully }
+      db-role-finalize: { condition: service_completed_successfully }
 
   journal:
     <<: *dotnet
@@ -144,7 +176,7 @@ services:
       <<: *dotnet-env
       ConnectionStrings__MarketData: Host=postgres;Database=trade_diary;Username=market_data_service;Password=${MARKET_DATA_DB_PASSWORD:?set MARKET_DATA_DB_PASSWORD}
       Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
-    depends_on: { db-init: { condition: service_completed_successfully } }
+    depends_on: { db-role-finalize: { condition: service_completed_successfully } }
 
   price-alert:
     <<: *dotnet

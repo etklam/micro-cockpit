@@ -1,3 +1,7 @@
+-- migration-id: 0011
+-- owner: platform-legacy
+-- description: Partner content and operations schemas
+
 CREATE SCHEMA IF NOT EXISTS partner;
 CREATE TABLE IF NOT EXISTS partner.partner_links (
   id uuid PRIMARY KEY, requester_user_id uuid NOT NULL, partner_user_id uuid NOT NULL,

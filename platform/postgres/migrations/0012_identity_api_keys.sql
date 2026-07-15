@@ -1,3 +1,7 @@
+-- migration-id: 0012
+-- owner: platform-legacy
+-- description: Identity API keys
+
 CREATE TABLE IF NOT EXISTS identity.api_keys (
   id uuid PRIMARY KEY,
   user_id uuid NOT NULL REFERENCES identity.users(id),

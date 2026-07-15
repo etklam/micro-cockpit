@@ -21,3 +21,5 @@ Implementation status: completed. Kubernetes Secrets are the production runtime 
 Live rotation status: pending operator execution. No exposed credential is claimed revoked without cluster evidence. Run `scripts/rotate-k8s-credentials.sh` only after recording a verified backup reference and confirming the intended Kubernetes context and namespace.
 
 History rewrite status: pending. Rewriting history remains a separate coordinated operator action after live rotation evidence exists.
+
+Database migration implementation status: completed with static, mocked Kubernetes, and ephemeral PostgreSQL verification. Production baseline and live Kubernetes migration Job verification remain pending operator execution. Credential rotation and Git history rewrite remain pending; no live completion is claimed.

@@ -8,8 +8,8 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 ownership = json.loads((root / "contracts/schema-ownership.json").read_text())["services"]
-sql_files = sorted((root / "platform/postgres/init").glob("*.sql"))
-roles_sql = (root / "platform/postgres/roles/001_service_roles.sql").read_text()
+sql_files = sorted((root / "platform/postgres/migrations").glob("*.sql"))
+roles_sql = (root / "platform/postgres/roles/003_finalize_grants.sql").read_text()
 all_sql = "\n".join(p.read_text() for p in sql_files)
 created = set(re.findall(r"CREATE\s+SCHEMA\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)", all_sql, re.I))
 tables = [(p.name, schema, table) for p in sql_files for schema, table in re.findall(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)", p.read_text(), re.I)]

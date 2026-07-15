@@ -1,3 +1,7 @@
+-- migration-id: 0008
+-- owner: platform-legacy
+-- description: Stock research schema and immutable timeline
+
 CREATE SCHEMA IF NOT EXISTS stock_research;
 
 CREATE TABLE IF NOT EXISTS stock_research.stocks (

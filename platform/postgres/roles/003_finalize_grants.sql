@@ -1,23 +1,3 @@
--- Run as the database administrator after migrations. Passwords are applied by apply.sh.
-DO $roles$
-DECLARE role_name text;
-BEGIN
-  FOREACH role_name IN ARRAY ARRAY[
-    'trade_diary_migrator',
-    'identity_service','journal_service','performance_service','discipline_service',
-    'reminder_service','market_data_service','price_alert_service','rotation_service',
-    'stock_research_service','partner_service','content_service','operations_service'
-  ] LOOP
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = role_name) THEN
-      EXECUTE format('CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT', role_name);
-    ELSE
-      EXECUTE format('ALTER ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT', role_name);
-    END IF;
-  END LOOP;
-END $roles$;
-
-REVOKE CREATE ON SCHEMA public FROM PUBLIC;
-
 -- Migration ownership is deliberately separate from every runtime identity.
 DO $ownership$
 DECLARE schema_name text;
@@ -126,3 +106,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA stock_research 
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA partner GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO partner_service;
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA content GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO content_service;
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA operations GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO operations_service;
+ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA market GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO market_data_service;
+ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA market_data_public GRANT SELECT ON TABLES TO market_data_service,price_alert_service,rotation_service;
+
+REVOKE CREATE ON DATABASE trade_diary FROM identity_service,journal_service,performance_service,discipline_service,reminder_service,market_data_service,price_alert_service,rotation_service,stock_research_service,partner_service,content_service,operations_service;
+REVOKE ALL ON SCHEMA platform_migrations FROM identity_service,journal_service,performance_service,discipline_service,reminder_service,market_data_service,price_alert_service,rotation_service,stock_research_service,partner_service,content_service,operations_service;
+REVOKE ALL ON platform_migrations.schema_history FROM identity_service,journal_service,performance_service,discipline_service,reminder_service,market_data_service,price_alert_service,rotation_service,stock_research_service,partner_service,content_service,operations_service;

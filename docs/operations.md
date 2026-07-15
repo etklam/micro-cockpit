@@ -17,20 +17,17 @@ Use independently generated values from the deployment secret store. Compose
 has no database-password defaults: missing secrets fail configuration instead
 of silently starting with production credentials from source control.
 
-`db-init` runs once after PostgreSQL becomes healthy. It keeps schema/object
-ownership on `trade_diary_migrator` and grants each LOGIN runtime role only
-`SELECT`, `INSERT`, `UPDATE`, and `DELETE` on its own schema. Price Alert and
-Rotation receive `SELECT` only on published market views. Re-run it after a
-migration to apply grants to existing objects:
+Database startup uses three one-shot services after PostgreSQL becomes healthy:
+`db-role-bootstrap`, `db-migrate`, and `db-role-finalize`. Applications wait for
+all three. The migrator owns managed schemas and history; runtime roles receive
+only their documented CRUD and cross-schema view grants:
 
 ```sh
-docker compose run --rm db-init
+docker compose run --rm db-migrate status
 ./tests/postgres-role-isolation.sh
 ```
 
-Apply later SQL migrations as `trade_diary_migrator`, not as a runtime role,
-then run `db-init` again. The bootstrap administrator is reserved for role and
-ownership administration.
+See [database-migrations.md](database-migrations.md) for canonical migration creation, existing-volume baseline, failure handling, and production adoption.
 
 `frontend` is served at `http://localhost:8080` and proxies `/api` to Edge.
 Edge is also bound at `http://localhost:5099`. PostgreSQL is reachable only
@@ -82,7 +79,15 @@ Configure `DEPLOY_HOST` and `DEPLOY_USER` as Forgejo variables. Configure `DEPLO
 
 Use a dedicated deployment account rather than `root`. Its Kubernetes permissions should be restricted to reading the required Secret metadata/keys, applying project non-secret manifests, restarting project Deployments, and reading rollout and Pod status. Normal deployment does not need permission to create, patch, or replace Secrets. Bootstrap and rotation should use a separately controlled operator identity. The deployment account also needs access to the namespace-scoped operation lock file on the host.
 
-Forgejo serializes production deployments with a concurrency group. The remote host additionally uses `scripts/with-k8s-operation-lock.sh`, which takes `/tmp/micro-cockpit-<namespace>.operation.lock` before runtime Secret verification and holds it through manifest rendering, image update, rollout, and final verification. Credential rotation uses the same lock for its entire operation, so a release and rotation cannot modify the namespace concurrently.
+Forgejo serializes production deployments with a concurrency group. The remote host additionally uses `scripts/with-k8s-operation-lock.sh`, which takes `/run/lock/micro-cockpit/micro-cockpit-<namespace>.operation.lock` before runtime Secret verification and holds it through database upgrade, manifest rendering, image update, rollout, and final verification. Credential rotation and explicit baseline use the same lock for their entire operations.
+
+Provision the lock directory outside CI with a restricted shared operations group; deployment and rotation identities must belong to that group:
+
+```sh
+sudo install -d -o root -g micro-cockpit-deploy-ops -m 2770 /run/lock/micro-cockpit
+```
+
+The directory must be a real directory, group-writable, setgid, and not world-writable. `MICRO_COCKPIT_LOCK_DIR` may select another pre-provisioned path. CI never creates this privileged directory.
 
 ## Kubernetes runtime Secret bootstrap
 

@@ -1,3 +1,7 @@
+-- migration-id: 0003
+-- owner: platform-legacy
+-- description: Extend journal transactions
+
 ALTER TABLE journal.transactions
   ADD COLUMN IF NOT EXISTS currency char(3) NOT NULL DEFAULT 'USD',
   ADD COLUMN IF NOT EXISTS notes text NOT NULL DEFAULT '',

@@ -12,7 +12,6 @@ trap cleanup EXIT
 access=$(curl -sS -H 'Content-Type: application/json' -d "{\"email\":\"owner@example.com\",\"password\":\"${TEST_PASSWORD}\"}" "$identity/internal/auth/login" | jq -r .accessToken)
 auth="Authorization: Bearer $access"
 
-"${psql[@]}" -f /docker-entrypoint-initdb.d/010_rotation.sql >/dev/null
 "${psql[@]}" <<'SQL' >/dev/null
 DELETE FROM rotation.market_rotation_universes WHERE code='ROTATION_SMOKE';
 DELETE FROM market.daily_bars WHERE provider_run_id='00000000-0000-0000-0000-00000000a010';

@@ -4,9 +4,10 @@ set -euo pipefail
 namespace="${K8S_NAMESPACE:-micro-cockpit}"
 registry=""
 image_tag=""
+skip_infrastructure=false
 
 usage() {
-  echo "Usage: $0 [--namespace NAME] --image-registry REGISTRY --image-tag COMMIT_SHA" >&2
+  echo "Usage: $0 [--namespace NAME] --image-registry REGISTRY --image-tag COMMIT_SHA [--skip-infrastructure]" >&2
 }
 
 while [ "$#" -gt 0 ]; do
@@ -14,6 +15,7 @@ while [ "$#" -gt 0 ]; do
     --namespace) namespace=${2:?missing namespace}; shift 2 ;;
     --image-registry) registry=${2:?missing image registry}; shift 2 ;;
     --image-tag) image_tag=${2:?missing image tag}; shift 2 ;;
+    --skip-infrastructure) skip_infrastructure=true; shift ;;
     *) usage; exit 2 ;;
   esac
 done
@@ -57,7 +59,9 @@ fi
 }
 grep -q "micro-cockpit/deployed-sha: ${image_tag}" "$rendered" || { echo "Rendered release annotation is missing." >&2; exit 1; }
 
-scripts/apply-k8s-manifests.sh --namespace "$namespace" --skip-services
+if [ "$skip_infrastructure" = false ]; then
+  scripts/apply-k8s-manifests.sh --namespace "$namespace" --skip-services
+fi
 kubectl apply --namespace "$namespace" -f "$rendered"
 
 for deployment in "${deployments[@]}"; do

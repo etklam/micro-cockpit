@@ -1,3 +1,7 @@
+-- migration-id: 0007
+-- owner: platform-legacy
+-- description: Market data schemas and stable read views
+
 CREATE SCHEMA IF NOT EXISTS market;
 CREATE SCHEMA IF NOT EXISTS market_data_public;
 

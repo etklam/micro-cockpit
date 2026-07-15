@@ -10,7 +10,7 @@ trap cleanup EXIT
 docker compose config --quiet
 docker compose up -d --build --wait
 
-expected=$(docker compose config --services | grep -v '^db-init$' | sort)
+expected=$(docker compose config --services | grep -Ev '^db-(role-bootstrap|migrate|role-finalize)$' | sort)
 running=$(docker compose ps --status running --services | sort)
 test "$running" = "$expected" || { echo "not every declared service is running" >&2; exit 1; }
 for container in $(docker compose ps -q); do

@@ -16,7 +16,8 @@ keys=(POSTGRES_PASSWORD MIGRATOR_DB_PASSWORD IDENTITY_DB_PASSWORD JOURNAL_DB_PAS
 
 make_fixture() {
   local directory=$1
-  mkdir -p "$directory/bin" "$directory/work" "$directory/fixtures"
+  mkdir -p "$directory/bin" "$directory/work" "$directory/fixtures" "$directory/locks"
+  chmod 0770 "$directory/locks"
   printf '%s' old >"$directory/db-state"
   printf '%s' old >"$directory/app-state"
   : >"$directory/calls.log"
@@ -138,7 +139,7 @@ run_case() {
   : >"$directory/events.log"
   (
     cd "$repo"
-    PATH="$directory/bin:$PATH" TMPDIR="$directory/work" TEST_ROOT="$directory" \
+    PATH="$directory/bin:$PATH" TMPDIR="$directory/work" TEST_ROOT="$directory" MICRO_COCKPIT_LOCK_DIR="$directory/locks" \
       ROTATION_TEST_MODE=1 ROTATION_TEST_PORT=18080 ROTATION_FAULT_INJECTION="$fault" \
       scripts/rotate-k8s-credentials.sh --namespace micro-cockpit \
         --context test-context --backup-confirmed TEST-BACKUP-REFERENCE

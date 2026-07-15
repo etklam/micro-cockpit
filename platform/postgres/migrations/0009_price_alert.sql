@@ -1,3 +1,7 @@
+-- migration-id: 0009
+-- owner: platform-legacy
+-- description: Price alert schema
+
 CREATE SCHEMA IF NOT EXISTS price_alert;
 CREATE TABLE price_alert.alerts (
   id uuid PRIMARY KEY,

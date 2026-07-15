@@ -53,7 +53,9 @@ jobs:
       - name: Architecture boundary checks
         run: ./tests/verify-architecture.sh
       - name: Migration ownership audit
-        run: python3 scripts/audit-migrations.py
+        run: |
+          python3 scripts/validate-migrations.py
+          python3 scripts/audit-migrations.py
       - name: Validate Kubernetes secret handling
         run: |
           set -eu
@@ -71,6 +73,7 @@ jobs:
           ./tests/verify-rotation-safety.sh
           ./tests/verify-runtime-secret-source.sh
           ./tests/verify-k8s-operation-lock.sh
+          ./tests/verify-migration-safety.sh
       - name: Validate Docker Compose config
         env:
           # Placeholder secrets are sufficient for `compose config` substitution validation.

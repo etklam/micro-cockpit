@@ -1,3 +1,7 @@
+-- migration-id: 0010
+-- owner: platform-legacy
+-- description: Market rotation schema
+
 CREATE SCHEMA IF NOT EXISTS rotation;
 
 CREATE TABLE IF NOT EXISTS rotation.market_rotation_universes (
