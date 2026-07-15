@@ -7,6 +7,7 @@ key=${SERVICE_KEY:-local-service-key}
 registration_key=${REGISTRATION_KEY:-local-test}
 admin="X-Service-Key: $key"
 status() { curl -sS -o /dev/null -w '%{http_code}' "$@"; }
+rejected() { case "$1" in 401|403) return 0;; *) return 1;; esac; }
 
 access=$(curl -sS -H 'Content-Type: application/json' -d '{"email":"owner@example.com","password":"correct-horse-battery-staple"}' "$identity/internal/auth/login" | jq -r .accessToken)
 owner="Authorization: Bearer $access"
@@ -31,8 +32,11 @@ curl -sS -o /dev/null -H "$owner" -H 'Content-Type: application/json' -d '{"symb
 curl -sS -o /dev/null -H "$owner" -H 'Content-Type: application/json' -d '{"symbol":"AAPL","conditionType":"percent_change","threshold":5}' "$alerts/internal/price-alerts"
 curl -sS -o /dev/null -H "$owner" -H 'Content-Type: application/json' -d '{"symbol":"AAPL","conditionType":"ma_crossing","threshold":0,"lookbackDays":2,"direction":"above"}' "$alerts/internal/price-alerts"
 test "$(status -H "$other" -X DELETE "$alerts/internal/price-alerts/$id")" = 404
-test "$(curl -sS -H "$owner" -X POST "$alerts/internal/worker/run" | jq -r .triggered)" -ge 1
-test "$(curl -sS -H "$owner" -X POST "$alerts/internal/worker/run" | jq -r .triggered)" = 0
+rejected "$(status -X POST "$alerts/internal/worker/run")"
+rejected "$(status -H 'X-Service-Key: wrong' -X POST "$alerts/internal/worker/run")"
+rejected "$(status -H "$owner" -X POST "$alerts/internal/worker/run")"
+test "$(curl -sS -H "$admin" -X POST "$alerts/internal/worker/run" | jq -r .triggered)" -ge 1
+test "$(curl -sS -H "$admin" -X POST "$alerts/internal/worker/run" | jq -r .triggered)" = 0
 test "$(curl -sS -H "$owner" "$alerts/internal/price-alerts" | jq -r ".items[]|select(.id==\"$id\")|.status")" = triggered
 curl -sS -o /dev/null -H "$owner" -X POST "$alerts/internal/price-alerts/$id/dismiss"
 curl -sS -o /dev/null -H "$owner" -X POST "$alerts/internal/price-alerts/$id/reactivate"
