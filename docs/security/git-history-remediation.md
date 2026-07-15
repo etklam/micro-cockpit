@@ -2,6 +2,8 @@
 
 Current-tree cleanup does not remove credentials from existing commits. Perform this procedure only after every exposed credential has been rotated and verified. Rewriting shared refs is intentionally not automated by this repository.
 
+Implementation status: current-tree removal and recoverable rotation tooling are completed. Live rotation status: pending operator execution. History rewrite status: pending.
+
 1. Record evidence that the PostgreSQL administrator, migrator, all service roles, local registration key, and internal service key have been rotated. Never reuse a former value.
 2. Create a protected backup of every repository ref and record the remote branch and tag inventory.
 3. Use `git-filter-repo` or an equivalent reviewed tool to remove the secret-only files `k8s/01a-db-secret.yaml` and `k8s/01b-app-secret.yaml` from every ref.

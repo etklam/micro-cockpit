@@ -72,6 +72,33 @@ docker compose build --pull
 docker compose up -d
 ```
 
+## Kubernetes release deployment
+
+Forgejo builds every application image with the full checked-out commit SHA and deploys that same SHA through `scripts/deploy-k8s-release.sh`. The helper renders a temporary Kustomize overlay, so tracked manifests are not edited. Base application manifests deliberately contain `REQUIRED_IMAGE_TAG` and cannot be deployed through the generic manifest helper. The release helper rejects mutable or shortened tags, applies all 15 application images together, records the SHA in `app.kubernetes.io/version` and `micro-cockpit/deployed-sha`, and then verifies live images, annotations, availability, and the absence of `CrashLoopBackOff`.
+
+Configure `DEPLOY_HOST` and `DEPLOY_USER` as Forgejo variables. Configure `DEPLOY_SSH_KEY` and `DEPLOY_KNOWN_HOSTS` as Forgejo secrets. Obtain the known-hosts entry independently from the deployment host administrator and verify its fingerprint out of band; never populate it with deployment-time `ssh-keyscan`. Missing host, user, or known-hosts data fails closed. Every SSH, SCP, and cleanup path uses strict host checking, the pinned file, and `IdentitiesOnly=yes`.
+
+Use a dedicated deployment account rather than `root`. Its Kubernetes permissions should be restricted to creating and updating this namespace's Secrets, applying project manifests, restarting project Deployments, and reading rollout and Pod status. It also needs access to the namespace-scoped deployment lock file on the host.
+
+Forgejo serializes production deployments with a concurrency group. The remote host additionally takes an exclusive `flock` before secret provisioning and holds it through manifest rendering, image update, rollout, and final verification. A second deployment waits rather than operating concurrently.
+
+## Kubernetes credential rotation
+
+Run rotation only in a maintenance window after creating a verified backup and confirming the exact Kubernetes context:
+
+```sh
+scripts/rotate-k8s-credentials.sh \
+  --context EXPECTED_CONTEXT \
+  --namespace micro-cockpit \
+  --backup-confirmed BACKUP_REFERENCE
+```
+
+The script captures all three current Secrets in a mode-0700 temporary directory, verifies every current PostgreSQL role login, and generates new credentials. Role changes use a fixed role allowlist and protected `psql` stdin. After PostgreSQL commits, any later failure activates rollback. Journal, Reminder, Market Data, Price Alert, and Operations are stopped together while the shared internal key changes, preventing mixed-key event delivery.
+
+Successful rotation requires all new database logins to succeed, every old database login to fail, the old internal key to receive `403`, and the new key to pass authentication and reach a non-mutating `400` validation response. Temporary credentials and probe headers are removed on every exit.
+
+Rollback restores PostgreSQL role passwords first, restores the exact captured data for `db-credentials`, `service-connection-strings`, and `app-secrets`, restores replicas, performs recovery rollouts, and verifies old runtime credentials. If automated recovery reports an emergency, keep the maintenance window active: restore role passwords from protected incident material, restore all three Secrets, restart affected Deployments, and verify old logins before reopening traffic. Never paste credential material into commands, tickets, or logs.
+
 Identity stores its RSA signing key in the `identity-keys` volume at
 `/keys/signing-key.pem`, so ordinary container replacement does not invalidate
 access tokens. Back up that volume and restrict access to it like any other

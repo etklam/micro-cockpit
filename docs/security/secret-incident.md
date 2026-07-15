@@ -16,4 +16,8 @@ This record intentionally contains metadata only. Credential values must always 
 
 The current tree and all reachable Git commits were inspected using metadata-only `git grep`, `git log -p`-equivalent history traversal, and the repository validator. Kubernetes manifests, both CI systems, environment templates, Compose, documentation, service configuration, and shell scripts were included. References to registry, SSH, and CI credentials already resolve from action secret stores and were not classified as exposed values. The Identity RSA signing key was excluded because it was not part of this plaintext incident.
 
-Live rotation has not been performed or claimed. Run `scripts/rotate-k8s-credentials.sh` only after recording a verified backup reference and confirming the intended Kubernetes context and namespace.
+Implementation status: completed. Recoverable rotation, old-credential negative verification, pinned deployment-host trust, immutable release tags, and deployment serialization are implemented and covered by mocked failure-path tests.
+
+Live rotation status: pending operator execution. No exposed credential is claimed revoked without cluster evidence. Run `scripts/rotate-k8s-credentials.sh` only after recording a verified backup reference and confirming the intended Kubernetes context and namespace.
+
+History rewrite status: pending. Rewriting history remains a separate coordinated operator action after live rotation evidence exists.

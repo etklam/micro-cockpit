@@ -64,9 +64,11 @@ jobs:
           tar -xzf "$tools/gitleaks.tgz" -C "$tools" gitleaks
           PATH="$tools:$PATH"
           gitleaks dir . --redact
-          bash -n scripts/provision-k8s-secrets.sh scripts/rotate-k8s-credentials.sh scripts/apply-k8s-manifests.sh
+          bash -n scripts/*.sh
           python3 scripts/verify-no-plaintext-k8s-secrets.py
           ./tests/verify-secret-handling.sh
+          ./tests/verify-deployment-safety.sh
+          ./tests/verify-rotation-safety.sh
       - name: Validate Docker Compose config
         env:
           # Placeholder secrets are sufficient for `compose config` substitution validation.

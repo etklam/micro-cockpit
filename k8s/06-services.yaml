@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: identity
-          image: git.913555.xyz/etklam/micro-cockpit/identity:latest
+          image: git.913555.xyz/etklam/micro-cockpit/identity:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -92,7 +92,7 @@ spec:
     spec:
       containers:
         - name: journal
-          image: git.913555.xyz/etklam/micro-cockpit/journal:latest
+          image: git.913555.xyz/etklam/micro-cockpit/journal:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -160,7 +160,7 @@ spec:
     spec:
       containers:
         - name: performance
-          image: git.913555.xyz/etklam/micro-cockpit/performance:latest
+          image: git.913555.xyz/etklam/micro-cockpit/performance:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -221,7 +221,7 @@ spec:
     spec:
       containers:
         - name: discipline
-          image: git.913555.xyz/etklam/micro-cockpit/discipline:latest
+          image: git.913555.xyz/etklam/micro-cockpit/discipline:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -282,7 +282,7 @@ spec:
     spec:
       containers:
         - name: reminder
-          image: git.913555.xyz/etklam/micro-cockpit/reminder:latest
+          image: git.913555.xyz/etklam/micro-cockpit/reminder:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -350,7 +350,7 @@ spec:
     spec:
       containers:
         - name: stock-research
-          image: git.913555.xyz/etklam/micro-cockpit/stock-research:latest
+          image: git.913555.xyz/etklam/micro-cockpit/stock-research:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -411,7 +411,7 @@ spec:
     spec:
       containers:
         - name: market-data
-          image: git.913555.xyz/etklam/micro-cockpit/market-data:latest
+          image: git.913555.xyz/etklam/micro-cockpit/market-data:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -475,7 +475,7 @@ spec:
     spec:
       containers:
         - name: price-alert
-          image: git.913555.xyz/etklam/micro-cockpit/price-alert:latest
+          image: git.913555.xyz/etklam/micro-cockpit/price-alert:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -541,7 +541,7 @@ spec:
     spec:
       containers:
         - name: rotation
-          image: git.913555.xyz/etklam/micro-cockpit/rotation:latest
+          image: git.913555.xyz/etklam/micro-cockpit/rotation:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -602,7 +602,7 @@ spec:
     spec:
       containers:
         - name: partner
-          image: git.913555.xyz/etklam/micro-cockpit/partner:latest
+          image: git.913555.xyz/etklam/micro-cockpit/partner:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -663,7 +663,7 @@ spec:
     spec:
       containers:
         - name: content
-          image: git.913555.xyz/etklam/micro-cockpit/content:latest
+          image: git.913555.xyz/etklam/micro-cockpit/content:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -724,7 +724,7 @@ spec:
     spec:
       containers:
         - name: tool
-          image: git.913555.xyz/etklam/micro-cockpit/tool:latest
+          image: git.913555.xyz/etklam/micro-cockpit/tool:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -780,7 +780,7 @@ spec:
     spec:
       containers:
         - name: operations
-          image: git.913555.xyz/etklam/micro-cockpit/operations:latest
+          image: git.913555.xyz/etklam/micro-cockpit/operations:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -846,7 +846,7 @@ spec:
     spec:
       containers:
         - name: edge
-          image: git.913555.xyz/etklam/micro-cockpit/edge:latest
+          image: git.913555.xyz/etklam/micro-cockpit/edge:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -928,7 +928,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: git.913555.xyz/etklam/micro-cockpit/frontend:latest
+          image: git.913555.xyz/etklam/micro-cockpit/frontend:REQUIRED_IMAGE_TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
