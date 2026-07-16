@@ -101,6 +101,40 @@ public sealed record DiaryReviewSummaryResponse(
 
 public sealed record MistakeTagCountResponse(string Tag, long Count);
 
+public sealed record RotationMonitorResponse(
+    RotationUniverseResponse Universe,
+    DateOnly? SnapshotDate,
+    string FormulaVersion,
+    string Status,
+    RotationMarketStateResponse MarketState,
+    IReadOnlyList<RotationSectorBreadthResponse> SectorBreadth,
+    IReadOnlyList<RotationEtfSnapshotResponse> Etfs);
+
+public sealed record RotationUniverseResponse(Guid Id, string Code, string Name);
+public sealed record RotationMarketStateResponse(string? State, decimal? BreadthPercent, bool? BenchmarkAboveMa200, string Status);
+public sealed record RotationSectorBreadthResponse(
+    string Sector,
+    int MemberCount,
+    int AvailableCount,
+    decimal? AboveMa20Percent,
+    decimal? AboveMa50Percent,
+    decimal? AboveMa200Percent,
+    string Status);
+public sealed record RotationEtfSnapshotResponse(
+    string Symbol,
+    string Label,
+    string? Sector,
+    decimal? Close,
+    decimal? Return2w,
+    decimal? Return1m,
+    decimal? Return3m,
+    int? Rank2w,
+    decimal? Percentile2w,
+    bool? AboveMa20,
+    bool? AboveMa50,
+    bool? AboveMa200,
+    string Status);
+
 public sealed record DailyPerformanceResponse(
     DateOnly LocalDate,
     decimal PnlAmount,

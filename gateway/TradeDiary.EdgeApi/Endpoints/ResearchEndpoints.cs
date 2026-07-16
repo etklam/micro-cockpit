@@ -22,6 +22,16 @@ internal static class ResearchEndpoints
         EdgeTransport.MapProxy(app, "/api/app/rotation/universes/{id:guid}", "rotation", "/internal/rotation/universes/{id}", [HttpMethods.Put, HttpMethods.Delete]);
         EdgeTransport.MapProxy(app, "/api/app/rotation/universes/{id:guid}/symbols", "rotation", "/internal/rotation/universes/{id}/symbols", [HttpMethods.Put]);
         EdgeTransport.MapProxy(app, "/api/app/rotation/universes/{id:guid}/calculate", "rotation", "/internal/rotation/universes/{id}/calculate", [HttpMethods.Post]);
-        EdgeTransport.MapProxy(app, "/api/app/rotation/monitor", "rotation", "/internal/rotation/monitor", [HttpMethods.Get]);
+        app.MapGet("/api/app/rotation/monitor", async (string universe, DateOnly? date, HttpContext context, EdgeTransport transport) =>
+        {
+            var target = $"/internal/rotation/monitor?universe={Uri.EscapeDataString(universe)}" + (date is null ? "" : $"&date={date:yyyy-MM-dd}");
+            var response = await transport.GetAsync<RotationMonitorResponse>("rotation", target, context);
+            if (!response.IsSuccess) return transport.ProblemFor(response, context);
+            var value = response.Value;
+            if (value is null || value.Universe is null || value.MarketState is null || value.SectorBreadth is null || value.Etfs is null ||
+                string.IsNullOrWhiteSpace(value.FormulaVersion) || string.IsNullOrWhiteSpace(value.Status))
+                return EdgeProblems.DownstreamInvalid(context);
+            return Results.Ok(value);
+        });
     }
 }

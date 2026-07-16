@@ -56,6 +56,7 @@ routes.push(
   { pub: '/api/app/diaries/{diaryId}/review', method: 'get', svc: 'journal', internal: '/internal/diaries/{diaryId}/review' },
   { pub: '/api/app/diaries/{diaryId}/review', method: 'put', svc: 'journal', internal: '/internal/diaries/{diaryId}/review' },
   { pub: '/api/app/diary-review-summary', method: 'get', svc: 'journal', internal: '/internal/diary-review-summary' },
+  { pub: '/api/app/rotation/monitor', method: 'get', svc: 'rotation', internal: '/internal/rotation/monitor' },
 )
 
 // --- schema collection ------------------------------------------------------

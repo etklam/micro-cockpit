@@ -135,6 +135,60 @@ public sealed class CockpitCompositionTests
     }
 
     [Fact]
+    public async Task Rotation_monitor_rejects_invalid_downstream_payload()
+    {
+        using var factory = CreateFactory((service, _) => service == "rotation"
+            ? Json(HttpStatusCode.OK, "not-json")
+            : Json(HttpStatusCode.OK, "{}"));
+        using var response = await factory.CreateClient().GetAsync("/api/app/rotation/monitor?universe=SECTORS");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal("downstream_invalid_response", document.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Rotation_monitor_preserves_typed_null_fields()
+    {
+        using var factory = CreateFactory((service, _) => service == "rotation"
+            ? Json(HttpStatusCode.OK, RotationResponse)
+            : Json(HttpStatusCode.OK, "{}"));
+        using var response = await factory.CreateClient().GetAsync("/api/app/rotation/monitor?universe=SECTORS");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("risk_on", document.RootElement.GetProperty("marketState").GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, document.RootElement.GetProperty("etfs")[0].GetProperty("close").ValueKind);
+        Assert.Equal(JsonValueKind.Null, document.RootElement.GetProperty("etfs")[0].GetProperty("aboveMa200").ValueKind);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task Rotation_monitor_preserves_downstream_authorization_failure(HttpStatusCode status)
+    {
+        using var factory = CreateFactory((service, _) => service == "rotation" ? Json(status, "{}") : Json(HttpStatusCode.OK, "{}"));
+        using var response = await factory.CreateClient().GetAsync("/api/app/rotation/monitor?universe=SECTORS");
+
+        Assert.Equal(status, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Rotation_monitor_timeout_is_not_an_empty_success()
+    {
+        using var factory = CreateAsyncFactory(async (service, _, cancellationToken) =>
+        {
+            if (service == "rotation") await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return Json(HttpStatusCode.OK, "{}");
+        });
+        using var response = await factory.CreateClient().GetAsync("/api/app/rotation/monitor?universe=SECTORS");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.GatewayTimeout, response.StatusCode);
+        Assert.Equal("downstream_timeout", document.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task Request_cancellation_reaches_downstream_calls()
     {
         var observed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -199,7 +253,7 @@ public sealed class CockpitCompositionTests
                     })
                     .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.Scheme, _ => { });
 
-                foreach (var service in new[] { "identity", "journal", "performance", "discipline", "reminder", "stock-research", "market-data" })
+                foreach (var service in new[] { "identity", "journal", "performance", "discipline", "reminder", "stock-research", "market-data", "rotation" })
                 {
                     services.AddHttpClient(service)
                         .ConfigurePrimaryHttpMessageHandler(() => new DownstreamHandler(service, responder));
@@ -220,7 +274,7 @@ public sealed class CockpitCompositionTests
                         options.DefaultChallengeScheme = TestAuthenticationHandler.Scheme;
                     })
                     .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.Scheme, _ => { });
-                foreach (var service in new[] { "identity", "journal", "performance", "discipline", "reminder", "stock-research", "market-data" })
+                foreach (var service in new[] { "identity", "journal", "performance", "discipline", "reminder", "stock-research", "market-data", "rotation" })
                     services.AddHttpClient(service).ConfigurePrimaryHttpMessageHandler(() => new AsyncDownstreamHandler(service, responder));
             });
         });
@@ -283,6 +337,10 @@ public sealed class CockpitCompositionTests
     {
         Content = new StringContent(body, Encoding.UTF8, "application/json")
     };
+
+    private const string RotationResponse = """
+        {"universe":{"id":"55555555-5555-5555-5555-555555555555","code":"SECTORS","name":"US sectors"},"snapshotDate":"2026-07-15","formulaVersion":"rotation-v1","status":"ok","marketState":{"state":"risk_on","breadthPercent":62.5,"benchmarkAboveMa200":true,"status":"ok"},"sectorBreadth":[{"sector":"Technology","memberCount":2,"availableCount":2,"aboveMa20Percent":100,"aboveMa50Percent":50,"aboveMa200Percent":50,"status":"ok"}],"etfs":[{"symbol":"XLK","label":"Technology","sector":"Technology","close":null,"return2w":4.5,"return1m":8.1,"return3m":12.2,"rank2w":1,"percentile2w":1,"aboveMa20":true,"aboveMa50":true,"aboveMa200":null,"status":"ok"}]}
+        """;
 
     private sealed class DownstreamHandler(string service, Func<string, string, HttpResponseMessage> responder) : HttpMessageHandler
     {

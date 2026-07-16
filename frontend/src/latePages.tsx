@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import type { PriceAlert, WatchlistItem } from './features/api'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import type { PriceAlert, RotationItem, WatchlistItem } from './features/api'
 import {
   useAddPriceAlertMutation, useAddWatchlistMutation, useArticleQuery, useArticlesQuery,
   useCalculateMutation, useCreateAgentMutation, useDeletePriceAlertMutation, usePartnersQuery,
   usePriceAlertsQuery, useRemoveWatchlistMutation, useResearchNoteQuery, useResearchTimelineQuery,
-  useRotationQuery, useSaveResearchNoteMutation, useWatchlistQuery,
+  useBootstrapQuery, useRotationQuery, useRotationUniversesQuery, useSaveResearchNoteMutation, useWatchlistQuery,
 } from './features/queries'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
 import { PageSkeleton, SectionError, useCockpit } from './App'
@@ -66,7 +66,135 @@ export function PriceAlertsPage() {
   return <><PageHeader title="Price alerts" subtitle="Levels worth looking up from the screen" /><Card flush><form className="alert-form__body" onSubmit={add}><div className="form-row"><Field label="Symbol"><TextInput required value={symbol} onChange={e => setSymbol(e.target.value)} /></Field><Field label="Direction"><SelectBox value={direction} onChange={e => setDirection(e.target.value)}><option value="above">Above</option><option value="below">Below</option></SelectBox></Field><Field label="Target price"><TextInput required min="0.0001" step="any" type="number" value={price} onChange={e => setPrice(e.target.value)} /></Field></div><div className="form-actions"><Button variant="primary" type="submit" loading={addPriceAlert.isPending}>Create alert</Button></div></form></Card><ListState loading={result.isLoading} error={result.isError ? 'error' : undefined} empty={!items.length} retry={() => { void result.refetch() }}><ul className="compact-list">{items.map(x => <li key={x.id}><Card><div className="row-main"><strong>{x.symbol}</strong><span>{x.conditionType} {x.threshold.toLocaleString()}</span></div><Badge tone={x.status === 'triggered' ? 'warn' : 'primary'}>{x.status}</Badge><IconButton icon="trash" label={`Delete ${x.symbol} alert`} onClick={() => remove(x)} /></Card></li>)}</ul></ListState></>
 }
 
-export function RotationPage() { const q = useRotationQuery(); const items = q.data?.etfs ?? []; return <><PageHeader title="Market rotation" subtitle={q.data?.snapshotDate ? `As of ${q.data.snapshotDate}` : 'Relative momentum, not a recommendation'} /><ListState loading={q.isLoading} error={q.isError ? 'error' : undefined} empty={!items.length} retry={() => { void q.refetch() }}><div className="card-grid">{items.map((x, i) => <Stat key={x.symbol} label={`#${x.rank2w ?? i + 1} · ${x.label}`} value={x.return2w == null ? '—' : `${x.return2w > 0 ? '+' : ''}${x.return2w.toFixed(2)}%`} sub={x.symbol} tone={x.return2w == null ? 'muted' : x.return2w > 0 ? 'gain' : x.return2w < 0 ? 'loss' : 'muted'} />)}</div></ListState></> }
+const rotationScopes = ['universe', 'sector'] as const
+const rotationMaFilters = ['all', 'above20', 'below20', 'above50', 'below50', 'above200', 'below200'] as const
+const rotationSorts = ['rank', 'return2w'] as const
+type RotationSort = (typeof rotationSorts)[number]
+
+const rotationNumber = (value: number | string | null) => value == null ? null : Number(value)
+const rotationPercent = (value: number | null) => value == null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
+const rotationLabel = (value: string | null) => value ? value.replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase()) : 'Unavailable'
+const maLabel = (value: boolean | null) => value == null ? '—' : value ? 'Above' : 'Below'
+
+function sortRotation(items: RotationItem[], sort: RotationSort, direction: 'asc' | 'desc') {
+  return [...items].sort((left, right) => {
+    const a = sort === 'rank' ? rotationNumber(left.rank2w) : left.return2w
+    const b = sort === 'rank' ? rotationNumber(right.rank2w) : right.return2w
+    if (a == null) return b == null ? 0 : 1
+    if (b == null) return -1
+    return (a - b) * (direction === 'asc' ? 1 : -1)
+  })
+}
+
+export function RotationPage() {
+  const [params, setParams] = useSearchParams()
+  const bootstrap = useBootstrapQuery()
+  const universesQuery = useRotationUniversesQuery()
+  const universes = useMemo(() => universesQuery.data?.items ?? [], [universesQuery.data?.items])
+  const requestedScope = params.get('scope') ?? ''
+  const validScope = rotationScopes.includes(requestedScope as (typeof rotationScopes)[number]) ? requestedScope : ''
+  const requestedUniverse = (params.get('universe') ?? '').toUpperCase()
+  const scopedUniverses = validScope ? universes.filter(item => item.rankScope === validScope) : universes
+  const selectedUniverse = universes.find(item => item.code === requestedUniverse && (!validScope || item.rankScope === validScope)) ?? scopedUniverses[0] ?? universes[0]
+  const scope = selectedUniverse?.rankScope ?? validScope
+  const monitor = useRotationQuery(selectedUniverse?.code ?? '', scope)
+  const group = params.get('group') ?? 'all'
+  const requestedMa = params.get('ma') ?? 'all'
+  const ma = rotationMaFilters.includes(requestedMa as (typeof rotationMaFilters)[number]) ? requestedMa : 'all'
+  const requestedSort = params.get('sort') ?? 'rank'
+  const sort = rotationSorts.includes(requestedSort as RotationSort) ? requestedSort as RotationSort : 'rank'
+  const direction = params.get('direction') === 'desc' ? 'desc' : 'asc'
+  const groups = useMemo(() => [...new Set((monitor.data?.etfs ?? []).map(item => item.sector).filter((value): value is string => !!value))].sort(), [monitor.data?.etfs])
+
+  useEffect(() => {
+    if (!selectedUniverse) return
+    const next = new URLSearchParams(params)
+    let changed = false
+    if (next.get('universe') !== selectedUniverse.code) { next.set('universe', selectedUniverse.code); changed = true }
+    if (next.get('scope') !== selectedUniverse.rankScope) { next.set('scope', selectedUniverse.rankScope); changed = true }
+    if (monitor.isSuccess && next.get('group') && next.get('group') !== 'all' && !groups.includes(next.get('group')!)) { next.delete('group'); changed = true }
+    if (next.get('ma') && !rotationMaFilters.includes(next.get('ma') as (typeof rotationMaFilters)[number])) { next.delete('ma'); changed = true }
+    if (next.get('sort') && !rotationSorts.includes(next.get('sort') as RotationSort)) { next.delete('sort'); changed = true }
+    if (next.get('direction') && !['asc', 'desc'].includes(next.get('direction')!)) { next.delete('direction'); changed = true }
+    if (changed) setParams(next, { replace: true })
+  }, [groups, monitor.isSuccess, params, selectedUniverse, setParams])
+
+  const setFilter = (name: string, value: string) => {
+    const next = new URLSearchParams(params)
+    if (!value || value === 'all' || value === 'rank' && name === 'sort' || value === 'asc' && name === 'direction') next.delete(name)
+    else next.set(name, value)
+    setParams(next)
+  }
+  const changeUniverse = (code: string) => {
+    const universe = universes.find(item => item.code === code)
+    const next = new URLSearchParams(params); next.set('universe', code)
+    if (universe) next.set('scope', universe.rankScope)
+    next.delete('group'); setParams(next)
+  }
+  const filtered = useMemo(() => (monitor.data?.etfs ?? []).filter(item => {
+    if (group !== 'all' && item.sector !== group) return false
+    if ((ma === 'above20' && item.aboveMa20 !== true) || (ma === 'below20' && item.aboveMa20 !== false)) return false
+    if ((ma === 'above50' && item.aboveMa50 !== true) || (ma === 'below50' && item.aboveMa50 !== false)) return false
+    if ((ma === 'above200' && item.aboveMa200 !== true) || (ma === 'below200' && item.aboveMa200 !== false)) return false
+    return true
+  }), [group, ma, monitor.data?.etfs])
+  const rows = useMemo(() => sortRotation(filtered, sort, direction), [direction, filtered, sort])
+  const backendRanked = useMemo(() => sortRotation(monitor.data?.etfs ?? [], 'rank', 'asc'), [monitor.data?.etfs])
+  const ranked = backendRanked.filter(item => item.rank2w != null)
+  const strongest = ranked.slice(0, 3).map(item => item.sector ?? item.label).join(', ') || 'Unavailable'
+  const weakest = ranked.slice(-3).reverse().map(item => item.sector ?? item.label).join(', ') || 'Unavailable'
+  const snapshotAge = monitor.data?.snapshotDate && bootstrap.data?.currentLocalDate
+    ? (Date.parse(`${bootstrap.data.currentLocalDate}T00:00:00Z`) - Date.parse(`${monitor.data.snapshotDate}T00:00:00Z`)) / 86_400_000 : null
+  const stale = snapshotAge != null && snapshotAge > 7
+
+  if (universesQuery.isLoading) return <PageSkeleton rows={4} />
+  if (universesQuery.isError) return <RotationUnavailable retry={() => { void universesQuery.refetch() }} />
+  if (!universes.length) return <><PageHeader title="Market rotation" subtitle="Relative group momentum" /><EmptyBox title="No rotation universes configured" hint="A valid universe is required before snapshots can be displayed." /></>
+  if (monitor.isLoading && !monitor.data) return <PageSkeleton rows={5} />
+  if (monitor.isError) return <RotationUnavailable retry={() => { void monitor.refetch() }} invalid={String(monitor.error).includes('400')} />
+
+  const data = monitor.data
+  return <>
+    <PageHeader title="Market rotation" subtitle="Existing rotation-v1 results; no frontend market calculations" />
+    <div className="rotation-toolbar">
+      <div className="rotation-heading-meta">
+        <span><strong>Snapshot</strong> {data?.snapshotDate ?? 'Unavailable'}</span>
+        <span><strong>Universe</strong> {data?.universe.name ?? selectedUniverse?.name}</span>
+        <span><strong>Data freshness</strong> {data?.snapshotDate ? stale ? 'Stale snapshot' : 'Current snapshot' : 'Unavailable'}</span>
+        <span><strong>Market state</strong> {rotationLabel(data?.marketState.state ?? null)}</span>
+      </div>
+      <Button size="sm" variant="ghost" loading={monitor.isFetching} onClick={() => { void monitor.refetch() }}>Refresh</Button>
+    </div>
+    <Card as="section" className="rotation-filters">
+      <Field label="Universe"><SelectBox value={selectedUniverse?.code ?? ''} onChange={event => changeUniverse(event.target.value)}>{universes.map(item => <option key={item.id} value={item.code}>{item.name}</option>)}</SelectBox></Field>
+      <Field label="Rank scope"><SelectBox value={scope} onChange={event => setFilter('scope', event.target.value)}>{rotationScopes.map(value => <option key={value} value={value}>{rotationLabel(value)}</option>)}</SelectBox></Field>
+      <Field label="Group"><SelectBox value={groups.includes(group) ? group : 'all'} onChange={event => setFilter('group', event.target.value)}><option value="all">All groups</option>{groups.map(value => <option key={value}>{value}</option>)}</SelectBox></Field>
+      <Field label="MA status"><SelectBox value={ma} onChange={event => setFilter('ma', event.target.value)}><option value="all">All MA statuses</option><option value="above20">Above MA20</option><option value="below20">Below MA20</option><option value="above50">Above MA50</option><option value="below50">Below MA50</option><option value="above200">Above MA200</option><option value="below200">Below MA200</option></SelectBox></Field>
+      <Field label="Sort"><SelectBox value={sort} onChange={event => setFilter('sort', event.target.value)}><option value="rank">Rotation rank</option><option value="return2w">2-week performance</option></SelectBox></Field>
+      <Field label="Direction"><SelectBox value={direction} onChange={event => setFilter('direction', event.target.value)}><option value="asc">Ascending</option><option value="desc">Descending</option></SelectBox></Field>
+    </Card>
+    {!data?.snapshotDate ? <EmptyBox title="No rotation snapshot yet" hint="The universe exists, but no calculated snapshot is available." /> : <>
+      <div className="rotation-summary">
+        <Stat label="Market state" value={rotationLabel(data.marketState.state)} sub={data.marketState.status} />
+        <Stat label="Breadth" value={data.marketState.breadthPercent == null ? '—' : `${data.marketState.breadthPercent.toFixed(2)}%`} sub={data.marketState.benchmarkAboveMa200 == null ? 'Benchmark MA200 unavailable' : data.marketState.benchmarkAboveMa200 ? 'Benchmark above MA200' : 'Benchmark below MA200'} />
+        <Stat label="Strongest groups" value={strongest} sub="By backend 2-week rank" />
+        <Stat label="Weakest groups" value={weakest} sub="By backend 2-week rank" />
+        <Stat label="Improving groups" value="Unavailable" sub="No backend trend series" />
+        <Stat label="Weakening groups" value="Unavailable" sub="No backend trend series" />
+      </div>
+      <Card as="section" className="rotation-breadth"><h2>Breadth by group</h2><div className="rotation-breadth__grid">{data.sectorBreadth.map(item => <div key={item.sector}><strong>{item.sector}</strong><span>{item.availableCount}/{item.memberCount} available</span><span>MA20 {item.aboveMa20Percent == null ? '—' : `${item.aboveMa20Percent.toFixed(2)}%`}</span><span>MA50 {item.aboveMa50Percent == null ? '—' : `${item.aboveMa50Percent.toFixed(2)}%`}</span><span>MA200 {item.aboveMa200Percent == null ? '—' : `${item.aboveMa200Percent.toFixed(2)}%`}</span></div>)}</div></Card>
+      {!data.etfs.length ? <EmptyBox title="Snapshot has no ranked groups" hint="The snapshot is valid but contains no group rows." /> : !rows.length ? <EmptyBox title="No rankings match these filters" hint="Clear a group or MA filter to see the available rows." /> : <RotationTable rows={rows} />}
+    </>}
+  </>
+}
+
+function RotationUnavailable({ retry, invalid }: { retry: () => void; invalid?: boolean }) {
+  return <><PageHeader title="Market rotation" subtitle="Relative group momentum" /><Card className="rotation-unavailable"><h2>{invalid ? 'Invalid rotation request' : 'Rotation data unavailable'}</h2><p>Live rotation data could not be loaded. This is different from an empty universe or snapshot.</p><Button onClick={retry}>Try again</Button></Card></>
+}
+
+function RotationTable({ rows }: { rows: RotationItem[] }) {
+  return <Card flush as="section" className="rotation-table-card"><div className="rotation-table-scroll"><table className="rotation-table"><thead><tr><th>Rank</th><th>Symbol</th><th>Name / sector</th><th>Last</th><th>2W</th><th>1M</th><th>3M</th><th>2W percentile</th><th>MA status</th><th>Data status</th></tr></thead><tbody>{rows.map(item => <tr key={item.symbol}><td>{item.rank2w ?? '—'}</td><td><strong>{item.symbol}</strong></td><td>{item.label}<small>{item.sector ?? '—'}</small></td><td>{item.close == null ? '—' : item.close.toLocaleString()}</td><td>{rotationPercent(item.return2w)}</td><td>{rotationPercent(item.return1m)}</td><td>{rotationPercent(item.return3m)}</td><td>{item.percentile2w == null ? '—' : item.percentile2w.toFixed(2)}</td><td><span className="ma-stack">20 {maLabel(item.aboveMa20)} · 50 {maLabel(item.aboveMa50)} · 200 {maLabel(item.aboveMa200)}</span></td><td><Badge tone={item.status === 'ok' ? 'gain' : 'warn'}>{item.status}</Badge></td></tr>)}</tbody></table></div></Card>
+}
 
 export function PartnersPage() {
   const q = usePartnersQuery(); const items = q.data?.items ?? []

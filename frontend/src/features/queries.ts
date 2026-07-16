@@ -14,7 +14,10 @@ export const queryKeys = {
   researchNote: (id: string) => ['research-note', id] as const,
   researchTimeline: (id: string) => ['research-timeline', id] as const,
   priceAlerts: ['price-alerts'] as const,
-  rotation: ['rotation'] as const,
+  rotation: {
+    universes: ['rotation', 'universes'] as const,
+    monitor: (universe: string, scope: string) => ['rotation', 'monitor', universe, scope] as const,
+  },
   partners: ['partners'] as const,
   articles: ['articles'] as const,
   article: (slug: string) => ['article', slug] as const,
@@ -37,7 +40,13 @@ export const useWatchlistQuery = () => useQuery({ queryKey: queryKeys.watchlist,
 export const useResearchNoteQuery = (id: string) => useQuery({ queryKey: queryKeys.researchNote(id), queryFn: () => api.getResearchNote(id), enabled: !!id })
 export const useResearchTimelineQuery = (id: string) => useQuery({ queryKey: queryKeys.researchTimeline(id), queryFn: () => api.getResearchTimeline(id), enabled: !!id })
 export const usePriceAlertsQuery = () => useQuery({ queryKey: queryKeys.priceAlerts, queryFn: api.getPriceAlerts })
-export const useRotationQuery = () => useQuery({ queryKey: queryKeys.rotation, queryFn: api.getMarketRotation })
+export const useRotationUniversesQuery = () => useQuery({ queryKey: queryKeys.rotation.universes, queryFn: api.getRotationUniverses, staleTime: 60_000 })
+export const useRotationQuery = (universe: string, scope: string) => useQuery({
+  queryKey: queryKeys.rotation.monitor(universe, scope),
+  queryFn: () => api.getMarketRotation(universe),
+  enabled: !!universe && !!scope,
+  placeholderData: previous => previous,
+})
 export const usePartnersQuery = () => useQuery({ queryKey: queryKeys.partners, queryFn: api.getPartners })
 export const useArticlesQuery = () => useQuery({ queryKey: queryKeys.articles, queryFn: api.getArticles })
 export const useArticleQuery = (slug: string) => useQuery({ queryKey: queryKeys.article(slug), queryFn: () => api.getArticle(slug), enabled: !!slug })

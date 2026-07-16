@@ -70,12 +70,8 @@ export const getPriceAlerts = () => G.getApiAppPriceAlerts()
 export const addPriceAlert = (symbol: string, threshold: number, conditionType: string) =>
   G.postApiAppPriceAlerts({ symbol, threshold, conditionType, lookbackDays: null, direction: null })
 export const deletePriceAlert = (id: string) => G.deleteApiAppPriceAlertsId(id)
-export async function getMarketRotation(): Promise<{ snapshotDate: string | null; etfs: RotationItem[] }> {
-  const universes = await G.getApiAppRotationUniverses()
-  if (!universes.items.length) return { snapshotDate: null, etfs: [] }
-  const monitor = await G.getApiAppRotationMonitor({ universe: universes.items[0].code })
-  return { snapshotDate: monitor.snapshotDate, etfs: monitor.etfs }
-}
+export const getRotationUniverses = () => G.getApiAppRotationUniverses()
+export const getMarketRotation = (universe: string) => G.getApiAppRotationMonitor({ universe })
 export const getPartners = () => G.getApiAppPartners()
 export const getArticles = () => G.getApiContentPosts()
 export const getArticle = (slug: string) => G.getApiContentPostsSlug(slug)

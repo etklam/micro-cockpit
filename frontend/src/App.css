@@ -543,6 +543,29 @@
 .review-tags legend { font-size: var(--fs-sm); font-weight: 600; margin-bottom: var(--sp-2); }
 .review-tags label { color: var(--muted); font-size: var(--fs-sm); }
 
+/* ====================  MARKET ROTATION  ======================== */
+.rotation-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; }
+.rotation-heading-meta { display: flex; gap: var(--sp-2); flex-wrap: wrap; color: var(--muted); font-size: var(--fs-sm); }
+.rotation-filters { display: flex; align-items: end; gap: var(--sp-3); flex-wrap: wrap; }
+.rotation-filters label { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: var(--fs-xs); }
+.rotation-filters select { min-width: 130px; }
+.rotation-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); }
+.rotation-breadth { display: flex; flex-direction: column; gap: var(--sp-3); }
+.rotation-breadth__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--sp-3); }
+.rotation-table-card { padding: 0; overflow: hidden; }
+.rotation-table-scroll { overflow-x: auto; }
+.rotation-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.rotation-table th, .rotation-table td { padding: var(--sp-3); text-align: right; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.rotation-table th { position: sticky; top: 0; z-index: 1; background: var(--surface); color: var(--muted); font-size: var(--fs-xs); }
+.rotation-table th:nth-child(2), .rotation-table td:nth-child(2) { text-align: left; }
+.rotation-table tbody tr:last-child td { border-bottom: 0; }
+.rotation-table__identity { display: flex; flex-direction: column; gap: 2px; }
+.rotation-table__identity span { color: var(--muted); font-size: var(--fs-xs); }
+.ma-stack { display: flex; gap: 4px; justify-content: flex-end; }
+.ma-stack span { min-width: 28px; padding: 2px 4px; border-radius: var(--r-sm); background: var(--overlay); color: var(--muted); text-align: center; }
+.ma-stack span.is-above { background: var(--success-soft); color: var(--success); }
+.rotation-unavailable { border-color: var(--danger-line); background: var(--danger-soft); }
+
 /* ======================  RESPONSIVE  ============================ */
 @media (max-width: 920px) {
   .shell { grid-template-columns: 1fr; }
@@ -589,6 +612,7 @@
     justify-content: center;
   }
   .mobile-nav__item.is-active { color: var(--primary); }
+  .rotation-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 540px) {
@@ -598,4 +622,9 @@
   .entry__title { font-size: var(--fs-lg); }
   .research-layout { grid-template-columns: 1fr; }
   .decision-review .form-row { flex-direction: column; }
+  .rotation-toolbar { align-items: stretch; }
+  .rotation-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rotation-filters label, .rotation-filters select { min-width: 0; width: 100%; }
+  .rotation-summary { grid-template-columns: 1fr 1fr; }
+  .rotation-table th, .rotation-table td { padding: var(--sp-2); }
 }
