@@ -42,7 +42,7 @@ export const usePartnersQuery = () => useQuery({ queryKey: queryKeys.partners, q
 export const useArticlesQuery = () => useQuery({ queryKey: queryKeys.articles, queryFn: api.getArticles })
 export const useArticleQuery = (slug: string) => useQuery({ queryKey: queryKeys.article(slug), queryFn: () => api.getArticle(slug), enabled: !!slug })
 export const useDiaryReviewQuery = (diaryId: string) => useQuery({ queryKey: queryKeys.diaryReview.detail(diaryId), queryFn: () => api.getDiaryReview(diaryId), enabled: !!diaryId })
-export const useDiaryReviewSummaryQuery = (from: string, to: string) => useQuery({ queryKey: queryKeys.diaryReview.summary(from, to), queryFn: () => api.getDiaryReviewSummary(from, to) })
+export const useDiaryReviewSummaryQuery = (from: string, to: string) => useQuery({ queryKey: queryKeys.diaryReview.summary(from, to), queryFn: () => api.getDiaryReviewSummary(from, to), enabled: !!from && !!to })
 
 const calendarPrefix = ['calendar'] as const
 const invalidateCalendar = (client: ReturnType<typeof useQueryClient>) => client.invalidateQueries({ queryKey: calendarPrefix })

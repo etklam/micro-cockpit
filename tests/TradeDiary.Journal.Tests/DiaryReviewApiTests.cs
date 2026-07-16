@@ -26,6 +26,7 @@ public sealed class DiaryReviewApiTests
         var root = Path.GetFullPath("../../../../..", AppContext.BaseDirectory);
         await new NpgsqlCommand(File.ReadAllText(Path.Combine(root, "platform/postgres/migrations/0001_initial_journal_performance.sql")), setup).ExecuteNonQueryAsync();
         await new NpgsqlCommand(File.ReadAllText(Path.Combine(root, "platform/postgres/migrations/0014_structured_diary_review.sql")), setup).ExecuteNonQueryAsync();
+        await new NpgsqlCommand(File.ReadAllText(Path.Combine(root, "platform/postgres/migrations/0015_diary_review_ownership.sql")), setup).ExecuteNonQueryAsync();
         var owner = Guid.NewGuid(); var other = Guid.NewGuid(); var active = Guid.NewGuid(); var deleted = Guid.NewGuid();
         await using (var seed = new NpgsqlCommand("INSERT INTO journal.diaries(id,user_id,local_date,title,content,deleted_at) VALUES($1,$2,'2026-07-01','Active','',null),($3,$2,'2026-07-02','Deleted','',now())", setup))
         { seed.Parameters.AddWithValue(active); seed.Parameters.AddWithValue(owner); seed.Parameters.AddWithValue(deleted); await seed.ExecuteNonQueryAsync(); }

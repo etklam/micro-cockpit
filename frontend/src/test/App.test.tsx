@@ -108,6 +108,21 @@ test('review summary empty state does not show fake zero averages', async () => 
   expect(screen.queryByText('0.0')).not.toBeInTheDocument()
 })
 
+test('authenticated bootstrap local date drives the review summary range', async () => {
+  let requestedRange = ''
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/bootstrap', () => HttpResponse.json({ ...bootstrap, currentLocalDate: '2030-03-01' })),
+    http.get('/api/app/diary-review-summary', ({ request }) => {
+      const url = new URL(request.url)
+      requestedRange = `${url.searchParams.get('from')}:${url.searchParams.get('to')}`
+      return HttpResponse.json({ reviewedCount: 0, averageDisciplineScore: null, averageExecutionScore: null, emotionCounts: {}, processAssessmentCounts: {}, topMistakeTags: [] })
+    }))
+  renderApp('/diary')
+  await screen.findByText('No structured reviews yet')
+  expect(requestedRange).toBe('2030-01-31:2030-03-01')
+})
+
 test('calendar month navigation updates the URL', async () => {
   server.use(...authenticatedHandlers())
   renderApp('/calendar/2026/07')

@@ -8,7 +8,7 @@ import {
   useCreateTransactionMutation, useDashboardQuery, useDeleteAlertMutation, useDeleteDiaryMutation,
   useDeleteDisciplineMutation, useDeleteTransactionMutation, useDiariesQuery, useDiaryQuery,
   useDismissAlertMutation, useQuickNoteMutation, useSaveDiaryMutation, useSavePerformanceMutation,
-  useDisciplinesQuery,
+  useBootstrapQuery, useDisciplinesQuery,
   useDeleteDiaryReviewMutation, useDiaryReviewQuery, useDiaryReviewSummaryQuery, useSaveDiaryReviewMutation,
   useTransactionsQuery,
 } from './features/queries'
@@ -169,10 +169,13 @@ export function DiaryPage() {
   const idem = useIdempotencyKey()
   const saveDiary = useSaveDiaryMutation()
   const deleteDiary = useDeleteDiaryMutation()
+  const bootstrap = useBootstrapQuery()
   const reviewWindow = useMemo(() => {
-    const to = todayISO(); const fromDate = new Date(`${to}T00:00:00`); fromDate.setDate(fromDate.getDate() - 29)
+    const to = bootstrap.data?.currentLocalDate ?? ''
+    if (!to) return { from: '', to: '' }
+    const fromDate = new Date(`${to}T00:00:00Z`); fromDate.setUTCDate(fromDate.getUTCDate() - 29)
     return { from: fromDate.toISOString().slice(0, 10), to }
-  }, [])
+  }, [bootstrap.data?.currentLocalDate])
   const reviewSummary = useDiaryReviewSummaryQuery(reviewWindow.from, reviewWindow.to)
 
   function startEdit(d: Diary) {

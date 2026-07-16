@@ -81,11 +81,11 @@ public sealed class MigrationEngineTests : IAsyncLifetime
         await RejectCatalogForAllCommands(absent);
 
         var extra = CopyMigrations();
-        await Simple(extra, "0015_extra.sql", "0015", "SELECT 15");
+        await Simple(extra, "0016_extra.sql", "0016", "SELECT 16");
         await RejectCatalogForAllCommands(extra);
 
         var missing = CopyMigrations();
-        File.Delete(Path.Combine(missing, "0014_structured_diary_review.sql"));
+        File.Delete(Path.Combine(missing, "0015_diary_review_ownership.sql"));
         await RejectCatalogForAllCommands(missing);
 
         var reordered = CopyMigrations();
@@ -101,7 +101,7 @@ public sealed class MigrationEngineTests : IAsyncLifetime
         await Reset();
         var engine = Engine(Migrations);
         Assert.Equal(0, await engine.RunAsync("migrate"));
-        Assert.Equal(14L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
+        Assert.Equal(15L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
         var applied = await Scalar<DateTime>("SELECT max(applied_at) FROM platform_migrations.schema_history");
         Assert.Equal(0, await engine.RunAsync("migrate"));
         Assert.Equal(applied, await Scalar<DateTime>("SELECT max(applied_at) FROM platform_migrations.schema_history"));
@@ -141,23 +141,35 @@ public sealed class MigrationEngineTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task DiaryReviewCompositeForeignKeyRejectsInconsistentOwnership()
+    {
+        await Reset(); await Engine(Migrations).RunAsync("migrate");
+        var diaryId = Guid.NewGuid(); var ownerId = Guid.NewGuid(); var otherUserId = Guid.NewGuid();
+        await Admin($"INSERT INTO journal.diaries(id,user_id,local_date,title) VALUES ('{diaryId}','{ownerId}','2026-07-16','Ownership')");
+        var exception = await Assert.ThrowsAsync<PostgresException>(() => Admin($"INSERT INTO journal.diary_reviews(diary_id,user_id) VALUES ('{diaryId}','{otherUserId}')"));
+        Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, exception.SqlState);
+        await Admin($"INSERT INTO journal.diary_reviews(diary_id,user_id) VALUES ('{diaryId}','{ownerId}')");
+        Assert.Equal(2, await Scalar<int>("SELECT count(*)::int FROM pg_constraint WHERE conrelid='journal.diary_reviews'::regclass AND contype='f'"));
+    }
+
+    [Fact]
     public async Task FailureRollsBackAndHistoryProtectionsRejectDrift()
     {
         await Reset();
         var fixture = CopyMigrations();
-        await File.WriteAllTextAsync(Path.Combine(fixture, "0015_failure.sql"), "-- migration-id: 0015\n-- owner: journal-service\n-- description: Failure fixture\n\nCREATE TABLE journal.rollback_probe(id integer);\nSELECT 1 / 0;\n");
+        await File.WriteAllTextAsync(Path.Combine(fixture, "0016_failure.sql"), "-- migration-id: 0016\n-- owner: journal-service\n-- description: Failure fixture\n\nCREATE TABLE journal.rollback_probe(id integer);\nSELECT 1 / 0;\n");
         await RefreshManifest(fixture);
         await Assert.ThrowsAnyAsync<Exception>(() => Engine(fixture).RunAsync("migrate"));
         Assert.False(await Scalar<bool>("SELECT to_regclass('journal.rollback_probe') IS NOT NULL"));
-        Assert.Equal(0L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history WHERE migration_id='0015'"));
-        File.Delete(Path.Combine(fixture, "0015_failure.sql"));
+        Assert.Equal(0L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history WHERE migration_id='0016'"));
+        File.Delete(Path.Combine(fixture, "0016_failure.sql"));
         await File.AppendAllTextAsync(Path.Combine(fixture, "0001_initial_journal_performance.sql"), "\n-- changed\n");
         await RefreshManifest(fixture);
         await Assert.ThrowsAsync<MigrationException>(() => Engine(fixture).RunAsync("migrate"));
         File.Delete(Path.Combine(fixture, "0001_initial_journal_performance.sql"));
         await RefreshManifest(fixture);
         await Assert.ThrowsAsync<MigrationException>(() => Engine(fixture).RunAsync("migrate"));
-        Assert.Equal(14L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
+        Assert.Equal(15L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
     }
 
     [Fact]
@@ -175,23 +187,59 @@ public sealed class MigrationEngineTests : IAsyncLifetime
         await Reset();
         var results = await Task.WhenAll(Engine(Migrations).RunAsync("migrate"), Engine(Migrations).RunAsync("migrate"));
         Assert.Equal(new[] { 0, 0 }, results);
-        Assert.Equal(14L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
+        Assert.Equal(15L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
     }
 
     [Fact]
-    public async Task BaselineRequiresCompleteFingerprintAndExplicitConfirmation()
+    public async Task BaselineThrough0013LeavesNewerMigrationsPendingForRealAdoption()
+    {
+        await Reset(); await ApplyLegacyThrough("0013");
+        await Assert.ThrowsAsync<MigrationException>(() => Engine(Migrations).RunAsync("migrate"));
+        Assert.Equal(0, await Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
+        Assert.Equal(13L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history WHERE baseline"));
+        Assert.Equal(13L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
+        Assert.Equal(0L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history WHERE migration_id > '0013'"));
+        Assert.False(await Scalar<bool>("SELECT to_regclass('journal.diary_reviews') IS NOT NULL"));
+        Assert.Equal(0, await Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
+        Assert.Equal(0, await Engine(Migrations).RunAsync("migrate"));
+        Assert.True(await Scalar<bool>("SELECT to_regclass('journal.diary_reviews') IS NOT NULL"));
+        Assert.False(await Scalar<bool>("SELECT baseline FROM platform_migrations.schema_history WHERE migration_id='0014'"));
+        Assert.False(await Scalar<bool>("SELECT baseline FROM platform_migrations.schema_history WHERE migration_id='0015'"));
+        Assert.Equal(0, await Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
+    }
+
+    [Fact]
+    public async Task BaselineRejectsInvalidTargetAndPostBaselineFingerprintObjects()
+    {
+        await Reset(); await ApplyLegacyThrough("0013");
+        var invalidTarget = await FingerprintFixture(text => text.Replace("\"baselineThroughMigrationId\": \"0013\"", "\"baselineThroughMigrationId\": \"9999\"", StringComparison.Ordinal));
+        await Assert.ThrowsAsync<MigrationException>(() => Engine(Migrations).RunAsync("baseline", new(true, "backup", invalidTarget)));
+
+        var postBaselineObject = await FingerprintFixture(text => text.Replace("\"journal.diaries\"", "\"journal.diary_reviews\", \"journal.diaries\"", StringComparison.Ordinal));
+        await Assert.ThrowsAsync<MigrationException>(() => Engine(Migrations).RunAsync("baseline", new(true, "backup", postBaselineObject)));
+    }
+
+    [Fact]
+    public async Task BaselineRejectsMissingLegacyObjectsAndPartialHistory()
+    {
+        await Reset(); await ApplyLegacyThrough("0013");
+        await Admin("DROP TABLE journal.idempotency_keys");
+        await Assert.ThrowsAsync<MigrationException>(() => Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
+
+        await Reset(); await ApplyLegacyThrough("0013");
+        Assert.Equal(0, await Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
+        await Admin("DELETE FROM platform_migrations.schema_history WHERE migration_id='0013'");
+        await Assert.ThrowsAsync<MigrationException>(() => Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
+    }
+
+    [Fact]
+    public async Task BaselineStillRequiresLegacySchemaConfirmationAndExactCatalog()
     {
         await Reset();
         await Assert.ThrowsAsync<MigrationException>(() => Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
-        await Admin("CREATE SCHEMA journal");
-        await Assert.ThrowsAsync<MigrationException>(() => Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
-        await Reset(); await ApplyLegacy();
-        await Assert.ThrowsAsync<MigrationException>(() => Engine(Migrations).RunAsync("migrate"));
+        await ApplyLegacyThrough("0013");
         await Assert.ThrowsAsync<MigrationException>(() => Engine(Migrations).RunAsync("baseline", new(false, "backup", Fingerprint)));
-        Assert.Equal(0, await Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
-        Assert.Equal(14L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history WHERE baseline"));
-        Assert.Equal(0, await Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
-        await Reset(); await ApplyLegacy(); await Admin("CREATE TABLE journal.unexpected_object(id integer)");
+        await Admin("CREATE TABLE journal.unexpected_object(id integer)");
         await Assert.ThrowsAsync<MigrationException>(() => Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
     }
 
@@ -219,7 +267,12 @@ public sealed class MigrationEngineTests : IAsyncLifetime
     private string RoleConnection(string role) { var builder = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { Username = role, Password = _passwords[role] }; return builder.ConnectionString; }
     private async Task SetPassword(string role, string password) { await using var connection = new NpgsqlConnection(_postgres.GetConnectionString()); await connection.OpenAsync(); await using var format = new NpgsqlCommand("SELECT format('ALTER ROLE %I PASSWORD %L', $1, $2)", connection); format.Parameters.AddWithValue(role); format.Parameters.AddWithValue(password); await new NpgsqlCommand((string)(await format.ExecuteScalarAsync())!, connection).ExecuteNonQueryAsync(); }
     private async Task Reset() => await Admin("DO $$ DECLARE s text; BEGIN FOREACH s IN ARRAY ARRAY['platform_migrations','identity','journal','performance','discipline','reminder','market','market_data_public','price_alert','rotation','stock_research','partner','content','operations','ordered'] LOOP EXECUTE format('DROP SCHEMA IF EXISTS %I CASCADE',s); END LOOP; END $$;");
-    private async Task ApplyLegacy() { foreach (var path in Directory.GetFiles(Migrations, "*.sql").Order(StringComparer.Ordinal)) await Admin(await File.ReadAllTextAsync(path)); }
+    private async Task ApplyLegacyThrough(string migrationId)
+    {
+        await using var connection = new NpgsqlConnection(MigratorConnection()); await connection.OpenAsync();
+        foreach (var path in Directory.GetFiles(Migrations, "*.sql").Where(path => string.CompareOrdinal(Path.GetFileName(path)[..4], migrationId) <= 0).Order(StringComparer.Ordinal))
+            await Execute(connection, await File.ReadAllTextAsync(path));
+    }
     private async Task Admin(string sql) { await using var connection = new NpgsqlConnection(_postgres.GetConnectionString()); await connection.OpenAsync(); await Execute(connection, sql); }
     private static async Task Execute(NpgsqlConnection connection, string sql) => await new NpgsqlCommand(sql, connection) { CommandTimeout = 120 }.ExecuteNonQueryAsync();
     private async Task<T> Scalar<T>(string sql, params object[] parameters) { await using var connection = new NpgsqlConnection(_postgres.GetConnectionString()); await connection.OpenAsync(); await using var command = new NpgsqlCommand(sql, connection); foreach (var parameter in parameters) command.Parameters.AddWithValue(parameter); return (T)(await command.ExecuteScalarAsync())!; }
@@ -228,5 +281,6 @@ public sealed class MigrationEngineTests : IAsyncLifetime
     private static string CopyMigrations() { var directory = Path.Combine(Path.GetTempPath(), $"migration-fixture-{Guid.NewGuid():N}"); Directory.CreateDirectory(directory); foreach (var file in Directory.GetFiles(Migrations)) File.Copy(file, Path.Combine(directory, Path.GetFileName(file))); return directory; }
     private static Task Simple(string directory, string filename, string id, string sql) => File.WriteAllTextAsync(Path.Combine(directory, filename), $"-- migration-id: {id}\n-- owner: platform-legacy\n-- description: Test {id}\n\n{sql};\n");
     private static async Task RefreshManifest(string directory) { var entries = Directory.GetFiles(directory, "*.sql").Order(StringComparer.Ordinal).Select(path => new MigrationManifestEntry(Path.GetFileName(path)[..4], Path.GetFileName(path), Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path))))).ToArray(); await File.WriteAllBytesAsync(Path.Combine(directory, "manifest.json"), JsonSerializer.SerializeToUtf8Bytes(new MigrationManifest(1, entries))); }
+    private static async Task<string> FingerprintFixture(Func<string, string> transform) { var path = Path.Combine(Path.GetTempPath(), $"baseline-fingerprint-{Guid.NewGuid():N}.json"); await File.WriteAllTextAsync(path, transform(await File.ReadAllTextAsync(Fingerprint))); return path; }
     private static string FindRoot() { var directory = new DirectoryInfo(AppContext.BaseDirectory); while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "TradeDiary.slnx"))) directory = directory.Parent; return directory?.FullName ?? throw new InvalidOperationException("Repository root not found."); }
 }

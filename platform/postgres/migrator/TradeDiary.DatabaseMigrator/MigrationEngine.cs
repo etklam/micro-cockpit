@@ -115,13 +115,20 @@ public sealed class MigrationEngine(string connectionString, string migrationsPa
     {
         if (!options.ConfirmExistingDatabase || string.IsNullOrWhiteSpace(options.BackupReference))
             throw new MigrationException("Baseline requires --confirm-existing-database and --backup-confirmed.");
+        var fingerprint = await LoadFingerprintAsync(options.FingerprintPath, cancellationToken);
+        var targetIndex = migrations.ToList().FindIndex(migration => migration.Id == fingerprint.BaselineThroughMigrationId);
+        if (targetIndex < 0)
+            throw new MigrationException($"Baseline target migration does not exist: {fingerprint.BaselineThroughMigrationId}");
+        var baselineMigrations = migrations.Take(targetIndex + 1).ToArray();
         if (await HistoryExistsAsync(connection, cancellationToken))
         {
             var existing = await LoadHistoryAsync(connection, cancellationToken);
             if (existing.Count != 0)
             {
                 ValidateHistory(migrations, existing);
-                if (existing.Count == migrations.Count && existing.All(row => row.Baseline))
+                var prefixIsComplete = baselineMigrations.All(migration => existing.Any(row => row.Id == migration.Id && row.Baseline));
+                var laterRowsAreMigrations = existing.Where(row => string.CompareOrdinal(row.Id, fingerprint.BaselineThroughMigrationId) > 0).All(row => !row.Baseline);
+                if (prefixIsComplete && laterRowsAreMigrations)
                 {
                     Console.WriteLine("Existing database baseline was already recorded and remains valid.");
                     return 0;
@@ -131,10 +138,10 @@ public sealed class MigrationEngine(string connectionString, string migrationsPa
         }
         if (!await ManagedSchemaExistsAsync(connection, cancellationToken))
             throw new MigrationException("Baseline is not permitted for a fresh empty database.");
-        await VerifyFingerprintAsync(connection, options.FingerprintPath, cancellationToken);
+        await VerifyFingerprintAsync(connection, fingerprint, cancellationToken);
         await CreateHistoryAsync(connection, cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        foreach (var migration in migrations)
+        foreach (var migration in baselineMigrations)
             await InsertHistoryAsync(connection, transaction, migration, 0, true, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         Console.WriteLine("Existing database baseline recorded after complete schema fingerprint verification.");
@@ -235,10 +242,14 @@ public sealed class MigrationEngine(string connectionString, string migrationsPa
         return rows;
     }
 
-    private static async Task VerifyFingerprintAsync(NpgsqlConnection connection, string path, CancellationToken cancellationToken)
+    private static async Task<SchemaFingerprint> LoadFingerprintAsync(string path, CancellationToken cancellationToken)
     {
-        var fingerprint = JsonSerializer.Deserialize<SchemaFingerprint>(await File.ReadAllTextAsync(path, cancellationToken), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+        return JsonSerializer.Deserialize<SchemaFingerprint>(await File.ReadAllTextAsync(path, cancellationToken), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
             ?? throw new MigrationException("Baseline fingerprint is invalid.");
+    }
+
+    private static async Task VerifyFingerprintAsync(NpgsqlConnection connection, SchemaFingerprint fingerprint, CancellationToken cancellationToken)
+    {
         foreach (var item in fingerprint.RequiredObjects)
         {
             var parts = item.Split('.', 2);
@@ -262,5 +273,5 @@ public sealed class MigrationEngine(string connectionString, string migrationsPa
 }
 
 public sealed record BaselineOptions(bool ConfirmExistingDatabase, string BackupReference, string FingerprintPath);
-public sealed record SchemaFingerprint(string[] RequiredObjects, FingerprintColumn[] RequiredColumns, string[] RequiredCatalogChecks);
+public sealed record SchemaFingerprint(string BaselineThroughMigrationId, string[] RequiredObjects, FingerprintColumn[] RequiredColumns, string[] RequiredCatalogChecks);
 public sealed record FingerprintColumn(string Schema, string Table, string Column);
