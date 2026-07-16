@@ -73,6 +73,7 @@ type RotationSort = (typeof rotationSorts)[number]
 
 const rotationNumber = (value: number | string | null) => value == null ? null : Number(value)
 const rotationPercent = (value: number | null) => value == null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
+const rotationPercentile = (value: number | null) => value == null ? '—' : `${(value * 100).toLocaleString(undefined, { maximumFractionDigits: 1 })}%`
 const rotationLabel = (value: string | null) => value ? value.replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase()) : 'Unavailable'
 const maLabel = (value: boolean | null) => value == null ? '—' : value ? 'Above' : 'Below'
 
@@ -84,6 +85,12 @@ function sortRotation(items: RotationItem[], sort: RotationSort, direction: 'asc
     if (b == null) return -1
     return (a - b) * (direction === 'asc' ? 1 : -1)
   })
+}
+
+function sortPartitionedRotation(items: RotationItem[], sort: RotationSort, direction: 'asc' | 'desc', rankScope: string) {
+  if (rankScope !== 'sector') return sortRotation(items, sort, direction)
+  const groups = [...new Set(items.map(item => item.rankGroup))].sort()
+  return groups.flatMap(group => sortRotation(items.filter(item => item.rankGroup === group), sort, direction))
 }
 
 export function RotationPage() {
@@ -104,7 +111,7 @@ export function RotationPage() {
   const requestedSort = params.get('sort') ?? 'rank'
   const sort = rotationSorts.includes(requestedSort as RotationSort) ? requestedSort as RotationSort : 'rank'
   const direction = params.get('direction') === 'desc' ? 'desc' : 'asc'
-  const groups = useMemo(() => [...new Set((monitor.data?.etfs ?? []).map(item => item.sector).filter((value): value is string => !!value))].sort(), [monitor.data?.etfs])
+  const groups = useMemo(() => [...new Set((monitor.data?.etfs ?? []).map(item => item.rankGroup))].sort(), [monitor.data?.etfs])
 
   useEffect(() => {
     if (!selectedUniverse) return
@@ -132,20 +139,23 @@ export function RotationPage() {
     next.delete('group'); setParams(next)
   }
   const filtered = useMemo(() => (monitor.data?.etfs ?? []).filter(item => {
-    if (group !== 'all' && item.sector !== group) return false
+    if (group !== 'all' && item.rankGroup !== group) return false
     if ((ma === 'above20' && item.aboveMa20 !== true) || (ma === 'below20' && item.aboveMa20 !== false)) return false
     if ((ma === 'above50' && item.aboveMa50 !== true) || (ma === 'below50' && item.aboveMa50 !== false)) return false
     if ((ma === 'above200' && item.aboveMa200 !== true) || (ma === 'below200' && item.aboveMa200 !== false)) return false
     return true
   }), [group, ma, monitor.data?.etfs])
-  const rows = useMemo(() => sortRotation(filtered, sort, direction), [direction, filtered, sort])
+  const rankScope = monitor.data?.universe.rankScope ?? scope
+  const rows = useMemo(() => sortPartitionedRotation(filtered, sort, direction, rankScope), [direction, filtered, rankScope, sort])
   const backendRanked = useMemo(() => sortRotation(monitor.data?.etfs ?? [], 'rank', 'asc'), [monitor.data?.etfs])
   const ranked = backendRanked.filter(item => item.rank2w != null)
-  const strongest = ranked.slice(0, 3).map(item => item.sector ?? item.label).join(', ') || 'Unavailable'
-  const weakest = ranked.slice(-3).reverse().map(item => item.sector ?? item.label).join(', ') || 'Unavailable'
+  const summaryRanked = rankScope === 'sector' && group !== 'all' ? ranked.filter(item => item.rankGroup === group) : ranked
+  const leaders = summaryRanked.slice(0, 3).map(item => item.label).join(', ') || 'Unavailable'
+  const laggards = summaryRanked.slice(-3).reverse().map(item => item.label).join(', ') || 'Unavailable'
   const snapshotAge = monitor.data?.snapshotDate && bootstrap.data?.currentLocalDate
     ? (Date.parse(`${bootstrap.data.currentLocalDate}T00:00:00Z`) - Date.parse(`${monitor.data.snapshotDate}T00:00:00Z`)) / 86_400_000 : null
-  const stale = snapshotAge != null && snapshotAge > 7
+  const snapshotAgeLabel = snapshotAge != null && snapshotAge >= 0
+    ? `${snapshotAge} calendar ${snapshotAge === 1 ? 'day' : 'days'}` : 'Unavailable'
 
   if (universesQuery.isLoading) return <PageSkeleton rows={4} />
   if (universesQuery.isError) return <RotationUnavailable retry={() => { void universesQuery.refetch() }} />
@@ -158,9 +168,9 @@ export function RotationPage() {
     <PageHeader title="Market rotation" subtitle="Existing rotation-v1 results; no frontend market calculations" />
     <div className="rotation-toolbar">
       <div className="rotation-heading-meta">
-        <span><strong>Snapshot</strong> {data?.snapshotDate ?? 'Unavailable'}</span>
+        <span>Snapshot: {data?.snapshotDate ?? 'Unavailable'}</span>
+        <span>Age: {snapshotAgeLabel}</span>
         <span><strong>Universe</strong> {data?.universe.name ?? selectedUniverse?.name}</span>
-        <span><strong>Data freshness</strong> {data?.snapshotDate ? stale ? 'Stale snapshot' : 'Current snapshot' : 'Unavailable'}</span>
         <span><strong>Market state</strong> {rotationLabel(data?.marketState.state ?? null)}</span>
       </div>
       <Button size="sm" variant="ghost" loading={monitor.isFetching} onClick={() => { void monitor.refetch() }}>Refresh</Button>
@@ -177,13 +187,22 @@ export function RotationPage() {
       <div className="rotation-summary">
         <Stat label="Market state" value={rotationLabel(data.marketState.state)} sub={data.marketState.status} />
         <Stat label="Breadth" value={data.marketState.breadthPercent == null ? '—' : `${data.marketState.breadthPercent.toFixed(2)}%`} sub={data.marketState.benchmarkAboveMa200 == null ? 'Benchmark MA200 unavailable' : data.marketState.benchmarkAboveMa200 ? 'Benchmark above MA200' : 'Benchmark below MA200'} />
-        <Stat label="Strongest groups" value={strongest} sub="By backend 2-week rank" />
-        <Stat label="Weakest groups" value={weakest} sub="By backend 2-week rank" />
+        {rankScope === 'universe' ? <>
+          <Stat label="Leaders" value={leaders} sub="By global backend 2-week rank" />
+          <Stat label="Laggards" value={laggards} sub="By global backend 2-week rank" />
+        </> : <>
+          <Stat label="Rank partition" value="Ranked independently within each sector" sub={`${groups.length} sectors`} />
+          <Stat label="Available rows" value={`${data.etfs.length} available rows`} sub={group === 'all' ? 'Select one group for leaders and laggards' : group} />
+          {group !== 'all' ? <>
+            <Stat label="Leaders" value={leaders} sub={`Within ${group}`} />
+            <Stat label="Laggards" value={laggards} sub={`Within ${group}`} />
+          </> : null}
+        </>}
         <Stat label="Improving groups" value="Unavailable" sub="No backend trend series" />
         <Stat label="Weakening groups" value="Unavailable" sub="No backend trend series" />
       </div>
       <Card as="section" className="rotation-breadth"><h2>Breadth by group</h2><div className="rotation-breadth__grid">{data.sectorBreadth.map(item => <div key={item.sector}><strong>{item.sector}</strong><span>{item.availableCount}/{item.memberCount} available</span><span>MA20 {item.aboveMa20Percent == null ? '—' : `${item.aboveMa20Percent.toFixed(2)}%`}</span><span>MA50 {item.aboveMa50Percent == null ? '—' : `${item.aboveMa50Percent.toFixed(2)}%`}</span><span>MA200 {item.aboveMa200Percent == null ? '—' : `${item.aboveMa200Percent.toFixed(2)}%`}</span></div>)}</div></Card>
-      {!data.etfs.length ? <EmptyBox title="Snapshot has no ranked groups" hint="The snapshot is valid but contains no group rows." /> : !rows.length ? <EmptyBox title="No rankings match these filters" hint="Clear a group or MA filter to see the available rows." /> : <RotationTable rows={rows} />}
+      {!data.etfs.length ? <EmptyBox title="Snapshot has no ranked groups" hint="The snapshot is valid but contains no group rows." /> : !rows.length ? <EmptyBox title="No rankings match these filters" hint="Clear a group or MA filter to see the available rows." /> : <RotationTable rows={rows} rankScope={rankScope} />}
     </>}
   </>
 }
@@ -192,8 +211,8 @@ function RotationUnavailable({ retry, invalid }: { retry: () => void; invalid?: 
   return <><PageHeader title="Market rotation" subtitle="Relative group momentum" /><Card className="rotation-unavailable"><h2>{invalid ? 'Invalid rotation request' : 'Rotation data unavailable'}</h2><p>Live rotation data could not be loaded. This is different from an empty universe or snapshot.</p><Button onClick={retry}>Try again</Button></Card></>
 }
 
-function RotationTable({ rows }: { rows: RotationItem[] }) {
-  return <Card flush as="section" className="rotation-table-card"><div className="rotation-table-scroll"><table className="rotation-table"><thead><tr><th>Rank</th><th>Symbol</th><th>Name / sector</th><th>Last</th><th>2W</th><th>1M</th><th>3M</th><th>2W percentile</th><th>MA status</th><th>Data status</th></tr></thead><tbody>{rows.map(item => <tr key={item.symbol}><td>{item.rank2w ?? '—'}</td><td><strong>{item.symbol}</strong></td><td>{item.label}<small>{item.sector ?? '—'}</small></td><td>{item.close == null ? '—' : item.close.toLocaleString()}</td><td>{rotationPercent(item.return2w)}</td><td>{rotationPercent(item.return1m)}</td><td>{rotationPercent(item.return3m)}</td><td>{item.percentile2w == null ? '—' : item.percentile2w.toFixed(2)}</td><td><span className="ma-stack">20 {maLabel(item.aboveMa20)} · 50 {maLabel(item.aboveMa50)} · 200 {maLabel(item.aboveMa200)}</span></td><td><Badge tone={item.status === 'ok' ? 'gain' : 'warn'}>{item.status}</Badge></td></tr>)}</tbody></table></div></Card>
+function RotationTable({ rows, rankScope }: { rows: RotationItem[]; rankScope: string }) {
+  return <Card flush as="section" className="rotation-table-card"><div className="rotation-table-scroll"><table className="rotation-table"><thead><tr><th>Rank</th><th>Symbol</th><th>Name / sector</th><th>Last</th><th>2W</th><th>1M</th><th>3M</th><th>2W percentile</th><th>MA status</th><th>Data status</th></tr></thead><tbody>{rows.map(item => <tr key={item.symbol}><td>{item.rank2w == null ? '—' : rankScope === 'sector' ? `#${item.rank2w} in ${item.rankGroup}` : `#${item.rank2w}`}</td><td><strong>{item.symbol}</strong></td><td>{item.label}<small>{item.sector ?? '—'}</small></td><td>{item.close == null ? '—' : item.close.toLocaleString()}</td><td>{rotationPercent(item.return2w)}</td><td>{rotationPercent(item.return1m)}</td><td>{rotationPercent(item.return3m)}</td><td>{rotationPercentile(item.percentile2w)}</td><td><span className="ma-stack">20 {maLabel(item.aboveMa20)} · 50 {maLabel(item.aboveMa50)} · 200 {maLabel(item.aboveMa200)}</span></td><td><Badge tone={item.status === 'ok' ? 'gain' : 'warn'}>{item.status}</Badge></td></tr>)}</tbody></table></div></Card>
 }
 
 export function PartnersPage() {

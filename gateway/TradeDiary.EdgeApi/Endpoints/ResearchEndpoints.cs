@@ -29,6 +29,10 @@ internal static class ResearchEndpoints
             if (!response.IsSuccess) return transport.ProblemFor(response, context);
             var value = response.Value;
             if (value is null || value.Universe is null || value.MarketState is null || value.SectorBreadth is null || value.Etfs is null ||
+                value.Universe.RankScope is not ("universe" or "sector") ||
+                value.Etfs.Any(row => value.Universe.RankScope == "universe"
+                    ? row.RankGroup != value.Universe.Code
+                    : row.RankGroup != (string.IsNullOrWhiteSpace(row.Sector) ? "Unclassified" : row.Sector)) ||
                 string.IsNullOrWhiteSpace(value.FormulaVersion) || string.IsNullOrWhiteSpace(value.Status))
                 return EdgeProblems.DownstreamInvalid(context);
             return Results.Ok(value);

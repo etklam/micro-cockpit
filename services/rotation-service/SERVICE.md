@@ -12,3 +12,5 @@ Owns ETF universes and versioned rotation, breadth, and market-state snapshots. 
 - `GET /health/live`, `GET /health/ready`, `GET /version`
 
 `rotation-v1` uses adjusted-close returns at 10, 20, and 63 trading-session lags and 20/50/200-session simple moving averages. Rank and percent-rank are partitioned by universe, snapshot date, and configured scope. Missing lookback data remains `null` with `insufficient_data`.
+
+The monitor exposes the stored partition semantics through `universe.rankScope` and `etfs[].rankGroup`. Universe scope uses the universe code as every row's rank group. Sector scope uses the sector name, or `Unclassified` when the sector is absent. The raw `percentile2w` value is in the inclusive `0` to `1` range; percentage conversion is presentation only.

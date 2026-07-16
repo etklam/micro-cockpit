@@ -2955,52 +2955,6 @@
         "operationId": "post_api_app_rotation_universes_id_calculate"
       }
     },
-    "/api/app/rotation/monitor": {
-      "get": {
-        "tags": [
-          "TradeDiary.Rotation"
-        ],
-        "parameters": [
-          {
-            "name": "universe",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "date",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MonitorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "operationId": "get_api_app_rotation_monitor"
-      }
-    },
     "/api/app/diary-review-summary": {
       "get": {
         "tags": [
@@ -3050,6 +3004,52 @@
           }
         ],
         "operationId": "get_api_app_diary_review_summary"
+      }
+    },
+    "/api/app/rotation/monitor": {
+      "get": {
+        "tags": [
+          "TradeDiary.Rotation"
+        ],
+        "parameters": [
+          {
+            "name": "universe",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "get_api_app_rotation_monitor"
       }
     },
     "/api/app/bootstrap": {
@@ -4446,6 +4446,7 @@
           "return1m",
           "return3m",
           "rank2w",
+          "rankGroup",
           "percentile2w",
           "aboveMa20",
           "aboveMa50",
@@ -4510,6 +4511,9 @@
               "string"
             ],
             "format": "int32"
+          },
+          "rankGroup": {
+            "type": "string"
           },
           "percentile2w": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
@@ -4859,7 +4863,8 @@
         "required": [
           "id",
           "code",
-          "name"
+          "name",
+          "rankScope"
         ],
         "type": "object",
         "properties": {
@@ -4871,6 +4876,9 @@
             "type": "string"
           },
           "name": {
+            "type": "string"
+          },
+          "rankScope": {
             "type": "string"
           }
         }

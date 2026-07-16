@@ -37,7 +37,7 @@ export type DiaryWrite = { "localDate": string; "title": string; "content": null
 export type DisciplineResponse = { "id": string; "content": string; "position": number | string; "createdAt": string; "updatedAt": string }
 export type DisciplineWrite = { "content": string }
 export type EdgeProblemDetails = { "code": string; "title": string; "status": number; "detail": string; "correlationId": string }
-export type EtfSnapshotResponse = { "symbol": string; "label": string; "sector": null | string; "close": number | null; "return2w": number | null; "return1m": number | null; "return3m": number | null; "rank2w": null | number | string; "percentile2w": number | null; "aboveMa20": null | boolean; "aboveMa50": null | boolean; "aboveMa200": null | boolean; "status": string }
+export type EtfSnapshotResponse = { "symbol": string; "label": string; "sector": null | string; "close": number | null; "return2w": number | null; "return1m": number | null; "return3m": number | null; "rank2w": null | number | string; "rankGroup": string; "percentile2w": number | null; "aboveMa20": null | boolean; "aboveMa50": null | boolean; "aboveMa200": null | boolean; "status": string }
 export type Fire = { "annualExpenses": number; "withdrawalRatePercent": number; "investedAssets": number }
 export type FireResponse = { "target": number; "gap": number }
 export type HealthWrite = { "serviceName": string; "status": string }
@@ -51,7 +51,7 @@ export type LoginRequest = { "email": string; "password": string }
 export type MistakeTagCountResponse = { "tag": string; "count": number | string }
 export type MonitorMarketState = { "state": null | string; "breadthPercent": number | null; "benchmarkAboveMa200": null | boolean; "status": string }
 export type MonitorResponse = { "universe": MonitorUniverse; "snapshotDate": null | string; "formulaVersion": string; "status": string; "marketState": MonitorMarketState; "sectorBreadth": Array<SectorBreadthResponse>; "etfs": Array<EtfSnapshotResponse> }
-export type MonitorUniverse = { "id": string; "code": string; "name": string }
+export type MonitorUniverse = { "id": string; "code": string; "name": string; "rankScope": string }
 export type MonthSummaryResponse = { "year": number | string; "month": number | string; "total": number; "recordedDays": number | string; "profitDays": number | string; "lossDays": number | string; "flatDays": number | string; "bestDay": number | null; "worstDay": number | null }
 export type NoteResponse = { "stockId": string; "content": string; "createdAt": string; "updatedAt": string }
 export type NoteWrite = { "content": null | string }
@@ -195,8 +195,8 @@ export const putApiAppRotationUniversesId = (id: string, body: UniverseWrite, ex
 export const deleteApiAppRotationUniversesId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/rotation/universes/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const putApiAppRotationUniversesIdSymbols = (id: string, body: Array<UniverseSymbolWrite>, extra?: RequestInit) => request<unknown>(`/api/app/rotation/universes/${encodeURIComponent(String(id))}/symbols`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const postApiAppRotationUniversesIdCalculate = (id: string, query: { "date": string }, extra?: RequestInit) => request<CalculateResponse>(`/api/app/rotation/universes/${encodeURIComponent(String(id))}/calculate` + withQuery(query), { method: "POST", ...extra })
-export const getApiAppRotationMonitor = (query: { "universe": string; "date"?: string }, extra?: RequestInit) => request<MonitorResponse>("/api/app/rotation/monitor" + withQuery(query), { method: "GET", ...extra })
 export const getApiAppDiaryReviewSummary = (query: { "from": string; "to": string }, extra?: RequestInit) => request<DiaryReviewSummaryResponse>("/api/app/diary-review-summary" + withQuery(query), { method: "GET", ...extra })
+export const getApiAppRotationMonitor = (query: { "universe": string; "date"?: string }, extra?: RequestInit) => request<MonitorResponse>("/api/app/rotation/monitor" + withQuery(query), { method: "GET", ...extra })
 export const getApiAppBootstrap = (extra?: RequestInit) => request<AppBootstrapResponse>("/api/app/bootstrap", { method: "GET", ...extra })
 export const getApiAppDashboard = (extra?: RequestInit) => request<DashboardResponse>("/api/app/dashboard", { method: "GET", ...extra })
 export const getApiAppCalendar = (query: { "year": number; "month": number }, extra?: RequestInit) => request<CalendarResponse>("/api/app/calendar" + withQuery(query), { method: "GET", ...extra })

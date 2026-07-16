@@ -148,6 +148,54 @@ public sealed class CockpitCompositionTests
     }
 
     [Fact]
+    public async Task Rotation_monitor_rejects_unknown_rank_scope()
+    {
+        var malformed = RotationResponse.Replace(
+            "\"rankScope\":\"sector\"",
+            "\"rankScope\":\"portfolio\"");
+        using var factory = CreateFactory((service, _) => service == "rotation"
+            ? Json(HttpStatusCode.OK, malformed)
+            : Json(HttpStatusCode.OK, "{}"));
+        using var response = await factory.CreateClient().GetAsync("/api/app/rotation/monitor?universe=SECTORS");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal("downstream_invalid_response", document.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Rotation_monitor_rejects_missing_sector_rank_group()
+    {
+        var malformed = RotationResponse.Replace(
+            ",\"rankGroup\":\"Technology\"",
+            "");
+        using var factory = CreateFactory((service, _) => service == "rotation"
+            ? Json(HttpStatusCode.OK, malformed)
+            : Json(HttpStatusCode.OK, "{}"));
+        using var response = await factory.CreateClient().GetAsync("/api/app/rotation/monitor?universe=SECTORS");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal("downstream_invalid_response", document.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Rotation_monitor_rejects_mismatched_rank_group()
+    {
+        var malformed = RotationResponse.Replace(
+            "\"rankGroup\":\"Technology\"",
+            "\"rankGroup\":\"Global\"");
+        using var factory = CreateFactory((service, _) => service == "rotation"
+            ? Json(HttpStatusCode.OK, malformed)
+            : Json(HttpStatusCode.OK, "{}"));
+        using var response = await factory.CreateClient().GetAsync("/api/app/rotation/monitor?universe=SECTORS");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal("downstream_invalid_response", document.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task Rotation_monitor_preserves_typed_null_fields()
     {
         using var factory = CreateFactory((service, _) => service == "rotation"
@@ -157,7 +205,9 @@ public sealed class CockpitCompositionTests
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("sector", document.RootElement.GetProperty("universe").GetProperty("rankScope").GetString());
         Assert.Equal("risk_on", document.RootElement.GetProperty("marketState").GetProperty("state").GetString());
+        Assert.Equal("Technology", document.RootElement.GetProperty("etfs")[0].GetProperty("rankGroup").GetString());
         Assert.Equal(JsonValueKind.Null, document.RootElement.GetProperty("etfs")[0].GetProperty("close").ValueKind);
         Assert.Equal(JsonValueKind.Null, document.RootElement.GetProperty("etfs")[0].GetProperty("aboveMa200").ValueKind);
     }
@@ -339,7 +389,7 @@ public sealed class CockpitCompositionTests
     };
 
     private const string RotationResponse = """
-        {"universe":{"id":"55555555-5555-5555-5555-555555555555","code":"SECTORS","name":"US sectors"},"snapshotDate":"2026-07-15","formulaVersion":"rotation-v1","status":"ok","marketState":{"state":"risk_on","breadthPercent":62.5,"benchmarkAboveMa200":true,"status":"ok"},"sectorBreadth":[{"sector":"Technology","memberCount":2,"availableCount":2,"aboveMa20Percent":100,"aboveMa50Percent":50,"aboveMa200Percent":50,"status":"ok"}],"etfs":[{"symbol":"XLK","label":"Technology","sector":"Technology","close":null,"return2w":4.5,"return1m":8.1,"return3m":12.2,"rank2w":1,"percentile2w":1,"aboveMa20":true,"aboveMa50":true,"aboveMa200":null,"status":"ok"}]}
+        {"universe":{"id":"55555555-5555-5555-5555-555555555555","code":"SECTORS","name":"US sectors","rankScope":"sector"},"snapshotDate":"2026-07-15","formulaVersion":"rotation-v1","status":"ok","marketState":{"state":"risk_on","breadthPercent":62.5,"benchmarkAboveMa200":true,"status":"ok"},"sectorBreadth":[{"sector":"Technology","memberCount":2,"availableCount":2,"aboveMa20Percent":100,"aboveMa50Percent":50,"aboveMa200Percent":50,"status":"ok"}],"etfs":[{"symbol":"XLK","label":"Technology","sector":"Technology","close":null,"return2w":4.5,"return1m":8.1,"return3m":12.2,"rank2w":1,"rankGroup":"Technology","percentile2w":1,"aboveMa20":true,"aboveMa50":true,"aboveMa200":null,"status":"ok"}]}
         """;
 
     private sealed class DownstreamHandler(string service, Func<string, string, HttpResponseMessage> responder) : HttpMessageHandler

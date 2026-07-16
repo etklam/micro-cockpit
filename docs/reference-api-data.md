@@ -169,7 +169,9 @@ Market ingestion is not browser-facing. An external authenticated loader uses th
 | POST | `/api/app/rotation/universes/{id}/calculate` |
 | GET | `/api/app/rotation/monitor` |
 
-The monitor returns stored backend calculations. Missing lookback data remains `null` with an appropriate status. The frontend does not calculate returns, moving averages, rank, percentile, breadth, or market state.
+The monitor returns stored backend calculations. `universe.rankScope` identifies whether `rank2w` is global to the universe (`universe`) or local to each sector (`sector`). Each row's `rankGroup` identifies that rank partition: the universe code for universe scope, or the sector name/`Unclassified` for sector scope. Sector-local ranks must not be compared across rank groups.
+
+The raw `percentile2w` contract range is `0` through `1`; clients may format it as `0%` through `100%` without recalculating it. Missing lookback data remains `null` with an appropriate status. The frontend does not calculate returns, moving averages, rank, percentile, breadth, or market state.
 
 ### Partners, content, tools, and operations
 

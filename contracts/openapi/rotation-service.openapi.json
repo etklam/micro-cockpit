@@ -445,6 +445,7 @@
           "return1m",
           "return3m",
           "rank2w",
+          "rankGroup",
           "percentile2w",
           "aboveMa20",
           "aboveMa50",
@@ -509,6 +510,9 @@
               "string"
             ],
             "format": "int32"
+          },
+          "rankGroup": {
+            "type": "string"
           },
           "percentile2w": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
@@ -626,7 +630,8 @@
         "required": [
           "id",
           "code",
-          "name"
+          "name",
+          "rankScope"
         ],
         "type": "object",
         "properties": {
@@ -638,6 +643,9 @@
             "type": "string"
           },
           "name": {
+            "type": "string"
+          },
+          "rankScope": {
             "type": "string"
           }
         }

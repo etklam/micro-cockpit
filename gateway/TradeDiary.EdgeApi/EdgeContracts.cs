@@ -110,7 +110,7 @@ public sealed record RotationMonitorResponse(
     IReadOnlyList<RotationSectorBreadthResponse> SectorBreadth,
     IReadOnlyList<RotationEtfSnapshotResponse> Etfs);
 
-public sealed record RotationUniverseResponse(Guid Id, string Code, string Name);
+public sealed record RotationUniverseResponse(Guid Id, string Code, string Name, string RankScope);
 public sealed record RotationMarketStateResponse(string? State, decimal? BreadthPercent, bool? BenchmarkAboveMa200, string Status);
 public sealed record RotationSectorBreadthResponse(
     string Sector,
@@ -129,6 +129,7 @@ public sealed record RotationEtfSnapshotResponse(
     decimal? Return1m,
     decimal? Return3m,
     int? Rank2w,
+    string? RankGroup,
     decimal? Percentile2w,
     bool? AboveMa20,
     bool? AboveMa50,

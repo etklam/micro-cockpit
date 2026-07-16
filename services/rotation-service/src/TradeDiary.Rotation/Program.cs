@@ -89,11 +89,11 @@ app.MapGet("/internal/rotation/monitor", async (string universe, DateOnly? date,
 {
     var code=universe.Trim().ToUpperInvariant(); await using var command=db.CreateCommand(Sql.Monitor); command.Parameters.AddWithValue(code); command.Parameters.AddWithValue((object?)date??DBNull.Value);
     await using var reader=await command.ExecuteReaderAsync(); if(!await reader.ReadAsync()) return Results.Problem("not_found", statusCode:404);
-    var id=reader.GetGuid(0); var universeCode=reader.GetString(1); var universeName=reader.GetString(2); var snapshotDate=reader.IsDBNull(3)?(DateOnly?)null:reader.GetFieldValue<DateOnly>(3); var state=reader.IsDBNull(4)?null:reader.GetString(4); var stateStatus=reader.IsDBNull(5)?"insufficient_data":reader.GetString(5); var breadth=reader.IsDBNull(6)?(decimal?)null:reader.GetDecimal(6); var benchmarkAbove=reader.IsDBNull(7)?(bool?)null:reader.GetBoolean(7); await reader.CloseAsync();
+    var id=reader.GetGuid(0); var universeCode=reader.GetString(1); var universeName=reader.GetString(2); var rankScope=reader.GetString(3); var snapshotDate=reader.IsDBNull(4)?(DateOnly?)null:reader.GetFieldValue<DateOnly>(4); var state=reader.IsDBNull(5)?null:reader.GetString(5); var stateStatus=reader.IsDBNull(6)?"insufficient_data":reader.GetString(6); var breadth=reader.IsDBNull(7)?(decimal?)null:reader.GetDecimal(7); var benchmarkAbove=reader.IsDBNull(8)?(bool?)null:reader.GetBoolean(8); await reader.CloseAsync();
     await using var readConnection=await db.OpenConnectionAsync();
     var sectors=new List<SectorBreadthResponse>(); await using(var q=new NpgsqlCommand("SELECT sector,member_count,available_count,above_ma20_percent,above_ma50_percent,above_ma200_percent,status FROM rotation.sector_breadth_snapshots WHERE universe_id=$1 AND snapshot_date=$2 ORDER BY above_ma20_percent DESC NULLS LAST,sector",readConnection)) { q.Parameters.AddWithValue(id); q.Parameters.AddWithValue((object?)snapshotDate??DBNull.Value); await using var r=await q.ExecuteReaderAsync(); while(await r.ReadAsync()) sectors.Add(new SectorBreadthResponse(r.GetString(0),r.GetInt32(1),r.GetInt32(2),NullableDecimal(r,3),NullableDecimal(r,4),NullableDecimal(r,5),r.GetString(6))); }
-    var etfs=new List<EtfSnapshotResponse>(); await using(var q=new NpgsqlCommand("SELECT s.symbol,u.label,s.sector,s.close,s.return_2w,s.return_1m,s.return_3m,s.rank_2w,s.percentile_2w,s.above_ma20,s.above_ma50,s.above_ma200,s.status FROM rotation.market_rotation_snapshots s JOIN rotation.market_rotation_universe_symbols u ON u.universe_id=s.universe_id AND u.symbol=s.symbol WHERE s.universe_id=$1 AND s.snapshot_date=$2 ORDER BY s.rank_2w NULLS LAST,u.sort_order",readConnection)) { q.Parameters.AddWithValue(id); q.Parameters.AddWithValue((object?)snapshotDate??DBNull.Value); await using var r=await q.ExecuteReaderAsync(); while(await r.ReadAsync()) etfs.Add(new EtfSnapshotResponse(r.GetString(0),r.GetString(1),r.IsDBNull(2)?null:r.GetString(2),NullableDecimal(r,3),NullableDecimal(r,4),NullableDecimal(r,5),NullableDecimal(r,6),r.IsDBNull(7)?(int?)null:r.GetInt32(7),NullableDecimal(r,8),NullableBool(r,9),NullableBool(r,10),NullableBool(r,11),r.GetString(12))); }
-    return Results.Ok(new MonitorResponse(new MonitorUniverse(id, universeCode, universeName), snapshotDate, RotationEngine.FormulaVersion, snapshotDate is null?"insufficient_data":stateStatus, new MonitorMarketState(state, breadth, benchmarkAbove, stateStatus), sectors, etfs));
+    var etfs=new List<EtfSnapshotResponse>(); await using(var q=new NpgsqlCommand("SELECT s.symbol,u.label,s.sector,s.close,s.return_2w,s.return_1m,s.return_3m,s.rank_2w,s.percentile_2w,s.above_ma20,s.above_ma50,s.above_ma200,s.status FROM rotation.market_rotation_snapshots s JOIN rotation.market_rotation_universe_symbols u ON u.universe_id=s.universe_id AND u.symbol=s.symbol WHERE s.universe_id=$1 AND s.snapshot_date=$2 ORDER BY s.rank_2w NULLS LAST,u.sort_order",readConnection)) { q.Parameters.AddWithValue(id); q.Parameters.AddWithValue((object?)snapshotDate??DBNull.Value); await using var r=await q.ExecuteReaderAsync(); while(await r.ReadAsync()) { var sector=r.IsDBNull(2)?null:r.GetString(2); var rankGroup=rankScope=="sector"?sector??"Unclassified":universeCode; etfs.Add(new EtfSnapshotResponse(r.GetString(0),r.GetString(1),sector,NullableDecimal(r,3),NullableDecimal(r,4),NullableDecimal(r,5),NullableDecimal(r,6),r.IsDBNull(7)?(int?)null:r.GetInt32(7),rankGroup,NullableDecimal(r,8),NullableBool(r,9),NullableBool(r,10),NullableBool(r,11),r.GetString(12))); } }
+    return Results.Ok(new MonitorResponse(new MonitorUniverse(id, universeCode, universeName, rankScope), snapshotDate, RotationEngine.FormulaVersion, snapshotDate is null?"insufficient_data":stateStatus, new MonitorMarketState(state, breadth, benchmarkAbove, stateStatus), sectors, etfs));
 })
 .Produces<MonitorResponse>(200).ProducesProblem(404);
 
@@ -106,10 +106,10 @@ record UniverseSymbolWrite(string Symbol,string Label,string? Sector,int? SortOr
 record UniverseResponse(Guid Id,string Code,string Name,string RankScope,DateTime CreatedAt,DateTime UpdatedAt);
 record UniverseCreatedResponse(Guid Id,string Code,string Name,string RankScope);
 public record CalculateResponse(Guid UniverseId,DateOnly SnapshotDate,string Status,string FormulaVersion);
-record MonitorUniverse(Guid Id,string Code,string Name);
+record MonitorUniverse(Guid Id,string Code,string Name,string RankScope);
 record MonitorMarketState(string? State,decimal? BreadthPercent,bool? BenchmarkAboveMa200,string Status);
 record SectorBreadthResponse(string Sector,int MemberCount,int AvailableCount,decimal? AboveMa20Percent,decimal? AboveMa50Percent,decimal? AboveMa200Percent,string Status);
-record EtfSnapshotResponse(string Symbol,string Label,string? Sector,decimal? Close,decimal? Return2w,decimal? Return1m,decimal? Return3m,int? Rank2w,decimal? Percentile2w,bool? AboveMa20,bool? AboveMa50,bool? AboveMa200,string Status);
+record EtfSnapshotResponse(string Symbol,string Label,string? Sector,decimal? Close,decimal? Return2w,decimal? Return1m,decimal? Return3m,int? Rank2w,string RankGroup,decimal? Percentile2w,bool? AboveMa20,bool? AboveMa50,bool? AboveMa200,string Status);
 record MonitorResponse(MonitorUniverse Universe,DateOnly? SnapshotDate,string FormulaVersion,string Status,MonitorMarketState MarketState,List<SectorBreadthResponse> SectorBreadth,List<EtfSnapshotResponse> Etfs);
 record CollectionResponse<T>(List<T> Items);
 
@@ -161,9 +161,9 @@ FROM LATERAL(SELECT symbol,above_ma200 FROM rotation.market_rotation_snapshots W
 CROSS JOIN LATERAL(SELECT round(100.0*count(*) FILTER(WHERE above_ma20)/nullif(count(above_ma20),0),2) breadth FROM rotation.market_rotation_snapshots WHERE universe_id=$1 AND snapshot_date=$2)x
 """;
 public const string Monitor="""
-SELECT u.id,u.code,u.name,d.snapshot_date,m.state,m.status,m.breadth_percent,m.benchmark_above_ma200
+SELECT u.id,u.code,u.name,coalesce(d.rank_scope,u.rank_scope),d.snapshot_date,m.state,m.status,m.breadth_percent,m.benchmark_above_ma200
 FROM rotation.market_rotation_universes u
-LEFT JOIN LATERAL(SELECT snapshot_date FROM rotation.market_rotation_snapshots WHERE universe_id=u.id AND ($2::date IS NULL OR snapshot_date<=$2) ORDER BY snapshot_date DESC LIMIT 1)d ON true
+LEFT JOIN LATERAL(SELECT snapshot_date,rank_scope FROM rotation.market_rotation_snapshots WHERE universe_id=u.id AND ($2::date IS NULL OR snapshot_date<=$2) ORDER BY snapshot_date DESC LIMIT 1)d ON true
 LEFT JOIN rotation.market_state_snapshots m ON m.universe_id=u.id AND m.snapshot_date=d.snapshot_date WHERE u.code=$1
 """;
 }
