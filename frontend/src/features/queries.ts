@@ -28,6 +28,9 @@ export const queryKeys = {
     detail: (diaryId: string) => ['diary-review', 'detail', diaryId] as const,
     summary: (from: string, to: string) => ['diary-review', 'summary', from, to] as const,
     summaries: ['diary-review', 'summary'] as const,
+    itemsPrefix: ['diary-review', 'items'] as const,
+    items: (from: string, to: string, status: api.DiaryReviewFilterStatus, assessment: api.DiaryReviewAssessmentFilter, tag: string, cursor: string) =>
+      ['diary-review', 'items', from, to, status, assessment, tag, cursor] as const,
   },
 }
 
@@ -56,6 +59,11 @@ export const useArticlesQuery = () => useQuery({ queryKey: queryKeys.articles, q
 export const useArticleQuery = (slug: string) => useQuery({ queryKey: queryKeys.article(slug), queryFn: () => api.getArticle(slug), enabled: !!slug })
 export const useDiaryReviewQuery = (diaryId: string) => useQuery({ queryKey: queryKeys.diaryReview.detail(diaryId), queryFn: () => api.getDiaryReview(diaryId), enabled: !!diaryId })
 export const useDiaryReviewSummaryQuery = (from: string, to: string) => useQuery({ queryKey: queryKeys.diaryReview.summary(from, to), queryFn: () => api.getDiaryReviewSummary(from, to), enabled: !!from && !!to })
+export const useDiaryReviewItemsQuery = (from: string, to: string, status: api.DiaryReviewFilterStatus, assessment: api.DiaryReviewAssessmentFilter, tag: string, cursor: string) => useQuery({
+  queryKey: queryKeys.diaryReview.items(from, to, status, assessment, tag, cursor),
+  queryFn: () => api.getDiaryReviewItems(from, to, status, assessment, tag || undefined, cursor || undefined),
+  enabled: !!from && !!to,
+})
 
 const calendarPrefix = ['calendar'] as const
 const invalidateCalendar = (client: ReturnType<typeof useQueryClient>) => client.invalidateQueries({ queryKey: calendarPrefix })
@@ -145,6 +153,7 @@ export function useSaveDiaryReviewMutation(diaryId: string) {
     await Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.diaryReview.detail(diaryId) }),
       client.invalidateQueries({ queryKey: queryKeys.diaryReview.summaries }),
+      client.invalidateQueries({ queryKey: queryKeys.diaryReview.itemsPrefix }),
       client.invalidateQueries({ queryKey: queryKeys.diary(diaryId) }),
     ])
   } })
@@ -156,6 +165,7 @@ export function useDeleteDiaryReviewMutation(diaryId: string) {
     await Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.diaryReview.detail(diaryId) }),
       client.invalidateQueries({ queryKey: queryKeys.diaryReview.summaries }),
+      client.invalidateQueries({ queryKey: queryKeys.diaryReview.itemsPrefix }),
       client.invalidateQueries({ queryKey: queryKeys.diary(diaryId) }),
     ])
   } })

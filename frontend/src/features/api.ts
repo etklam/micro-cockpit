@@ -25,6 +25,9 @@ export type RotationItem = G.EtfSnapshotResponse
 export type DiaryReview = G.DiaryReviewResponse
 export type DiaryReviewWrite = G.DiaryReviewWrite
 export type DiaryReviewSummary = G.DiaryReviewSummaryResponse
+export type DiaryReviewItems = G.DiaryReviewItemsResponse
+export type DiaryReviewFilterStatus = NonNullable<G.DiaryReviewFilterStatus>
+export type DiaryReviewAssessmentFilter = NonNullable<G.DiaryReviewAssessmentFilter>
 
 export const getBootstrap = () => G.getApiAppBootstrap()
 export const getDashboard = () => G.getApiAppDashboard()
@@ -44,6 +47,8 @@ export async function getDiaryReview(diaryId: string): Promise<DiaryReview | nul
 export const saveDiaryReview = (diaryId: string, body: DiaryReviewWrite) => G.putApiAppDiariesDiaryIdReview(diaryId, body)
 export const deleteDiaryReview = (diaryId: string) => G.deleteApiAppDiariesDiaryIdReview(diaryId)
 export const getDiaryReviewSummary = (from: string, to: string) => G.getApiAppDiaryReviewSummary({ from, to })
+export const getDiaryReviewItems = (from: string, to: string, status: DiaryReviewFilterStatus, assessment: DiaryReviewAssessmentFilter, tag: string | undefined, cursor: string | undefined) =>
+  G.getApiAppDiaryReviewItems({ from, to, status, assessment, tag, cursor, limit: 50 })
 export const createTransaction = (diaryId: string, body: G.TransactionWrite, key?: string) =>
   G.postApiAppDiariesDiaryIdTransactions(diaryId, body, idempotencyHeader(key))
 export const deleteTransaction = (diaryId: string, id: string) => G.deleteApiAppDiariesDiaryIdTransactionsId(diaryId, id)

@@ -36,6 +36,7 @@ function handlers(calendar: CalendarResponse = {
     http.get('/api/app/bootstrap', () => HttpResponse.json(bootstrap)),
     http.get('/api/app/calendar', () => HttpResponse.json(calendar)),
     http.get('/api/app/diary-review-summary', () => HttpResponse.json(review)),
+    http.get('/api/app/diary-review-items', () => HttpResponse.json({ items: [], nextCursor: null })),
   ]
 }
 
@@ -49,6 +50,20 @@ test('/review uses bootstrap local date and replaces with its canonical month UR
   server.use(...handlers())
   renderReview()
   expect(await screen.findByRole('heading', { name: 'Monthly review' })).toBeInTheDocument()
+  expect(window.location.pathname).toBe('/review/2028/02')
+})
+
+test('noncanonical valid review month is replaced with the canonical month URL', async () => {
+  server.use(...handlers())
+  renderReview('/review/2028/2')
+  await screen.findByRole('heading', { name: 'Monthly review' })
+  expect(window.location.pathname).toBe('/review/2028/02')
+})
+
+test.each(['/review/2028/13', '/review/foo/02'])('invalid review path redirects through bootstrap month', async path => {
+  server.use(...handlers())
+  renderReview(path)
+  await screen.findByRole('heading', { name: 'Monthly review' })
   expect(window.location.pathname).toBe('/review/2028/02')
 })
 
@@ -81,6 +96,7 @@ test('missing P/L is omitted while an actual zero is shown as a flat day', async
   const chart = await screen.findByRole('list', { name: 'Daily P/L for February 2028' })
   expect(within(chart).queryByLabelText(/February 1/)).not.toBeInTheDocument()
   expect(within(chart).getByLabelText('February 2, P/L 0, flat')).toBeInTheDocument()
+  expect(within(chart).getByRole('link', { name: /February 2/ })).toHaveAttribute('href', '/calendar/2028/02?day=2028-02-02')
   expect(screen.getByText('Flat days').nextSibling).toHaveTextContent('1')
 })
 
@@ -89,6 +105,56 @@ test('review coverage uses the sum of the selected month diary counts', async ()
   renderReview('/review/2028/02')
   expect(await screen.findByText('1 of 3 diaries (33.3%)')).toBeInTheDocument()
   expect(screen.getByText('Average execution').nextSibling).toHaveTextContent('Unavailable')
+  expect(screen.getByText('Completion').nextSibling).toHaveTextContent('2 diaries still need review')
+})
+
+test('evidence filters use selected-month backend queries and clear cursor in URL', async () => {
+  let requested = ''
+  server.use(...handlers())
+  server.use(http.get('/api/app/diary-review-items', ({ request }) => {
+    requested = new URL(request.url).search
+    return HttpResponse.json({ items: [
+      { diaryId: 'diary-1', localDate: '2028-02-03', title: 'Plan review', contentPreview: 'Evidence', reviewStatus: 'unreviewed', processAssessment: null, emotion: null, disciplineScore: null, executionScore: null, mistakeTags: [], lesson: null, nextAction: null, reviewUpdatedAt: null },
+      { diaryId: 'diary-2', localDate: '2028-02-02', title: 'Completed review', contentPreview: 'Evidence', reviewStatus: 'reviewed', processAssessment: 'good', emotion: 'calm', disciplineScore: 4, executionScore: 3, mistakeTags: ['no_plan'], lesson: 'Lesson', nextAction: 'Next', reviewUpdatedAt: '2028-02-02T00:00:00Z' },
+    ], nextCursor: null })
+  }))
+  renderReview('/review/2028/02?reviewStatus=reviewed&cursor=old')
+  expect(await screen.findByRole('link', { name: 'Complete review' })).toHaveAttribute('href', '/diary/diary-1#decision-review')
+  expect(screen.getByRole('link', { name: 'Open review' })).toHaveAttribute('href', '/diary/diary-2#decision-review')
+  await waitFor(() => expect(requested).toContain('from=2028-02-01'))
+  expect(requested).toContain('to=2028-02-29')
+  expect(requested).toContain('status=reviewed')
+  await userEvent.selectOptions(screen.getByLabelText('Assessment'), 'poor')
+  expect(window.location.search).toContain('reviewStatus=reviewed')
+  expect(window.location.search).toContain('assessment=poor')
+  expect(window.location.search).not.toContain('cursor=')
+})
+
+test('evidence load-more failure preserves the already loaded items', async () => {
+  server.use(...handlers())
+  server.use(http.get('/api/app/diary-review-items', ({ request }) => {
+    if (new URL(request.url).searchParams.get('cursor')) return new HttpResponse(null, { status: 503 })
+    return HttpResponse.json({ items: [{ diaryId: 'diary-1', localDate: '2028-02-03', title: 'First evidence', contentPreview: 'Notes', reviewStatus: 'reviewed', processAssessment: 'good', emotion: null, disciplineScore: 4, executionScore: null, mistakeTags: [], lesson: null, nextAction: null, reviewUpdatedAt: '2028-02-03T00:00:00Z' }], nextCursor: 'next-page' })
+  }))
+  renderReview('/review/2028/02')
+  expect(await screen.findByText('First evidence')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Load more' }))
+  expect(await screen.findByText('Could not load more review evidence.')).toBeInTheDocument()
+  expect(screen.getByText('First evidence')).toBeInTheDocument()
+})
+
+test('browser back and forward restore evidence filters', async () => {
+  server.use(...handlers())
+  renderReview('/review/2028/02')
+  const filter = await screen.findByLabelText('Assessment')
+  await userEvent.selectOptions(filter, 'good')
+  await waitFor(() => expect(window.location.search).toContain('assessment=good'))
+  await userEvent.selectOptions(filter, 'poor')
+  await waitFor(() => expect(window.location.search).toContain('assessment=poor'))
+  window.history.back()
+  await waitFor(() => expect(screen.getByLabelText('Assessment')).toHaveValue('good'))
+  window.history.forward()
+  await waitFor(() => expect(screen.getByLabelText('Assessment')).toHaveValue('poor'))
 })
 
 test('zero diaries makes coverage unavailable without hiding a zero review count', async () => {
@@ -109,6 +175,15 @@ test('outcome and process remain separate when review service is unavailable', a
   expect(within(process).getByText('Process data is unavailable.')).toBeInTheDocument()
   expect(within(process).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
   expect(screen.getByText('Process and outcome are reviewed separately.')).toBeInTheDocument()
+})
+
+test('evidence failure does not hide outcome or process summary', async () => {
+  server.use(...handlers())
+  server.use(http.get('/api/app/diary-review-items', () => new HttpResponse(null, { status: 504 })))
+  renderReview('/review/2028/02')
+  expect(await screen.findByText('Review evidence is unavailable.')).toBeInTheDocument()
+  expect(screen.getByText('Net P/L')).toBeInTheDocument()
+  expect(screen.getByText('Reviewed entries')).toBeInTheDocument()
 })
 
 test('an empty outcome differs from unavailable performance', async () => {

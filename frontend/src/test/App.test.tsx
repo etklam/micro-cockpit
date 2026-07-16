@@ -28,6 +28,7 @@ function authenticatedHandlers() {
     }),
     http.get('/api/app/diaries', () => HttpResponse.json({ items: [] })),
     http.get('/api/app/diary-review-summary', () => HttpResponse.json({ reviewedCount: 0, averageDisciplineScore: null, averageExecutionScore: null, emotionCounts: {}, processAssessmentCounts: {}, topMistakeTags: [] })),
+    http.get('/api/app/diary-review-items', () => HttpResponse.json({ items: [], nextCursor: null })),
     http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
   ]
 }
@@ -56,6 +57,23 @@ test('loads a diary and its transactions from a direct detail link', async () =>
   expect(await screen.findByText('No trades logged.')).toBeInTheDocument()
   await userEvent.click(screen.getByText('Decision review'))
   expect(await screen.findByDisplayValue('Demand remains strong')).toBeInTheDocument()
+})
+
+test('decision review hash expands and focuses the review after loading', async () => {
+  server.use(...authenticatedHandlers(),
+    http.get('/api/app/diaries/:id', () => HttpResponse.json({ id: 'diary-1', localDate: '2026-07-16', title: 'Direct entry', content: 'Notes', createdAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T00:00:00Z' })),
+    http.get('/api/app/diaries/:id/transactions', () => HttpResponse.json({ items: [] })),
+    http.get('/api/app/diaries/:id/review', () => new HttpResponse(null, { status: 404 })))
+  renderApp('/diary/diary-1#decision-review')
+  const heading = await screen.findByText('Decision review')
+  await waitFor(() => expect(heading.closest('details')).toHaveAttribute('open'))
+  expect(document.activeElement).toBe(heading)
+})
+
+test('calendar day query selects the exact valid route-month date', async () => {
+  server.use(...authenticatedHandlers())
+  renderApp('/calendar/2026/07?day=2026-07-09')
+  expect(await screen.findByRole('heading', { name: '2026-07-09' })).toBeInTheDocument()
 })
 
 test('missing diary review shows an empty state', async () => {

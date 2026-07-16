@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { Alert, Diary, DiaryReviewWrite, Discipline, Transaction } from './features/api'
 import { useIdempotencyKey } from './features/api'
 import {
@@ -303,14 +303,24 @@ function DecisionReview({ diaryId }: { diaryId: string }) {
   const save = useSaveDiaryReviewMutation(diaryId)
   const removeReview = useDeleteDiaryReviewMutation(diaryId)
   const [form, setForm] = useState<DiaryReviewWrite>(emptyReview)
+  const location = useLocation()
+  const detailsRef = useRef<HTMLDetailsElement>(null)
+  const headingRef = useRef<HTMLElement>(null)
+  const deepLinked = location.hash === '#decision-review'
   useEffect(() => { if (review.data) setForm({ thesis: review.data.thesis, plannedAction: review.data.plannedAction, actualAction: review.data.actualAction, emotion: review.data.emotion, disciplineScore: review.data.disciplineScore, executionScore: review.data.executionScore, processAssessment: review.data.processAssessment, mistakeTags: review.data.mistakeTags ?? [], lesson: review.data.lesson, nextAction: review.data.nextAction }) }, [review.data])
+  useEffect(() => {
+    if (!deepLinked || review.isLoading) return
+    if (detailsRef.current) detailsRef.current.open = true
+    document.getElementById('decision-review')?.scrollIntoView?.({ block: 'start' })
+    headingRef.current?.focus()
+  }, [deepLinked, review.isLoading])
   const text = (key: keyof DiaryReviewWrite) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm(current => ({ ...current, [key]: event.target.value || null }))
   const toggleTag = (tag: string) => setForm(current => { const tags = current.mistakeTags ?? []; return { ...current, mistakeTags: tags.includes(tag) ? tags.filter(item => item !== tag) : [...tags, tag] } })
   async function remove() {
     if (!await confirm({ title: 'Delete structured review?', message: 'Your diary and trades will remain.', confirmText: 'Delete', tone: 'danger' })) return
     await removeReview.mutateAsync(); setForm(emptyReview)
   }
-  return <Card as="section" className="decision-review"><details><summary><strong>Decision review</strong></summary>
+  return <Card as="section" className="decision-review" id="decision-review"><details ref={detailsRef}><summary><strong ref={headingRef} tabIndex={-1}>Decision review</strong></summary>
     {review.isLoading ? <p className="is-muted">Loading decision review…</p> : review.isError ? <SectionError onRetry={() => { void review.refetch() }} /> : <form className="diary-form__body" onSubmit={event => { event.preventDefault(); void save.mutateAsync(form) }}>
       {!review.data ? <p className="is-muted">No structured review yet</p> : null}
       <Field label="Thesis"><TextArea value={form.thesis ?? ''} onChange={text('thesis')} /></Field>
@@ -430,13 +440,18 @@ export function CalendarPage() {
   const year = Number(params.year) || now.getFullYear()
   const month = Number(params.month) || now.getMonth() + 1
   const cursor = { year, month }
+  const [search, setSearch] = useSearchParams()
   const { data, isLoading: loading, isError: error, refetch: reload } = useCalendarQuery(year, month)
-  const [selected, setSelected] = useState(todayISO())
+  const requestedDay = search.get('day')
+  const selectedFromUrl = validCalendarDay(requestedDay, year, month) ? requestedDay! : todayISO()
+  const [selected, setSelected] = useState(selectedFromUrl)
   const [amount, setAmount] = useState('')
   const [capital, setCapital] = useState('')
   const [note, setNote] = useState('')
   const [formError, setFormError] = useState('')
   const savePerformance = useSavePerformanceMutation()
+
+  useEffect(() => { setSelected(selectedFromUrl) }, [selectedFromUrl])
 
   const day = data?.days.find((d) => d.date === selected)
   useEffect(() => {
@@ -506,7 +521,7 @@ export function CalendarPage() {
                         type="button"
                         className={cx('day', selected === d.date && 'is-selected', tone !== 'muted' && `is-${tone}`)}
                         aria-label={`${formatDate(d.date)}${d.performance ? `, ${signedCompact(d.performance.pnlAmount)}` : ', no result'}${hasNote ? `, ${d.diaryCount} note${d.diaryCount > 1 ? 's' : ''}` : ''}`}
-                        onClick={() => setSelected(d.date)}
+                        onClick={() => { setSelected(d.date); const next = new URLSearchParams(search); next.set('day', d.date); setSearch(next) }}
                       >
                         <span className="day__num num">{Number(d.date.slice(-2))}</span>
                         {d.performance ? (
@@ -549,6 +564,12 @@ export function CalendarPage() {
       </Card>
     </>
   )
+}
+
+function validCalendarDay(value: string | null, year: number, month: number): boolean {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const date = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(date.getTime()) && date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.toISOString().slice(0, 10) === value
 }
 
 /* ============================ DISCIPLINE =========================== */

@@ -65,6 +65,12 @@ internal sealed class EdgeExceptionMiddleware(RequestDelegate next, ILogger<Edge
         {
             throw;
         }
+        catch (BadHttpRequestException)
+        {
+            if (context.Response.HasStarted) throw;
+            context.Response.Clear();
+            await EdgeProblems.InvalidRequest(context).ExecuteAsync(context);
+        }
         catch (Exception exception)
         {
             logger.LogError(exception, "Unhandled Edge request failure. CorrelationId: {CorrelationId}", CorrelationMiddleware.Get(context));

@@ -10,7 +10,7 @@ vi.mock('../features/api', () => ({
   deleteDiaryReview: vi.fn().mockResolvedValue({}),
 }))
 
-import { useSaveDiaryMutation, useSaveDiaryReviewMutation } from '../features/queries'
+import { useDeleteDiaryReviewMutation, useSaveDiaryMutation, useSaveDiaryReviewMutation } from '../features/queries'
 
 let client: QueryClient
 const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -26,12 +26,20 @@ test('diary mutation invalidates diaries, dashboard, and calendar queries', asyn
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['calendar'] })
 })
 
-test('review save invalidates only its detail, summaries, and diary detail', async () => {
+test('review save invalidates its detail, summaries, evidence items, and diary detail', async () => {
   const invalidation = vi.spyOn(client, 'invalidateQueries')
   const { result } = renderHook(() => useSaveDiaryReviewMutation('diary-1'), { wrapper })
   await act(() => result.current.mutateAsync({ thesis: null, plannedAction: null, actualAction: null, emotion: null, disciplineScore: null, executionScore: null, processAssessment: null, mistakeTags: [], lesson: null, nextAction: null }))
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diary-review', 'detail', 'diary-1'] })
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diary-review', 'summary'] })
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diary-review', 'items'] })
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diary', 'diary-1'] })
-  expect(invalidation).toHaveBeenCalledTimes(3)
+  expect(invalidation).toHaveBeenCalledTimes(4)
+})
+
+test('review delete invalidates evidence item queries', async () => {
+  const invalidation = vi.spyOn(client, 'invalidateQueries')
+  const { result } = renderHook(() => useDeleteDiaryReviewMutation('diary-1'), { wrapper })
+  await act(() => result.current.mutateAsync())
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diary-review', 'items'] })
 })

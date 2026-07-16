@@ -101,6 +101,27 @@ public sealed record DiaryReviewSummaryResponse(
 
 public sealed record MistakeTagCountResponse(string Tag, long Count);
 
+public enum DiaryReviewStatus { reviewed, unreviewed }
+public enum DiaryReviewFilterStatus { all, reviewed, unreviewed }
+public enum DiaryReviewProcessAssessment { good, mixed, poor }
+public enum DiaryReviewAssessmentFilter { all, good, mixed, poor }
+
+public sealed record DiaryReviewItemsResponse(IReadOnlyList<DiaryReviewItemResponse> Items, string? NextCursor);
+public sealed record DiaryReviewItemResponse(
+    Guid DiaryId,
+    DateOnly LocalDate,
+    string Title,
+    string ContentPreview,
+    DiaryReviewStatus ReviewStatus,
+    DiaryReviewProcessAssessment? ProcessAssessment,
+    string? Emotion,
+    short? DisciplineScore,
+    short? ExecutionScore,
+    IReadOnlyList<string> MistakeTags,
+    string? Lesson,
+    string? NextAction,
+    DateTime? ReviewUpdatedAt);
+
 public sealed record RotationMonitorResponse(
     RotationUniverseResponse Universe,
     DateOnly? SnapshotDate,

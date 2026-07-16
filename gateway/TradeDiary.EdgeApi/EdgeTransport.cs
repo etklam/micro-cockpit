@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Routing;
 
 internal enum DownstreamFailure
@@ -24,6 +25,8 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
     {
         PropertyNameCaseInsensitive = true
     };
+
+    static EdgeTransport() => Json.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
 
     private TimeSpan Timeout => TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Edge:DownstreamTimeoutSeconds", 8), 1, 30));
 

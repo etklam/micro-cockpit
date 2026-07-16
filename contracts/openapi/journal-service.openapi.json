@@ -621,6 +621,113 @@
         ]
       }
     },
+    "/internal/diary-review-items": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "$ref": "#/components/schemas/DiaryReviewFilterStatus"
+            }
+          },
+          {
+            "name": "assessment",
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "$ref": "#/components/schemas/DiaryReviewAssessmentFilter"
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaryReviewItemsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/internal/quick-note": {
       "post": {
         "tags": [
@@ -1103,6 +1210,146 @@
           }
         }
       },
+      "DiaryReviewAssessmentFilter": {
+        "enum": [
+          "all",
+          "good",
+          "mixed",
+          "poor"
+        ]
+      },
+      "DiaryReviewFilterStatus": {
+        "enum": [
+          "all",
+          "reviewed",
+          "unreviewed"
+        ]
+      },
+      "DiaryReviewItemResponse": {
+        "required": [
+          "diaryId",
+          "localDate",
+          "title",
+          "contentPreview",
+          "reviewStatus",
+          "processAssessment",
+          "emotion",
+          "disciplineScore",
+          "executionScore",
+          "mistakeTags",
+          "lesson",
+          "nextAction",
+          "reviewUpdatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "diaryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "localDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "title": {
+            "type": "string"
+          },
+          "contentPreview": {
+            "type": "string"
+          },
+          "reviewStatus": {
+            "$ref": "#/components/schemas/DiaryReviewStatus"
+          },
+          "processAssessment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DiaryReviewProcessAssessment"
+              }
+            ]
+          },
+          "emotion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "disciplineScore": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int16"
+          },
+          "executionScore": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int16"
+          },
+          "mistakeTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lesson": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "nextAction": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reviewUpdatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "DiaryReviewItemsResponse": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiaryReviewItemResponse"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "DiaryReviewProcessAssessment": {
+        "enum": [
+          "good",
+          "mixed",
+          "poor",
+          null
+        ]
+      },
       "DiaryReviewResponse": {
         "required": [
           "diaryId",
@@ -1200,6 +1447,12 @@
             "format": "date-time"
           }
         }
+      },
+      "DiaryReviewStatus": {
+        "enum": [
+          "reviewed",
+          "unreviewed"
+        ]
       },
       "DiaryReviewSummaryResponse": {
         "required": [

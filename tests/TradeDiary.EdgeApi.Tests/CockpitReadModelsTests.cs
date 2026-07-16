@@ -283,6 +283,55 @@ public sealed class CockpitCompositionTests
     }
 
     [Fact]
+    public async Task Review_items_are_typed_and_forward_validated_filters_to_journal()
+    {
+        string? forwarded = null;
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service == "journal")
+            {
+                forwarded = path;
+                return Json(HttpStatusCode.OK, "{\"items\":[{\"diaryId\":\"11111111-1111-1111-1111-111111111111\",\"localDate\":\"2026-07-03\",\"title\":\"Evidence\",\"contentPreview\":\"Notes\",\"reviewStatus\":\"reviewed\",\"processAssessment\":\"good\",\"emotion\":\"calm\",\"disciplineScore\":4,\"executionScore\":3,\"mistakeTags\":[\"no_plan\"],\"lesson\":\"Lesson\",\"nextAction\":\"Next\",\"reviewUpdatedAt\":\"2026-07-03T00:00:00Z\"}],\"nextCursor\":null}");
+            }
+            return Json(HttpStatusCode.OK, "{}");
+        });
+
+        using var response = await factory.CreateClient().GetAsync("/api/app/diary-review-items?from=2026-07-01&to=2026-07-31&status=reviewed&assessment=good&tag=no_plan&limit=25");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("reviewed", document.RootElement.GetProperty("items")[0].GetProperty("reviewStatus").GetString());
+        Assert.Contains("status=reviewed", forwarded);
+        Assert.Contains("assessment=good", forwarded);
+        Assert.Contains("tag=no_plan", forwarded);
+        Assert.Contains("limit=25", forwarded);
+    }
+
+    [Theory]
+    [InlineData("/api/app/diary-review-items?from=2026-01-01&to=2026-03-04")]
+    [InlineData("/api/app/diary-review-items?from=2026-07-01&to=2026-07-31&limit=101")]
+    [InlineData("/api/app/diary-review-items?from=2026-07-01&to=2026-07-31&cursor=malformed")]
+    [InlineData("/api/app/diary-review-items?from=2026-07-01&to=2026-07-31&tag=unknown")]
+    [InlineData("/api/app/diary-review-items?from=2026-07-01&to=2026-07-31&status=pending")]
+    public async Task Review_items_reject_invalid_query_values(string path)
+    {
+        using var factory = CreateFactory((_, _) => Json(HttpStatusCode.OK, "{\"items\":[],\"nextCursor\":null}"));
+        using var response = await factory.CreateClient().GetAsync(path);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    [InlineData(HttpStatusCode.GatewayTimeout)]
+    public async Task Review_items_preserve_downstream_failures(HttpStatusCode status)
+    {
+        using var factory = CreateFactory((service, _) => service == "journal" ? Json(status, "{}") : Json(HttpStatusCode.OK, "{}"));
+        using var response = await factory.CreateClient().GetAsync("/api/app/diary-review-items?from=2026-07-01&to=2026-07-31");
+        Assert.Equal(status, response.StatusCode);
+    }
+
+    [Fact]
     public void ResolveLocalDate_uses_timezone_claim_at_utc_boundary()
     {
         var user = new ClaimsPrincipal(new ClaimsIdentity([new Claim("timezone", "America/Los_Angeles")]));

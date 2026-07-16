@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(
@@ -33,6 +34,8 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.AddHttpClient("reminder", client => client.BaseAddress = new Uri(builder.Configuration["Services:Reminder"] ?? "http://127.0.0.1:5104"));
 builder.Services.AddHostedService<OutboxPublisher>();
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<SecuritySchemesTransformer>();
@@ -250,6 +253,17 @@ diary.MapGet("/diary-review-summary", async (DateOnly from, DateOnly to, HttpReq
     return Results.Ok(new DiaryReviewSummaryResponse(count, disciplineAverage, executionAverage, emotions, assessments, topTags));
 })
 .Produces<DiaryReviewSummaryResponse>(200).ProducesProblem(400).ProducesProblem(401);
+
+diary.MapGet("/diary-review-items", async (HttpRequest request, NpgsqlDataSource db, DateOnly from, DateOnly to, DiaryReviewFilterStatus status = DiaryReviewFilterStatus.all, DiaryReviewAssessmentFilter assessment = DiaryReviewAssessmentFilter.all, string? tag = null, string? cursor = null, int limit = 50) =>
+{
+    if (!TryUser(request, out var userId)) return Results.Unauthorized();
+    var selectedStatus = status.ToString();
+    var selectedAssessment = assessment.ToString();
+    var error = DiaryReviewItems.Validate(from, to, selectedStatus, selectedAssessment, tag, limit, cursor, out var parsedCursor);
+    if (error is not null) return Results.Problem(error, statusCode: 400);
+    return Results.Ok(await DiaryReviewItems.ReadAsync(db, userId, from, to, selectedStatus, selectedAssessment, tag, limit, parsedCursor));
+})
+.Produces<DiaryReviewItemsResponse>(200).ProducesProblem(400).ProducesProblem(401);
 
 diary.MapPost("/quick-note", async (QuickNote input, HttpRequest request, NpgsqlDataSource db) =>
 {
