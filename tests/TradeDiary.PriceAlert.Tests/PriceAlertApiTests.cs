@@ -18,7 +18,7 @@ using Testcontainers.PostgreSql;
 public sealed class PriceAlertApiTests
 {
     [Fact]
-    public async Task Api_defaults_to_close_and_preserves_user_ownership_for_lifecycle_actions()
+    public async Task Lifecycle_actions_preserve_ownership_and_reactivate_while_provider_is_unhealthy()
     {
         await using var postgres = new PostgreSqlBuilder().WithImage("postgres:17-alpine").WithDatabase("test").WithUsername("postgres").WithPassword("postgres").Build();
         await postgres.StartAsync();
@@ -63,6 +63,7 @@ public sealed class PriceAlertApiTests
             await using var reader = await dismissed.ExecuteReaderAsync(); Assert.True(await reader.ReadAsync());
             Assert.Equal("dismissed", reader.GetString(0)); Assert.Equal(1L, reader.GetInt64(1)); Assert.True(reader.GetBoolean(2));
         }
+        await new NpgsqlCommand($"INSERT INTO market.provider_runs(id,provider,started_at,completed_at,status,error) VALUES ('{Guid.NewGuid()}','test',now() + interval '1 minute',now() + interval '1 minute','failed','test provider unavailable')", setup).ExecuteNonQueryAsync();
         Assert.Equal(HttpStatusCode.NoContent, (await ownerClient.PostAsync($"/internal/price-alerts/{alertId}/reactivate", null)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await ownerClient.PostAsync($"/internal/price-alerts/{alertId}/dismiss", null)).StatusCode);
         Assert.Equal(1L, (long)(await new NpgsqlCommand($"SELECT count(*) FROM price_alert.triggers WHERE alert_id='{alertId}' AND dismissed_at IS NOT NULL", setup).ExecuteScalarAsync())!);

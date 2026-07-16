@@ -88,7 +88,7 @@ static async Task<IResult> Dismiss(Guid id,HttpRequest request,NpgsqlDataSource 
 }
 static async Task<IResult> Reactivate(Guid id,HttpRequest request,NpgsqlDataSource db)
 {
-    if(!UserId(request,out var user))return Results.Unauthorized();await using var connection=await db.OpenConnectionAsync();if(!await PriceAlertEngine.MarketHealthy(connection))return Results.Json(new { error="market_unhealthy" },statusCode:503);
+    if(!UserId(request,out var user))return Results.Unauthorized();await using var connection=await db.OpenConnectionAsync();
     await using var cmd=new NpgsqlCommand("UPDATE price_alert.alerts SET status='active',updated_at=now() WHERE id=$1 AND user_id=$2",connection);cmd.Parameters.AddWithValue(id);cmd.Parameters.AddWithValue(user);return await cmd.ExecuteNonQueryAsync()==0?Results.Problem("not_found",statusCode:404):Results.NoContent();
 }
 enum EvaluationPrice { Open,Close }

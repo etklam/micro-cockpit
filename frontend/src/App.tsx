@@ -10,12 +10,13 @@ import './App.css'
 import { AlertsPage, CalendarPage, DiaryDetailPage, DiaryPage, DisciplinePage, TodayPage } from './pages'
 import { ArticleDetailPage, ArticlesPage, MorePage, PartnersPage, PriceAlertsPage, RotationPage, ToolsPage, WatchlistPage } from './latePages'
 import { useBootstrapQuery } from './features/queries'
+import { MonthlyReviewPage, MonthlyReviewRedirect } from './MonthlyReviewPage'
 
-export type Page = 'today' | 'diary' | 'calendar' | 'discipline' | 'alerts' | 'more' | 'watchlist' | 'price-alerts' | 'rotation' | 'partners' | 'articles' | 'tools'
+export type Page = 'today' | 'diary' | 'calendar' | 'discipline' | 'alerts' | 'more' | 'review' | 'watchlist' | 'price-alerts' | 'rotation' | 'partners' | 'articles' | 'tools'
 
 const PATHS: Record<Page, string> = {
   today: '/today', diary: '/diary', calendar: currentCalendarPath(), discipline: '/discipline', alerts: '/alerts',
-  more: '/more', watchlist: '/watchlist', 'price-alerts': '/price-alerts', rotation: '/rotation', partners: '/partners',
+  more: '/more', review: '/review', watchlist: '/watchlist', 'price-alerts': '/price-alerts', rotation: '/rotation', partners: '/partners',
   articles: '/articles', tools: '/tools',
 }
 const NAV: { id: Page; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
@@ -26,6 +27,7 @@ const NAV: { id: Page; label: string; icon: Parameters<typeof Icon>[0]['name'] }
   { id: 'alerts', label: 'Alerts', icon: 'bell' },
 ]
 const MORE: { id: Page; label: string }[] = [
+  { id: 'review', label: 'Monthly review' },
   { id: 'watchlist', label: 'Watchlist' }, { id: 'price-alerts', label: 'Price alerts' },
   { id: 'rotation', label: 'Market rotation' }, { id: 'partners', label: 'Partners' },
   { id: 'articles', label: 'Articles' }, { id: 'tools', label: 'Tools' },
@@ -49,6 +51,8 @@ export default function App() {
           <Route path="/discipline" element={<DisciplinePage />} />
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/more" element={<MorePage />} />
+          <Route path="/review" element={<MonthlyReviewRedirect />} />
+          <Route path="/review/:year/:month" element={<MonthlyReviewPage />} />
           <Route path="/watchlist" element={<WatchlistPage />} />
           <Route path="/price-alerts" element={<PriceAlertsPage />} />
           <Route path="/rotation" element={<RotationPage />} />

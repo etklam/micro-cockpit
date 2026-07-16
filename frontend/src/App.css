@@ -543,6 +543,33 @@
 .review-tags legend { font-size: var(--fs-sm); font-weight: 600; margin-bottom: var(--sp-2); }
 .review-tags label { color: var(--muted); font-size: var(--fs-sm); }
 
+/* ======================  MONTHLY REVIEW  ======================= */
+.review-month-nav { display: flex; align-items: center; justify-content: center; gap: var(--sp-4); }
+.review-month-nav h2 { min-width: 200px; text-align: center; font-size: var(--fs-lg); }
+.review-separation { display: flex; flex-direction: column; gap: 4px; border-color: var(--primary-line); background: var(--primary-soft); }
+.review-separation span { color: var(--muted); font-size: var(--fs-sm); }
+.monthly-review-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); align-items: start; }
+.monthly-review-section { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-4); }
+.monthly-review-section > h2 { font-size: var(--fs-xl); }
+.monthly-review-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+.monthly-review-stats .stat { min-width: 0; }
+.monthly-review-stats .stat__value { overflow-wrap: anywhere; }
+.daily-pnl, .review-distribution { padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
+.daily-pnl h3, .review-distribution h3 { margin-bottom: var(--sp-3); font-size: var(--fs-base); }
+.daily-pnl__chart { min-height: 190px; display: flex; align-items: stretch; gap: 4px; overflow-x: auto; }
+.daily-pnl__day { min-width: 26px; flex: 1 0 26px; display: grid; grid-template-rows: 24px 1fr 20px; gap: 4px; text-align: center; color: var(--faint); font-size: var(--fs-xs); }
+.daily-pnl__amount { overflow: hidden; color: var(--muted); font-size: 10px; }
+.daily-pnl__track { height: 130px; display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid var(--border-strong); }
+.daily-pnl__track span { width: min(18px, 80%); min-height: 3px; border-radius: 3px 3px 0 0; background: var(--muted); }
+.daily-pnl__track.is-gain span { background: var(--success); }
+.daily-pnl__track.is-loss { align-items: flex-start; border-top: 1px solid var(--border-strong); border-bottom: 0; }
+.daily-pnl__track.is-loss span { background: var(--danger); border-radius: 0 0 3px 3px; }
+.review-distribution ol { display: flex; flex-direction: column; gap: var(--sp-2); }
+.review-distribution li { display: flex; justify-content: space-between; gap: var(--sp-3); color: var(--muted); font-size: var(--fs-sm); }
+.review-distribution strong { color: var(--ink); }
+.review-related { display: flex; gap: var(--sp-4); flex-wrap: wrap; }
+.cal-review-link { align-self: center; }
+
 /* ====================  MARKET ROTATION  ======================== */
 .rotation-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; }
 .rotation-heading-meta { display: flex; gap: var(--sp-2); flex-wrap: wrap; color: var(--muted); font-size: var(--fs-sm); }
@@ -613,6 +640,7 @@
   }
   .mobile-nav__item.is-active { color: var(--primary); }
   .rotation-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .monthly-review-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 540px) {
@@ -627,4 +655,6 @@
   .rotation-filters label, .rotation-filters select { min-width: 0; width: 100%; }
   .rotation-summary { grid-template-columns: 1fr 1fr; }
   .rotation-table th, .rotation-table td { padding: var(--sp-2); }
+  .monthly-review-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .daily-pnl, .review-distribution { padding: var(--sp-3); }
 }

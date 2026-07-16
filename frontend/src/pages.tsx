@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Alert, Diary, DiaryReviewWrite, Discipline, Transaction } from './features/api'
 import { useIdempotencyKey } from './features/api'
 import {
@@ -205,6 +205,7 @@ export function DiaryPage() {
   return (
     <>
       <PageHeader title="Diary" subtitle={`${items.length} reflection${items.length === 1 ? '' : 's'}`} />
+      <Link className="text-link" to="/review">Open monthly review</Link>
 
       <Card as="section" className="review-patterns">
         <h2>Recent review patterns</h2>
@@ -482,6 +483,7 @@ export function CalendarPage() {
         <h2 className="cal-head__title">{monthLabel(cursor.year, cursor.month)}</h2>
         <IconButton icon="right" label="Next month" onClick={() => shift(1)} />
       </div>
+      <Link className="text-link cal-review-link" to={`/review/${cursor.year}/${String(cursor.month).padStart(2, '0')}`}>Review this month</Link>
 
       {error ? (
         <SectionError onRetry={reload} />
