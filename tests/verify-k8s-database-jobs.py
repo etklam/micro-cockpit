@@ -211,7 +211,7 @@ def main() -> None:
     harness = Harness()
     try:
         result = harness.status(HISTORY_PRESENT="t", DB_HISTORY=history)
-        assert "current-migration-id: 0013" in result.stdout and "pending-ids: none" in result.stdout
+        assert "current-migration-id: 0014" in result.stdout and "pending-ids: none" in result.stdout
         changed = history.replace(manifest[0]["sha256"], "0" * 64, 1)
         mismatch = harness.status(expected=2, HISTORY_PRESENT="t", DB_HISTORY=changed)
         assert "checksum-mismatch: true" in mismatch.stdout

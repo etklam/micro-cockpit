@@ -30,6 +30,9 @@ export type DashboardResponse = { "localDate": string; "diary": { "writtenToday"
 export type DiaryAlertResponse = { "id": string; "diaryId": string; "startLocalDate": string; "nextLocalDate": null | string; "localTime": string; "timezone": string; "repeatMode": string; "recurrenceEndLocalDate": string; "nextTriggerAt": null | string; "status": string; "createdAt": string; "updatedAt": string }
 export type DiaryAlertWrite = { "diaryId": string; "startLocalDate": string; "localTime": string; "timezone": string; "repeatMode": string }
 export type DiaryResponse = { "id": string; "localDate": string; "title": string; "content": string; "createdAt": string; "updatedAt": string }
+export type DiaryReviewResponse = { "diaryId": string; "thesis": null | string; "plannedAction": null | string; "actualAction": null | string; "emotion": null | string; "disciplineScore": null | number | string; "executionScore": null | number | string; "processAssessment": null | string; "mistakeTags": Array<string>; "lesson": null | string; "nextAction": null | string; "createdAt": string; "updatedAt": string }
+export type DiaryReviewSummaryResponse = { "reviewedCount": number | string; "averageDisciplineScore": number | null; "averageExecutionScore": number | null; "emotionCounts": { [key: string]: number | string }; "processAssessmentCounts": { [key: string]: number | string }; "topMistakeTags": Array<MistakeTagCountResponse> }
+export type DiaryReviewWrite = { "thesis": null | string; "plannedAction": null | string; "actualAction": null | string; "emotion": null | string; "disciplineScore": null | number | string; "executionScore": null | number | string; "processAssessment": null | string; "mistakeTags": null | Array<string>; "lesson": null | string; "nextAction": null | string }
 export type DiaryWrite = { "localDate": string; "title": string; "content": null | string }
 export type DisciplineResponse = { "id": string; "content": string; "position": number | string; "createdAt": string; "updatedAt": string }
 export type DisciplineWrite = { "content": string }
@@ -45,6 +48,7 @@ export type JsonElement = unknown
 export type Link = { "id": string; "requesterUserId": string; "partnerUserId": string; "partnerType": string; "status": string; "createdAt": string; "updatedAt": string }
 export type LinkWrite = { "partnerUserId": string; "partnerType": string }
 export type LoginRequest = { "email": string; "password": string }
+export type MistakeTagCountResponse = { "tag": string; "count": number | string }
 export type MonitorMarketState = { "state": null | string; "breadthPercent": number | null; "benchmarkAboveMa200": null | boolean; "status": string }
 export type MonitorResponse = { "universe": MonitorUniverse; "snapshotDate": null | string; "formulaVersion": string; "status": string; "marketState": MonitorMarketState; "sectorBreadth": Array<SectorBreadthResponse>; "etfs": Array<EtfSnapshotResponse> }
 export type MonitorUniverse = { "id": string; "code": string; "name": string }
@@ -160,6 +164,9 @@ export const getApiAppDiariesDiaryIdTransactions = (diaryId: string, extra?: Req
 export const postApiAppDiariesDiaryIdTransactions = (diaryId: string, body: TransactionWrite, extra?: RequestInit) => request<TransactionResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions`, { method: "POST", body: JSON.stringify(body), ...extra })
 export const putApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: string, body: TransactionWrite, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const deleteApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const deleteApiAppDiariesDiaryIdReview = (diaryId: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/review`, { method: "DELETE", ...extra })
+export const getApiAppDiariesDiaryIdReview = (diaryId: string, extra?: RequestInit) => request<DiaryReviewResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/review`, { method: "GET", ...extra })
+export const putApiAppDiariesDiaryIdReview = (diaryId: string, body: DiaryReviewWrite, extra?: RequestInit) => request<DiaryReviewResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/review`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const getApiAppStocks = (query: { "query"?: string }, extra?: RequestInit) => request<CollectionResponseOfStockResponse>("/api/app/stocks" + withQuery(query), { method: "GET", ...extra })
 export const postApiAppStocks = (body: StockWrite, extra?: RequestInit) => request<StockResponse>("/api/app/stocks", { method: "POST", body: JSON.stringify(body), ...extra })
 export const getApiAppStocksSymbol = (symbol: string, extra?: RequestInit) => request<StockResponse>(`/api/app/stocks/${encodeURIComponent(String(symbol))}`, { method: "GET", ...extra })
@@ -189,6 +196,7 @@ export const deleteApiAppRotationUniversesId = (id: string, extra?: RequestInit)
 export const putApiAppRotationUniversesIdSymbols = (id: string, body: Array<UniverseSymbolWrite>, extra?: RequestInit) => request<unknown>(`/api/app/rotation/universes/${encodeURIComponent(String(id))}/symbols`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const postApiAppRotationUniversesIdCalculate = (id: string, query: { "date": string }, extra?: RequestInit) => request<CalculateResponse>(`/api/app/rotation/universes/${encodeURIComponent(String(id))}/calculate` + withQuery(query), { method: "POST", ...extra })
 export const getApiAppRotationMonitor = (query: { "universe": string; "date"?: string }, extra?: RequestInit) => request<MonitorResponse>("/api/app/rotation/monitor" + withQuery(query), { method: "GET", ...extra })
+export const getApiAppDiaryReviewSummary = (query: { "from": string; "to": string }, extra?: RequestInit) => request<DiaryReviewSummaryResponse>("/api/app/diary-review-summary" + withQuery(query), { method: "GET", ...extra })
 export const getApiAppBootstrap = (extra?: RequestInit) => request<AppBootstrapResponse>("/api/app/bootstrap", { method: "GET", ...extra })
 export const getApiAppDashboard = (extra?: RequestInit) => request<DashboardResponse>("/api/app/dashboard", { method: "GET", ...extra })
 export const getApiAppCalendar = (query: { "year": number; "month": number }, extra?: RequestInit) => request<CalendarResponse>("/api/app/calendar" + withQuery(query), { method: "GET", ...extra })

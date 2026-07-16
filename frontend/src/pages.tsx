@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
+import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import type { Alert, Diary, Discipline, Transaction } from './features/api'
+import type { Alert, Diary, DiaryReviewWrite, Discipline, Transaction } from './features/api'
 import { useIdempotencyKey } from './features/api'
 import {
   useAlertsQuery, useCalendarQuery, useCreateAlertMutation, useCreateDisciplineMutation,
@@ -9,6 +9,7 @@ import {
   useDeleteDisciplineMutation, useDeleteTransactionMutation, useDiariesQuery, useDiaryQuery,
   useDismissAlertMutation, useQuickNoteMutation, useSaveDiaryMutation, useSavePerformanceMutation,
   useDisciplinesQuery,
+  useDeleteDiaryReviewMutation, useDiaryReviewQuery, useDiaryReviewSummaryQuery, useSaveDiaryReviewMutation,
   useTransactionsQuery,
 } from './features/queries'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
@@ -168,6 +169,11 @@ export function DiaryPage() {
   const idem = useIdempotencyKey()
   const saveDiary = useSaveDiaryMutation()
   const deleteDiary = useDeleteDiaryMutation()
+  const reviewWindow = useMemo(() => {
+    const to = todayISO(); const fromDate = new Date(`${to}T00:00:00`); fromDate.setDate(fromDate.getDate() - 29)
+    return { from: fromDate.toISOString().slice(0, 10), to }
+  }, [])
+  const reviewSummary = useDiaryReviewSummaryQuery(reviewWindow.from, reviewWindow.to)
 
   function startEdit(d: Diary) {
     setEditing(d); setTitle(d.title); setContent(d.content); setDate(d.localDate)
@@ -196,6 +202,18 @@ export function DiaryPage() {
   return (
     <>
       <PageHeader title="Diary" subtitle={`${items.length} reflection${items.length === 1 ? '' : 's'}`} />
+
+      <Card as="section" className="review-patterns">
+        <h2>Recent review patterns</h2>
+        {reviewSummary.isLoading ? <p className="is-muted">Loading review patterns…</p> : reviewSummary.isError ? <SectionError onRetry={() => { void reviewSummary.refetch() }} /> : Number(reviewSummary.data?.reviewedCount ?? 0) === 0 ? (
+          <EmptyBox title="No structured reviews yet" hint="Patterns from the last 30 days will appear here." dense />
+        ) : <div className="card-grid">
+          <Stat label="Reviewed" value={Number(reviewSummary.data?.reviewedCount)} />
+          <Stat label="Average discipline" value={reviewSummary.data?.averageDisciplineScore == null ? '—' : Number(reviewSummary.data.averageDisciplineScore).toFixed(1)} />
+          <Stat label="Average execution" value={reviewSummary.data?.averageExecutionScore == null ? '—' : Number(reviewSummary.data.averageExecutionScore).toFixed(1)} />
+          <Stat label="Top mistakes" value={reviewSummary.data?.topMistakeTags.map(item => item.tag.replaceAll('_', ' ')).join(', ') || '—'} />
+        </div>}
+      </Card>
 
       <Card flush as="section" id="diary-form" className="diary-form">
         <form className="diary-form__body" onSubmit={submit}>
@@ -269,7 +287,37 @@ export function DiaryDetailPage() {
   }
   if (diary.isLoading) return <PageSkeleton rows={2} />
   if (diary.isError || !diary.data) return <SectionError onRetry={() => { void diary.refetch() }} />
-  return <><PageHeader title={diary.data.title} subtitle={diary.data.localDate} /><Card as="article" className="entry"><p className="prose entry__body">{diary.data.content}</p><div className="form-actions"><Button variant="ghost" onClick={() => navigate('/diary')}>Back to diary</Button><Button variant="danger" loading={removeDiary.isPending} onClick={remove}>Delete entry</Button></div><TransactionPanel diaryId={diaryId} /></Card></>
+  return <><PageHeader title={diary.data.title} subtitle={diary.data.localDate} /><Card as="article" className="entry"><p className="prose entry__body">{diary.data.content}</p><div className="form-actions"><Button variant="ghost" onClick={() => navigate('/diary')}>Back to diary</Button><Button variant="danger" loading={removeDiary.isPending} onClick={remove}>Delete entry</Button></div><TransactionPanel diaryId={diaryId} /></Card><DecisionReview diaryId={diaryId} /></>
+}
+
+const reviewTags = ['no_plan', 'fomo', 'poor_timing', 'risk_violation', 'overtrading', 'ignored_signal', 'early_exit', 'late_exit', 'other']
+const emptyReview: DiaryReviewWrite = { thesis: null, plannedAction: null, actualAction: null, emotion: null, disciplineScore: null, executionScore: null, processAssessment: null, mistakeTags: [], lesson: null, nextAction: null }
+
+function DecisionReview({ diaryId }: { diaryId: string }) {
+  const { confirm } = useCockpit()
+  const review = useDiaryReviewQuery(diaryId)
+  const save = useSaveDiaryReviewMutation(diaryId)
+  const removeReview = useDeleteDiaryReviewMutation(diaryId)
+  const [form, setForm] = useState<DiaryReviewWrite>(emptyReview)
+  useEffect(() => { if (review.data) setForm({ thesis: review.data.thesis, plannedAction: review.data.plannedAction, actualAction: review.data.actualAction, emotion: review.data.emotion, disciplineScore: review.data.disciplineScore, executionScore: review.data.executionScore, processAssessment: review.data.processAssessment, mistakeTags: review.data.mistakeTags ?? [], lesson: review.data.lesson, nextAction: review.data.nextAction }) }, [review.data])
+  const text = (key: keyof DiaryReviewWrite) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm(current => ({ ...current, [key]: event.target.value || null }))
+  const toggleTag = (tag: string) => setForm(current => { const tags = current.mistakeTags ?? []; return { ...current, mistakeTags: tags.includes(tag) ? tags.filter(item => item !== tag) : [...tags, tag] } })
+  async function remove() {
+    if (!await confirm({ title: 'Delete structured review?', message: 'Your diary and trades will remain.', confirmText: 'Delete', tone: 'danger' })) return
+    await removeReview.mutateAsync(); setForm(emptyReview)
+  }
+  return <Card as="section" className="decision-review"><details><summary><strong>Decision review</strong></summary>
+    {review.isLoading ? <p className="is-muted">Loading decision review…</p> : review.isError ? <SectionError onRetry={() => { void review.refetch() }} /> : <form className="diary-form__body" onSubmit={event => { event.preventDefault(); void save.mutateAsync(form) }}>
+      {!review.data ? <p className="is-muted">No structured review yet</p> : null}
+      <Field label="Thesis"><TextArea value={form.thesis ?? ''} onChange={text('thesis')} /></Field>
+      <div className="form-row"><Field label="Planned action" className="field--grow"><TextInput value={form.plannedAction ?? ''} onChange={text('plannedAction')} /></Field><Field label="Actual action" className="field--grow"><TextInput value={form.actualAction ?? ''} onChange={text('actualAction')} /></Field></div>
+      <div className="form-row"><Field label="Emotion"><SelectBox value={form.emotion ?? ''} onChange={event => setForm(current => ({ ...current, emotion: event.target.value || null }))}><option value="">Not set</option>{['calm','confident','uncertain','anxious','fomo','frustrated','overconfident','other'].map(value => <option key={value}>{value}</option>)}</SelectBox></Field><Field label="Discipline score"><SelectBox value={form.disciplineScore == null ? '' : String(form.disciplineScore)} onChange={event => setForm(current => ({ ...current, disciplineScore: event.target.value ? Number(event.target.value) : null }))}><option value="">Not set</option>{[1,2,3,4,5].map(value => <option key={value}>{value}</option>)}</SelectBox></Field><Field label="Execution score"><SelectBox value={form.executionScore == null ? '' : String(form.executionScore)} onChange={event => setForm(current => ({ ...current, executionScore: event.target.value ? Number(event.target.value) : null }))}><option value="">Not set</option>{[1,2,3,4,5].map(value => <option key={value}>{value}</option>)}</SelectBox></Field></div>
+      <Field label="Process assessment"><SelectBox value={form.processAssessment ?? ''} onChange={event => setForm(current => ({ ...current, processAssessment: event.target.value || null }))}><option value="">Not set</option><option value="good">Good</option><option value="mixed">Mixed</option><option value="poor">Poor</option></SelectBox></Field>
+      <fieldset className="review-tags"><legend>Mistake tags</legend>{reviewTags.map(tag => <label key={tag}><input type="checkbox" checked={(form.mistakeTags ?? []).includes(tag)} onChange={() => toggleTag(tag)} /> {tag.replaceAll('_', ' ')}</label>)}</fieldset>
+      <div className="form-row"><Field label="Lesson" className="field--grow"><TextArea value={form.lesson ?? ''} onChange={text('lesson')} /></Field><Field label="Next action" className="field--grow"><TextArea value={form.nextAction ?? ''} onChange={text('nextAction')} /></Field></div>
+      <div className="form-actions">{review.data ? <Button variant="danger" loading={removeReview.isPending} onClick={remove}>Delete review</Button> : null}<Button variant="primary" type="submit" loading={save.isPending}>Save review</Button></div>
+    </form>}
+  </details></Card>
 }
 
 function DiaryListSkeleton() {

@@ -64,6 +64,43 @@ public sealed record DiaryResponse(
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
+public sealed record DiaryReviewWrite(
+    string? Thesis,
+    string? PlannedAction,
+    string? ActualAction,
+    string? Emotion,
+    short? DisciplineScore,
+    short? ExecutionScore,
+    string? ProcessAssessment,
+    IReadOnlyList<string>? MistakeTags,
+    string? Lesson,
+    string? NextAction);
+
+public sealed record DiaryReviewResponse(
+    Guid DiaryId,
+    string? Thesis,
+    string? PlannedAction,
+    string? ActualAction,
+    string? Emotion,
+    short? DisciplineScore,
+    short? ExecutionScore,
+    string? ProcessAssessment,
+    IReadOnlyList<string> MistakeTags,
+    string? Lesson,
+    string? NextAction,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+public sealed record DiaryReviewSummaryResponse(
+    long ReviewedCount,
+    decimal? AverageDisciplineScore,
+    decimal? AverageExecutionScore,
+    IReadOnlyDictionary<string, long> EmotionCounts,
+    IReadOnlyDictionary<string, long> ProcessAssessmentCounts,
+    IReadOnlyList<MistakeTagCountResponse> TopMistakeTags);
+
+public sealed record MistakeTagCountResponse(string Tag, long Count);
+
 public sealed record DailyPerformanceResponse(
     DateOnly LocalDate,
     decimal PnlAmount,

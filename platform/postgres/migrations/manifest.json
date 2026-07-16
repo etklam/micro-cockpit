@@ -13,6 +13,7 @@
     { "id": "0010", "filename": "0010_rotation.sql", "sha256": "d2e832c64235224f68d0ac4acf49d17107462477f49ca08f7358c4f6ade5a006" },
     { "id": "0011", "filename": "0011_partner_content_operations.sql", "sha256": "d5be115a259d1e0b523178f717b07a8cbc1dabdc00c27689b5696730e5e17d4e" },
     { "id": "0012", "filename": "0012_identity_api_keys.sql", "sha256": "716ee592d783021169621e91e7ce6be64c9c4d7ccfa3866779d9953ac2d74e00" },
-    { "id": "0013", "filename": "0013_journal_idempotency.sql", "sha256": "d424bf4a04b0d41afc1f63e361224f92bd0afe70661794d163b65baaa3f5565c" }
+    { "id": "0013", "filename": "0013_journal_idempotency.sql", "sha256": "d424bf4a04b0d41afc1f63e361224f92bd0afe70661794d163b65baaa3f5565c" },
+    { "id": "0014", "filename": "0014_structured_diary_review.sql", "sha256": "cdac3514e27c4232654d0497416057fa1ed9b2a1e88a9ee222bb5556b3e19538" }
   ]
 }

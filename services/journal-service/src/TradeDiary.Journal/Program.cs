@@ -1,4 +1,5 @@
 using Npgsql;
+using NpgsqlTypes;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -164,6 +165,91 @@ diary.MapDelete("/diaries/{id:guid}", async (Guid id, HttpRequest request, Npgsq
     return Results.NoContent();
 })
 .Produces(204).ProducesProblem(401).ProducesProblem(404);
+
+diary.MapGet("/diaries/{diaryId:guid}/review", async (Guid diaryId, HttpRequest request, NpgsqlDataSource db) =>
+{
+    if (!TryUser(request, out var userId)) return Results.Unauthorized();
+    await using var command = db.CreateCommand("""
+        SELECT r.diary_id,r.thesis,r.planned_action,r.actual_action,r.emotion,r.discipline_score,
+               r.execution_score,r.process_assessment,r.mistake_tags,r.lesson,r.next_action,r.created_at,r.updated_at
+        FROM journal.diary_reviews r JOIN journal.diaries d ON d.id=r.diary_id
+        WHERE r.diary_id=$1 AND r.user_id=$2 AND d.user_id=$2 AND d.deleted_at IS NULL
+        """);
+    command.Parameters.AddWithValue(diaryId); command.Parameters.AddWithValue(userId);
+    await using var reader = await command.ExecuteReaderAsync();
+    return await reader.ReadAsync() ? Results.Ok(ReadReview(reader)) : Results.Problem("not_found", statusCode: 404);
+})
+.Produces<DiaryReviewResponse>(200).ProducesProblem(401).ProducesProblem(404);
+
+diary.MapPut("/diaries/{diaryId:guid}/review", async (Guid diaryId, DiaryReviewWrite input, HttpRequest request, NpgsqlDataSource db) =>
+{
+    if (!TryUser(request, out var userId)) return Results.Unauthorized();
+    var error = DiaryReviewRules.Validate(input);
+    if (error is not null) return Results.Problem(error, statusCode: 400);
+    await using var command = db.CreateCommand("""
+        INSERT INTO journal.diary_reviews
+          (diary_id,user_id,thesis,planned_action,actual_action,emotion,discipline_score,execution_score,process_assessment,mistake_tags,lesson,next_action)
+        SELECT d.id,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12 FROM journal.diaries d
+        WHERE d.id=$1 AND d.user_id=$2 AND d.deleted_at IS NULL
+        ON CONFLICT (diary_id) DO UPDATE SET
+          thesis=EXCLUDED.thesis,planned_action=EXCLUDED.planned_action,actual_action=EXCLUDED.actual_action,
+          emotion=EXCLUDED.emotion,discipline_score=EXCLUDED.discipline_score,execution_score=EXCLUDED.execution_score,
+          process_assessment=EXCLUDED.process_assessment,mistake_tags=EXCLUDED.mistake_tags,
+          lesson=EXCLUDED.lesson,next_action=EXCLUDED.next_action,updated_at=now()
+        WHERE journal.diary_reviews.user_id=EXCLUDED.user_id
+        RETURNING diary_id,thesis,planned_action,actual_action,emotion,discipline_score,execution_score,
+                  process_assessment,mistake_tags,lesson,next_action,created_at,updated_at
+        """);
+    command.Parameters.AddWithValue(diaryId); command.Parameters.AddWithValue(userId);
+    AddNullableText(command, input.Thesis); AddNullableText(command, input.PlannedAction); AddNullableText(command, input.ActualAction);
+    AddNullableText(command, input.Emotion); AddNullableSmallint(command, input.DisciplineScore);
+    AddNullableSmallint(command, input.ExecutionScore); AddNullableText(command, input.ProcessAssessment);
+    command.Parameters.AddWithValue((input.MistakeTags ?? []).ToArray()); AddNullableText(command, input.Lesson); AddNullableText(command, input.NextAction);
+    await using var reader = await command.ExecuteReaderAsync();
+    return await reader.ReadAsync() ? Results.Ok(ReadReview(reader)) : Results.Problem("not_found", statusCode: 404);
+})
+.Produces<DiaryReviewResponse>(200).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
+
+diary.MapDelete("/diaries/{diaryId:guid}/review", async (Guid diaryId, HttpRequest request, NpgsqlDataSource db) =>
+{
+    if (!TryUser(request, out var userId)) return Results.Unauthorized();
+    await using var command = db.CreateCommand("""
+        DELETE FROM journal.diary_reviews r USING journal.diaries d
+        WHERE r.diary_id=$1 AND r.user_id=$2 AND d.id=r.diary_id AND d.user_id=$2 AND d.deleted_at IS NULL
+        """);
+    command.Parameters.AddWithValue(diaryId); command.Parameters.AddWithValue(userId);
+    return await command.ExecuteNonQueryAsync() == 0 ? Results.Problem("not_found", statusCode: 404) : Results.NoContent();
+})
+.Produces(204).ProducesProblem(401).ProducesProblem(404);
+
+diary.MapGet("/diary-review-summary", async (DateOnly from, DateOnly to, HttpRequest request, NpgsqlDataSource db) =>
+{
+    if (!TryUser(request, out var userId)) return Results.Unauthorized();
+    if (DiaryReviewRules.InvalidRange(from, to)) return Results.Problem("invalid_date_range", statusCode: 400);
+    const string scope = "FROM journal.diary_reviews r JOIN journal.diaries d ON d.id=r.diary_id WHERE r.user_id=$1 AND d.user_id=$1 AND d.deleted_at IS NULL AND d.local_date BETWEEN $2 AND $3";
+    await using var totals = db.CreateCommand($"SELECT count(*),avg(r.discipline_score),avg(r.execution_score) {scope}");
+    totals.Parameters.AddWithValue(userId); totals.Parameters.AddWithValue(from); totals.Parameters.AddWithValue(to);
+    long count; decimal? disciplineAverage; decimal? executionAverage;
+    await using (var reader = await totals.ExecuteReaderAsync())
+    {
+        await reader.ReadAsync(); count = reader.GetInt64(0);
+        disciplineAverage = reader.IsDBNull(1) ? null : reader.GetDecimal(1);
+        executionAverage = reader.IsDBNull(2) ? null : reader.GetDecimal(2);
+    }
+    var emotions = await ReadCounts(db, $"SELECT r.emotion,count(*) {scope} AND r.emotion IS NOT NULL GROUP BY r.emotion ORDER BY r.emotion", userId, from, to);
+    var assessments = await ReadCounts(db, $"SELECT r.process_assessment,count(*) {scope} AND r.process_assessment IS NOT NULL GROUP BY r.process_assessment ORDER BY r.process_assessment", userId, from, to);
+    await using var tags = db.CreateCommand("""
+        SELECT tag,count(*) total FROM journal.diary_reviews r
+        JOIN journal.diaries d ON d.id=r.diary_id CROSS JOIN LATERAL unnest(r.mistake_tags) tag
+        WHERE r.user_id=$1 AND d.user_id=$1 AND d.deleted_at IS NULL AND d.local_date BETWEEN $2 AND $3
+        GROUP BY tag ORDER BY total DESC,tag LIMIT 5
+        """);
+    tags.Parameters.AddWithValue(userId); tags.Parameters.AddWithValue(from); tags.Parameters.AddWithValue(to);
+    var topTags = new List<MistakeTagCountResponse>();
+    await using (var reader = await tags.ExecuteReaderAsync()) while (await reader.ReadAsync()) topTags.Add(new(reader.GetString(0), reader.GetInt64(1)));
+    return Results.Ok(new DiaryReviewSummaryResponse(count, disciplineAverage, executionAverage, emotions, assessments, topTags));
+})
+.Produces<DiaryReviewSummaryResponse>(200).ProducesProblem(400).ProducesProblem(401);
 
 diary.MapPost("/quick-note", async (QuickNote input, HttpRequest request, NpgsqlDataSource db) =>
 {
@@ -386,6 +472,30 @@ static TransactionResponse ReadTransaction(NpgsqlDataReader reader) => new(
     reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetString(3), reader.GetDecimal(4), reader.GetDecimal(5),
     reader.GetString(6).Trim(), reader.GetDateTime(7), reader.GetString(8), reader.GetDateTime(9), reader.GetDateTime(10));
 
+static DiaryReviewResponse ReadReview(NpgsqlDataReader reader) => new(
+    reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2),
+    reader.IsDBNull(3) ? null : reader.GetString(3), reader.IsDBNull(4) ? null : reader.GetString(4),
+    reader.IsDBNull(5) ? null : reader.GetInt16(5), reader.IsDBNull(6) ? null : reader.GetInt16(6),
+    reader.IsDBNull(7) ? null : reader.GetString(7), reader.GetFieldValue<string[]>(8),
+    reader.IsDBNull(9) ? null : reader.GetString(9), reader.IsDBNull(10) ? null : reader.GetString(10),
+    reader.GetDateTime(11), reader.GetDateTime(12));
+
+static void AddNullableText(NpgsqlCommand command, string? value) =>
+    command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Text, Value = (object?)(string.IsNullOrWhiteSpace(value) ? null : value.Trim()) ?? DBNull.Value });
+
+static void AddNullableSmallint(NpgsqlCommand command, short? value) =>
+    command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Smallint, Value = (object?)value ?? DBNull.Value });
+
+static async Task<Dictionary<string, long>> ReadCounts(NpgsqlDataSource db, string sql, Guid userId, DateOnly from, DateOnly to)
+{
+    await using var command = db.CreateCommand(sql);
+    command.Parameters.AddWithValue(userId); command.Parameters.AddWithValue(from); command.Parameters.AddWithValue(to);
+    await using var reader = await command.ExecuteReaderAsync();
+    var result = new Dictionary<string, long>();
+    while (await reader.ReadAsync()) result[reader.GetString(0)] = reader.GetInt64(1);
+    return result;
+}
+
 record DiaryWrite(DateOnly LocalDate, string Title, string? Content);
 record QuickNote(DateOnly LocalDate, string Content, Guid? TargetDiaryId);
 record DiaryResponse(Guid Id, DateOnly LocalDate, string Title, string Content, DateTime CreatedAt, DateTime UpdatedAt);
@@ -493,3 +603,5 @@ sealed class OutboxPublisher(NpgsqlDataSource db, IHttpClientFactory clients, IC
         }
     }
 }
+
+public partial class Program;

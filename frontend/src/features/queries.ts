@@ -18,6 +18,11 @@ export const queryKeys = {
   partners: ['partners'] as const,
   articles: ['articles'] as const,
   article: (slug: string) => ['article', slug] as const,
+  diaryReview: {
+    detail: (diaryId: string) => ['diary-review', 'detail', diaryId] as const,
+    summary: (from: string, to: string) => ['diary-review', 'summary', from, to] as const,
+    summaries: ['diary-review', 'summary'] as const,
+  },
 }
 
 export const useBootstrapQuery = () => useQuery({ queryKey: queryKeys.bootstrap, queryFn: api.getBootstrap, staleTime: 60_000 })
@@ -36,6 +41,8 @@ export const useRotationQuery = () => useQuery({ queryKey: queryKeys.rotation, q
 export const usePartnersQuery = () => useQuery({ queryKey: queryKeys.partners, queryFn: api.getPartners })
 export const useArticlesQuery = () => useQuery({ queryKey: queryKeys.articles, queryFn: api.getArticles })
 export const useArticleQuery = (slug: string) => useQuery({ queryKey: queryKeys.article(slug), queryFn: () => api.getArticle(slug), enabled: !!slug })
+export const useDiaryReviewQuery = (diaryId: string) => useQuery({ queryKey: queryKeys.diaryReview.detail(diaryId), queryFn: () => api.getDiaryReview(diaryId), enabled: !!diaryId })
+export const useDiaryReviewSummaryQuery = (from: string, to: string) => useQuery({ queryKey: queryKeys.diaryReview.summary(from, to), queryFn: () => api.getDiaryReviewSummary(from, to) })
 
 const calendarPrefix = ['calendar'] as const
 const invalidateCalendar = (client: ReturnType<typeof useQueryClient>) => client.invalidateQueries({ queryKey: calendarPrefix })
@@ -99,3 +106,25 @@ export const useAddPriceAlertMutation = () => useInvalidatingMutation(({ symbol,
 export const useDeletePriceAlertMutation = () => useInvalidatingMutation(api.deletePriceAlert, [queryKeys.priceAlerts])
 export const useCalculateMutation = () => useMutation({ mutationFn: ({ tool, values }: { tool: string; values: Record<string, unknown> }) => api.calculate(tool, values) })
 export const useCreateAgentMutation = () => useMutation({ mutationFn: api.createAgent })
+
+export function useSaveDiaryReviewMutation(diaryId: string) {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: (body: api.DiaryReviewWrite) => api.saveDiaryReview(diaryId, body), onSuccess: async () => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.diaryReview.detail(diaryId) }),
+      client.invalidateQueries({ queryKey: queryKeys.diaryReview.summaries }),
+      client.invalidateQueries({ queryKey: queryKeys.diary(diaryId) }),
+    ])
+  } })
+}
+
+export function useDeleteDiaryReviewMutation(diaryId: string) {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: () => api.deleteDiaryReview(diaryId), onSuccess: async () => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.diaryReview.detail(diaryId) }),
+      client.invalidateQueries({ queryKey: queryKeys.diaryReview.summaries }),
+      client.invalidateQueries({ queryKey: queryKeys.diary(diaryId) }),
+    ])
+  } })
+}

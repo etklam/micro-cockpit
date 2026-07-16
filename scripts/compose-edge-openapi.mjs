@@ -52,6 +52,11 @@ for (const m of edgeSource.matchAll(/MapProxy\(app,\s*"([^"]+)",\s*"([\w-]+)",\s
 // next app.Map route. Aggregations/auth have no Forward() and are skipped.
 const fwdRe = /app\.Map(Get|Post|Put|Patch|Delete)\(\s*"([^"]+)"(?:(?!app\.Map).)*?\bForward(?:NoBody)?\(\s*clients,\s*"([\w-]+)",\s*\$?"([^"]+)"/gs
 for (const m of edgeSource.matchAll(fwdRe)) routes.push({ pub: norm(m[2]), method: m[1].toLowerCase(), svc: m[3], internal: norm(m[4]) })
+routes.push(
+  { pub: '/api/app/diaries/{diaryId}/review', method: 'get', svc: 'journal', internal: '/internal/diaries/{diaryId}/review' },
+  { pub: '/api/app/diaries/{diaryId}/review', method: 'put', svc: 'journal', internal: '/internal/diaries/{diaryId}/review' },
+  { pub: '/api/app/diary-review-summary', method: 'get', svc: 'journal', internal: '/internal/diary-review-summary' },
+)
 
 // --- schema collection ------------------------------------------------------
 const collected = new Map()

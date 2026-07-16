@@ -20,6 +20,9 @@ export type PriceAlert = G.PriceAlertResponse
 export type WatchlistItem = G.WatchlistResponse
 export type ResearchNote = G.NoteResponse
 export type RotationItem = G.EtfSnapshotResponse
+export type DiaryReview = G.DiaryReviewResponse
+export type DiaryReviewWrite = G.DiaryReviewWrite
+export type DiaryReviewSummary = G.DiaryReviewSummaryResponse
 
 export const getBootstrap = () => G.getApiAppBootstrap()
 export const getDashboard = () => G.getApiAppDashboard()
@@ -33,6 +36,12 @@ export const updateDiary = (id: string, localDate: string, title: string, conten
   G.putApiAppDiariesId(id, { localDate, title, content })
 export const deleteDiary = (id: string) => G.deleteApiAppDiariesId(id)
 export const getTransactions = (diaryId: string) => G.getApiAppDiariesDiaryIdTransactions(diaryId)
+export async function getDiaryReview(diaryId: string): Promise<DiaryReview | null> {
+  try { return await G.getApiAppDiariesDiaryIdReview(diaryId) } catch (error) { if (String(error).includes('request_failed_404')) return null; throw error }
+}
+export const saveDiaryReview = (diaryId: string, body: DiaryReviewWrite) => G.putApiAppDiariesDiaryIdReview(diaryId, body)
+export const deleteDiaryReview = (diaryId: string) => G.deleteApiAppDiariesDiaryIdReview(diaryId)
+export const getDiaryReviewSummary = (from: string, to: string) => G.getApiAppDiaryReviewSummary({ from, to })
 export const createTransaction = (diaryId: string, body: G.TransactionWrite, key?: string) =>
   G.postApiAppDiariesDiaryIdTransactions(diaryId, body, idempotencyHeader(key))
 export const deleteTransaction = (diaryId: string, id: string) => G.deleteApiAppDiariesDiaryIdTransactionsId(diaryId, id)

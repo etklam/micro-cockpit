@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { BrowserRouter } from 'react-router-dom'
@@ -27,6 +27,7 @@ function authenticatedHandlers() {
       return HttpResponse.json({ year: Number(url.searchParams.get('year')), month: Number(url.searchParams.get('month')), summary: null, days: [], capabilities: { alerts: 'unavailable' } })
     }),
     http.get('/api/app/diaries', () => HttpResponse.json({ items: [] })),
+    http.get('/api/app/diary-review-summary', () => HttpResponse.json({ reviewedCount: 0, averageDisciplineScore: null, averageExecutionScore: null, emotionCounts: {}, processAssessmentCounts: {}, topMistakeTags: [] })),
     http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
   ]
 }
@@ -48,10 +49,63 @@ test('restores a session and renders a deep calendar link', async () => {
 test('loads a diary and its transactions from a direct detail link', async () => {
   server.use(...authenticatedHandlers(),
     http.get('/api/app/diaries/:id', () => HttpResponse.json({ id: 'diary-1', localDate: '2026-07-16', title: 'Direct entry', content: 'Notes', createdAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T00:00:00Z' })),
-    http.get('/api/app/diaries/:id/transactions', () => HttpResponse.json({ items: [] })))
+    http.get('/api/app/diaries/:id/transactions', () => HttpResponse.json({ items: [] })),
+    http.get('/api/app/diaries/:id/review', () => HttpResponse.json({ diaryId: 'diary-1', thesis: 'Demand remains strong', plannedAction: null, actualAction: null, emotion: 'calm', disciplineScore: 4, executionScore: null, processAssessment: 'good', mistakeTags: [], lesson: null, nextAction: null, createdAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T00:00:00Z' })))
   renderApp('/diary/diary-1')
   expect(await screen.findByRole('heading', { name: 'Direct entry' })).toBeInTheDocument()
   expect(await screen.findByText('No trades logged.')).toBeInTheDocument()
+  await userEvent.click(screen.getByText('Decision review'))
+  expect(await screen.findByDisplayValue('Demand remains strong')).toBeInTheDocument()
+})
+
+test('missing diary review shows an empty state', async () => {
+  server.use(...authenticatedHandlers(),
+    http.get('/api/app/diaries/:id', () => HttpResponse.json({ id: 'diary-1', localDate: '2026-07-16', title: 'Direct entry', content: 'Notes', createdAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T00:00:00Z' })),
+    http.get('/api/app/diaries/:id/transactions', () => HttpResponse.json({ items: [] })),
+    http.get('/api/app/diaries/:id/review', () => new HttpResponse(null, { status: 404 })))
+  renderApp('/diary/diary-1')
+  await userEvent.click(await screen.findByText('Decision review'))
+  expect(await screen.findByText('No structured review yet')).toBeInTheDocument()
+})
+
+test('saves an optional structured review', async () => {
+  let savedThesis: string | null = null
+  server.use(...authenticatedHandlers(),
+    http.get('/api/app/diaries/:id', () => HttpResponse.json({ id: 'diary-1', localDate: '2026-07-16', title: 'Direct entry', content: 'Notes', createdAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T00:00:00Z' })),
+    http.get('/api/app/diaries/:id/transactions', () => HttpResponse.json({ items: [] })),
+    http.get('/api/app/diaries/:id/review', () => new HttpResponse(null, { status: 404 })),
+    http.put('/api/app/diaries/:id/review', async ({ request }) => {
+      savedThesis = ((await request.json()) as { thesis: string | null }).thesis
+      return HttpResponse.json({ diaryId: 'diary-1', thesis: savedThesis, plannedAction: null, actualAction: null, emotion: null, disciplineScore: null, executionScore: null, processAssessment: null, mistakeTags: [], lesson: null, nextAction: null, createdAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T00:00:00Z' })
+    }))
+  renderApp('/diary/diary-1')
+  await userEvent.click(await screen.findByText('Decision review'))
+  await userEvent.type(screen.getByLabelText('Thesis'), 'Follow the original plan')
+  await userEvent.click(screen.getByRole('button', { name: 'Save review' }))
+  await waitFor(() => expect(savedThesis).toBe('Follow the original plan'))
+})
+
+test('deletes a structured review only after confirmation', async () => {
+  let deleted = false
+  server.use(...authenticatedHandlers(),
+    http.get('/api/app/diaries/:id', () => HttpResponse.json({ id: 'diary-1', localDate: '2026-07-16', title: 'Direct entry', content: 'Notes', createdAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T00:00:00Z' })),
+    http.get('/api/app/diaries/:id/transactions', () => HttpResponse.json({ items: [] })),
+    http.get('/api/app/diaries/:id/review', () => HttpResponse.json({ diaryId: 'diary-1', thesis: null, plannedAction: null, actualAction: null, emotion: null, disciplineScore: null, executionScore: null, processAssessment: null, mistakeTags: [], lesson: null, nextAction: null, createdAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T00:00:00Z' })),
+    http.delete('/api/app/diaries/:id/review', () => { deleted = true; return new HttpResponse(null, { status: 204 }) }))
+  renderApp('/diary/diary-1')
+  await userEvent.click(await screen.findByText('Decision review'))
+  await userEvent.click(await screen.findByRole('button', { name: 'Delete review' }))
+  expect(deleted).toBe(false)
+  const dialog = await screen.findByRole('alertdialog')
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+  await waitFor(() => expect(deleted).toBe(true))
+})
+
+test('review summary empty state does not show fake zero averages', async () => {
+  server.use(...authenticatedHandlers())
+  renderApp('/diary')
+  expect(await screen.findByText('No structured reviews yet')).toBeInTheDocument()
+  expect(screen.queryByText('0.0')).not.toBeInTheDocument()
 })
 
 test('calendar month navigation updates the URL', async () => {

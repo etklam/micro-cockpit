@@ -537,6 +537,12 @@
 .page-skel { display: flex; flex-direction: column; gap: var(--sp-5); }
 .page-skel .card-grid { margin-top: var(--sp-2); }
 
+.review-patterns, .decision-review { display: flex; flex-direction: column; gap: var(--sp-4); }
+.decision-review summary { cursor: pointer; padding: var(--sp-2) 0; }
+.review-tags { border: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); }
+.review-tags legend { font-size: var(--fs-sm); font-weight: 600; margin-bottom: var(--sp-2); }
+.review-tags label { color: var(--muted); font-size: var(--fs-sm); }
+
 /* ======================  RESPONSIVE  ============================ */
 @media (max-width: 920px) {
   .shell { grid-template-columns: 1fr; }
@@ -591,4 +597,5 @@
   .pnl-value { font-size: 1.5rem; }
   .entry__title { font-size: var(--fs-lg); }
   .research-layout { grid-template-columns: 1fr; }
+  .decision-review .form-row { flex-direction: column; }
 }

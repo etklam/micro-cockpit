@@ -13,7 +13,8 @@
     "rotation.batch_runs", "rotation.market_rotation_snapshots", "rotation.sector_breadth_snapshots",
     "rotation.market_state_snapshots", "partner.partner_links", "partner.partner_share_policies",
     "content.posts", "content.post_tags", "operations.audit_events", "operations.job_registry",
-    "operations.service_health_history", "identity.api_keys", "journal.idempotency_keys"
+    "operations.service_health_history", "identity.api_keys", "journal.idempotency_keys",
+    "journal.diary_reviews"
   ],
   "requiredColumns": [
     { "schema": "journal", "table": "transactions", "column": "currency" },
@@ -26,8 +27,8 @@
     { "schema": "rotation", "table": "market_state_snapshots", "column": "benchmark_above_ma200" }
   ],
   "requiredCatalogChecks": [
-    "SELECT count(*) = 40 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname = ANY(ARRAY['identity','journal','performance','discipline','reminder','market','market_data_public','price_alert','rotation','stock_research','partner','content','operations']) AND c.relkind IN ('r','p','v','m')",
-    "SELECT count(*) = 10 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='i' AND c.relname = ANY(ARRAY['api_keys_user_idx','diaries_user_date_idx','diary_alerts_due_idx','journal_outbox_unpublished_idx','market_daily_bars_published_idx','price_alert_active_idx','refresh_tokens_family_idx','rotation_snapshots_lookup_idx','stock_timeline_user_stock_event_idx','transactions_diary_idx'])",
+    "SELECT count(*) = 41 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname = ANY(ARRAY['identity','journal','performance','discipline','reminder','market','market_data_public','price_alert','rotation','stock_research','partner','content','operations']) AND c.relkind IN ('r','p','v','m')",
+    "SELECT count(*) = 11 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='i' AND c.relname = ANY(ARRAY['api_keys_user_idx','diaries_user_date_idx','diary_alerts_due_idx','diary_reviews_user_idx','journal_outbox_unpublished_idx','market_daily_bars_published_idx','price_alert_active_idx','refresh_tokens_family_idx','rotation_snapshots_lookup_idx','stock_timeline_user_stock_event_idx','transactions_diary_idx'])",
     "SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='stock_research' AND p.proname='reject_timeline_mutation')",
     "SELECT EXISTS(SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='stock_research' AND c.relname='stock_timeline_records' AND t.tgname='stock_timeline_immutable' AND NOT t.tgisinternal)"
   ]
