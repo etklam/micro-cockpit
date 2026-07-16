@@ -64,7 +64,42 @@ for (const [path, pathItem] of Object.entries(api.paths)) {
 
 const schemas = Object.entries(api.components?.schemas || {}).map(([name, schema]) => `export type ${name} = ${typeOf(schema)}`).join('\n')
 const queryHelper = Object.values(api.paths).some((pathItem) => Object.values(pathItem).some((operation) => operation?.parameters?.some?.((parameter) => parameter.in === 'query'))) ? `const withQuery = (query: Record<string, unknown>) => {\n  const params = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== null).map(([key, value]) => [key, String(value)]))\n  return params.size ? \`?${'${params}'}\` : ''\n}\n` : ''
-const output = `// Generated from contracts/openapi/edge-api.openapi.json. Do not edit.\n\n${schemas}\n\nexport type RequestOptions = { baseUrl?: string; token?: string | null; refresh?: () => Promise<string | null>; onUnauthorized?: () => void }\n\nlet options: RequestOptions = {}\nlet refreshInFlight: Promise<string | null> | null = null\nexport const configureClient = (next: RequestOptions) => { options = next; refreshInFlight = null }\nasync function send(path: string, init: RequestInit, token: string | null | undefined): Promise<Response> {\n  return fetch(\`${'${options.baseUrl ?? \'\'}${path}'}\`, { ...init, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: \`Bearer ${'${token}'}\` } : {}), ...init.headers } })\n}\nexport async function request<T>(path: string, init: RequestInit = {}): Promise<T> {\n  let response = await send(path, init, options.token)\n  if (response.status === 401 && options.refresh && !path.endsWith('/api/auth/refresh')) {\n    refreshInFlight ??= options.refresh().finally(() => { refreshInFlight = null })\n    const fresh = await refreshInFlight\n    if (fresh) response = await send(path, init, fresh)\n    else { options.onUnauthorized?.(); throw new Error('request_failed_401') }\n  }\n  if (response.status === 401) options.onUnauthorized?.()\n  if (!response.ok) throw new Error(\`request_failed_${'${response.status}'}\`)\n  return response.status === 204 ? undefined as T : response.json()\n}\n${queryHelper}\n${operations.join('\n')}\n`
+const output = `// Generated from contracts/openapi/edge-api.openapi.json. Do not edit.
+
+${schemas}
+
+export type RequestOptions = { baseUrl?: string; token?: string | null; refresh?: () => Promise<string | null>; onUnauthorized?: () => void }
+export class ApiError extends Error {
+  readonly status: number
+  readonly responseBody: string
+  constructor(status: number, responseBody: string) {
+    super(\`request_failed_${'${status}'}\`)
+    this.status = status
+    this.responseBody = responseBody
+  }
+}
+
+let options: RequestOptions = {}
+let refreshInFlight: Promise<string | null> | null = null
+export const configureClient = (next: RequestOptions) => { options = next; refreshInFlight = null }
+async function send(path: string, init: RequestInit, token: string | null | undefined): Promise<Response> {
+  return fetch(\`${'${options.baseUrl ?? \'\'}${path}'}\`, { ...init, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: \`Bearer ${'${token}'}\` } : {}), ...init.headers } })
+}
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  let response = await send(path, init, options.token)
+  if (response.status === 401 && options.refresh && !path.endsWith('/api/auth/refresh')) {
+    refreshInFlight ??= options.refresh().finally(() => { refreshInFlight = null })
+    const fresh = await refreshInFlight
+    if (fresh) response = await send(path, init, fresh)
+    else { options.onUnauthorized?.(); throw new ApiError(401, '') }
+  }
+  if (response.status === 401) options.onUnauthorized?.()
+  if (!response.ok) throw new ApiError(response.status, await response.text())
+  return response.status === 204 ? undefined as T : response.json()
+}
+${queryHelper}
+${operations.join('\n')}
+`
 
 mkdirSync(dirname(target), { recursive: true })
 writeFileSync(target, output)

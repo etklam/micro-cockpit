@@ -157,6 +157,8 @@ Timeline evidence is append-only. Corrections create a new linked record; there 
 | POST | `/api/app/price-alerts/{id}/reactivate` |
 | GET | `/api/app/price-alerts/{id}/triggers` |
 
+Price alerts are evaluated from the read-only `market_data_public.daily_bar_prices_v1` contract only after a daily bar is published. `evaluationPrice` accepts `open` or `close` and defaults to `close`; open means the opening value inside the completed daily bar, not a real-time market-open quote. Trigger responses retain `observedClose` for compatibility and also identify the actual `observedPrice` and `priceType`. A trade date is evaluated at most once per alert.
+
 Market ingestion is not browser-facing. An external authenticated loader uses the Market Data service-key admin flow documented in [`services/market-data-service/SERVICE.md`](../services/market-data-service/SERVICE.md).
 
 ### Market rotation
@@ -243,7 +245,7 @@ The current domain event is `DiaryDeleted.v1`. Journal writes it through a trans
 
 ## Migration contract
 
-`platform/postgres/migrations/manifest.json` currently contains migrations `0001` through `0015`. Migration files are append-only and checksummed. The legacy baseline is fixed through `0013`; `0014` and later are normal pending migrations after baseline adoption.
+`platform/postgres/migrations/manifest.json` currently contains migrations `0001` through `0017`. Migration files are append-only and checksummed. The legacy baseline is fixed through `0013`; `0014` and later are normal pending migrations after baseline adoption.
 
 Use the commands and production adoption sequence in [Database migrations](database-migrations.md). Never edit an applied SQL file or a history row.
 

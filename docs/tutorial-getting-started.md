@@ -108,7 +108,7 @@ Inspect non-sensitive migration state:
 docker compose run --rm db-migrate status
 ```
 
-The current catalog should show migrations through `0015` applied on a fresh database.
+The current catalog should show migrations through `0017` applied on a fresh database.
 
 ## Step 6: Stop safely
 

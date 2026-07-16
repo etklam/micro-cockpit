@@ -25,7 +25,7 @@ test "$(curl -sS "$market/internal/v1/bars/AAPL?from=2026-07-01&to=2026-07-31" |
 test "$(status -H "$owner" -H 'Content-Type: application/json' -d '{"symbol":"AAPL","conditionType":"above","threshold":105}' "$alerts/internal/price-alerts")" = 503
 curl -sS -o /dev/null -H "$admin" -H 'Content-Type: application/json' -d '{"status":"succeeded"}' "$market/internal/admin/provider-runs/$run/complete"
 test "$(curl -sS "$market/internal/v1/bars/AAPL?from=2026-07-01&to=2026-07-31" | jq '.items|length')" = 2
-test "$(docker exec micro-cockpit-postgres-1 psql -U trade_diary -d trade_diary -Atc "select count(*) from market_data_public.adjusted_daily_bars_v1 where symbol='AAPL'")" = 2
+test "$(docker exec micro-cockpit-postgres-1 psql -U trade_diary -d trade_diary -Atc "select count(*) from market_data_public.daily_bar_prices_v1 where symbol='AAPL'")" = 2
 
 alert=$(curl -sS -H "$owner" -H 'Content-Type: application/json' -d '{"symbol":"AAPL","conditionType":"above","threshold":105}' "$alerts/internal/price-alerts")
 id=$(jq -r .id <<<"$alert")

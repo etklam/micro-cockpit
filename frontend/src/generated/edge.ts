@@ -61,8 +61,8 @@ export type PositionSizing = { "accountValue": number; "riskPercent": number; "e
 export type PositionSizingResponse = { "riskAmount": number; "quantity": number; "perUnitRisk": number }
 export type PostResponse = { "id": string; "slug": string; "title": string; "body": string; "publishedAt": string }
 export type PostWrite = { "slug": string; "title": string; "body": null | string; "status": string }
-export type PriceAlertResponse = { "id": string; "symbol": string; "conditionType": string; "threshold": number; "lookbackDays": null | number | string; "direction": null | string; "status": string; "baselineClose": number | null; "lastEvaluatedDate": null | string; "createdAt": string; "updatedAt": string }
-export type PriceAlertWrite = { "symbol": string; "conditionType": string; "threshold": number; "lookbackDays": null | number | string; "direction": null | string }
+export type PriceAlertResponse = { "id": string; "symbol": string; "conditionType": string; "threshold": number; "lookbackDays": null | number | string; "direction": null | string; "evaluationPrice": string; "status": string; "baselineClose": number | null; "lastEvaluatedDate": null | string; "createdAt": string; "updatedAt": string }
+export type PriceAlertWrite = { "symbol": string; "conditionType": string; "threshold": number; "lookbackDays": null | number | string; "direction": null | string; "evaluationPrice"?: null | string }
 export type ProviderHealthResponse = { "provider": string; "lastSuccessAt": string; "healthy": boolean }
 export type ProvidersHealthResponse = { "contractVersion": number | string; "healthy": boolean; "items": Array<ProviderHealthResponse> }
 export type PublishedBarResponse = { "tradingDate": string; "open": number; "high": number; "low": number; "close": number; "volume": number; "provider": string; "publishedAt": string }
@@ -88,7 +88,7 @@ export type TimelineResponse = { "id": string; "stockId": string; "eventTime": s
 export type TimelineWrite = { "eventTime": null | string; "sourceType": null | string; "title": null | string; "content": null | string; "diaryId": null | string }
 export type TransactionResponse = { "id": string; "diaryId": string; "symbol": string; "side": string; "quantity": number; "price": number; "currency": string; "tradedAt": string; "notes": string; "createdAt": string; "updatedAt": string }
 export type TransactionWrite = { "symbol": string; "side": string; "quantity": number; "price": number; "currency": string; "tradedAt": string; "notes": null | string }
-export type TriggerResponse = { "id": string; "tradingDate": string; "observedClose": number; "triggeredAt": string; "dismissedAt": null | string }
+export type TriggerResponse = { "id": string; "tradingDate": string; "observedClose": number; "observedPrice": number; "priceType": string; "triggeredAt": string; "dismissedAt": null | string }
 export type UniverseCreatedResponse = { "id": string; "code": string; "name": string; "rankScope": string }
 export type UniverseResponse = { "id": string; "code": string; "name": string; "rankScope": string; "createdAt": string; "updatedAt": string }
 export type UniverseSymbolWrite = { "symbol": string; "label": string; "sector": null | string; "sortOrder": null | number | string }
@@ -97,6 +97,15 @@ export type WatchlistItemCreatedResponse = { "stockId": string }
 export type WatchlistResponse = { "stock": StockResponse; "currentNote": null | string; "noteUpdatedAt": null | string; "timelineCount": number | string }
 
 export type RequestOptions = { baseUrl?: string; token?: string | null; refresh?: () => Promise<string | null>; onUnauthorized?: () => void }
+export class ApiError extends Error {
+  readonly status: number
+  readonly responseBody: string
+  constructor(status: number, responseBody: string) {
+    super(`request_failed_${status}`)
+    this.status = status
+    this.responseBody = responseBody
+  }
+}
 
 let options: RequestOptions = {}
 let refreshInFlight: Promise<string | null> | null = null
@@ -110,10 +119,10 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     refreshInFlight ??= options.refresh().finally(() => { refreshInFlight = null })
     const fresh = await refreshInFlight
     if (fresh) response = await send(path, init, fresh)
-    else { options.onUnauthorized?.(); throw new Error('request_failed_401') }
+    else { options.onUnauthorized?.(); throw new ApiError(401, '') }
   }
   if (response.status === 401) options.onUnauthorized?.()
-  if (!response.ok) throw new Error(`request_failed_${response.status}`)
+  if (!response.ok) throw new ApiError(response.status, await response.text())
   return response.status === 204 ? undefined as T : response.json()
 }
 const withQuery = (query: Record<string, unknown>) => {

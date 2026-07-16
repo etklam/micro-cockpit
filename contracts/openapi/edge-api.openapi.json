@@ -5231,6 +5231,7 @@
           "threshold",
           "lookbackDays",
           "direction",
+          "evaluationPrice",
           "status",
           "baselineClose",
           "lastEvaluatedDate",
@@ -5271,6 +5272,9 @@
               "null",
               "string"
             ]
+          },
+          "evaluationPrice": {
+            "type": "string"
           },
           "status": {
             "type": "string"
@@ -5335,6 +5339,12 @@
             "format": "int32"
           },
           "direction": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evaluationPrice": {
             "type": [
               "null",
               "string"
@@ -6201,6 +6211,8 @@
           "id",
           "tradingDate",
           "observedClose",
+          "observedPrice",
+          "priceType",
           "triggeredAt",
           "dismissedAt"
         ],
@@ -6221,6 +6233,17 @@
               "string"
             ],
             "format": "double"
+          },
+          "observedPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "priceType": {
+            "type": "string"
           },
           "triggeredAt": {
             "type": "string",

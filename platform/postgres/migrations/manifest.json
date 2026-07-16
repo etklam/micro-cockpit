@@ -15,6 +15,8 @@
     { "id": "0012", "filename": "0012_identity_api_keys.sql", "sha256": "716ee592d783021169621e91e7ce6be64c9c4d7ccfa3866779d9953ac2d74e00" },
     { "id": "0013", "filename": "0013_journal_idempotency.sql", "sha256": "d424bf4a04b0d41afc1f63e361224f92bd0afe70661794d163b65baaa3f5565c" },
     { "id": "0014", "filename": "0014_structured_diary_review.sql", "sha256": "cdac3514e27c4232654d0497416057fa1ed9b2a1e88a9ee222bb5556b3e19538" },
-    { "id": "0015", "filename": "0015_diary_review_ownership.sql", "sha256": "7d7d226e00c90fedd443c3950afac19bf10ca21bf4c814ed2938891fedd7529c" }
+    { "id": "0015", "filename": "0015_diary_review_ownership.sql", "sha256": "7d7d226e00c90fedd443c3950afac19bf10ca21bf4c814ed2938891fedd7529c" },
+    { "id": "0016", "filename": "0016_market_daily_bar_price_contract.sql", "sha256": "4794c699600ad1876a63ac13dd4aca102a9169a11a760d1119804695917b4569" },
+    { "id": "0017", "filename": "0017_price_alert_evaluation_price.sql", "sha256": "9f86661257ef75d16fe37c85cd2dea20c6f5b076ea8e7311e0e894c26c30147b" }
   ]
 }

@@ -17,6 +17,7 @@ export type Transaction = G.TransactionResponse
 export type Discipline = G.DisciplineResponse
 export type Alert = G.DiaryAlertResponse
 export type PriceAlert = G.PriceAlertResponse
+export type PriceAlertTrigger = G.TriggerResponse
 export type WatchlistItem = G.WatchlistResponse
 export type ResearchNote = G.NoteResponse
 export type RotationItem = G.EtfSnapshotResponse
@@ -67,9 +68,21 @@ export async function getResearchNote(id: string): Promise<ResearchNote | null> 
 export const saveResearchNote = (id: string, content: string) => G.putApiAppStocksStockIdNote(id, { content })
 export const getResearchTimeline = (id: string) => G.getApiAppStocksStockIdTimeline(id)
 export const getPriceAlerts = () => G.getApiAppPriceAlerts()
-export const addPriceAlert = (symbol: string, threshold: number, conditionType: string) =>
-  G.postApiAppPriceAlerts({ symbol, threshold, conditionType, lookbackDays: null, direction: null })
+export const addPriceAlert = (symbol: string, threshold: number, conditionType: string, evaluationPrice: string) =>
+  G.postApiAppPriceAlerts({ symbol, threshold, conditionType, evaluationPrice, lookbackDays: null, direction: null })
 export const deletePriceAlert = (id: string) => G.deleteApiAppPriceAlertsId(id)
+export const dismissPriceAlert = (id: string) => G.postApiAppPriceAlertsIdDismiss(id)
+export const reactivatePriceAlert = (id: string) => G.postApiAppPriceAlertsIdReactivate(id)
+export const getPriceAlertTriggers = (id: string) => G.getApiAppPriceAlertsIdTriggers(id)
+export type PriceAlertCreateErrorKind = 'no_published_price' | 'invalid_request' | 'unavailable' | 'timeout' | 'unknown'
+export function priceAlertCreateErrorKind(error: unknown): PriceAlertCreateErrorKind {
+  if (!(error instanceof G.ApiError)) return 'unknown'
+  if (error.responseBody.includes('symbol_has_no_published_price')) return 'no_published_price'
+  if (error.status === 503) return 'unavailable'
+  if (error.status === 504) return 'timeout'
+  if (error.status === 400 || error.status === 422) return 'invalid_request'
+  return 'unknown'
+}
 export const getRotationUniverses = () => G.getApiAppRotationUniverses()
 export const getMarketRotation = (universe: string) => G.getApiAppRotationMonitor({ universe })
 export const getPartners = () => G.getApiAppPartners()

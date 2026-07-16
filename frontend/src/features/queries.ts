@@ -13,7 +13,10 @@ export const queryKeys = {
   watchlist: ['watchlist'] as const,
   researchNote: (id: string) => ['research-note', id] as const,
   researchTimeline: (id: string) => ['research-timeline', id] as const,
-  priceAlerts: ['price-alerts'] as const,
+  priceAlerts: {
+    list: ['price-alerts', 'list'] as const,
+    triggers: (id: string) => ['price-alerts', 'triggers', id] as const,
+  },
   rotation: {
     universes: ['rotation', 'universes'] as const,
     monitor: (universe: string, scope: string) => ['rotation', 'monitor', universe, scope] as const,
@@ -39,7 +42,8 @@ export const useAlertsQuery = () => useQuery({ queryKey: queryKeys.alerts, query
 export const useWatchlistQuery = () => useQuery({ queryKey: queryKeys.watchlist, queryFn: api.getWatchlist })
 export const useResearchNoteQuery = (id: string) => useQuery({ queryKey: queryKeys.researchNote(id), queryFn: () => api.getResearchNote(id), enabled: !!id })
 export const useResearchTimelineQuery = (id: string) => useQuery({ queryKey: queryKeys.researchTimeline(id), queryFn: () => api.getResearchTimeline(id), enabled: !!id })
-export const usePriceAlertsQuery = () => useQuery({ queryKey: queryKeys.priceAlerts, queryFn: api.getPriceAlerts })
+export const usePriceAlertsQuery = () => useQuery({ queryKey: queryKeys.priceAlerts.list, queryFn: api.getPriceAlerts })
+export const usePriceAlertTriggersQuery = (id: string | null) => useQuery({ queryKey: queryKeys.priceAlerts.triggers(id ?? ''), queryFn: () => api.getPriceAlertTriggers(id!), enabled: !!id })
 export const useRotationUniversesQuery = () => useQuery({ queryKey: queryKeys.rotation.universes, queryFn: api.getRotationUniverses, staleTime: 60_000 })
 export const useRotationQuery = (universe: string, scope: string) => useQuery({
   queryKey: queryKeys.rotation.monitor(universe, scope),
@@ -111,8 +115,18 @@ export const useDeleteAlertMutation = () => useInvalidatingMutation(api.deleteAl
 export const useAddWatchlistMutation = () => useInvalidatingMutation(api.addWatchlist, [queryKeys.watchlist])
 export const useRemoveWatchlistMutation = () => useInvalidatingMutation(api.removeWatchlist, [queryKeys.watchlist])
 export const useSaveResearchNoteMutation = (id: string) => useInvalidatingMutation((content: string) => api.saveResearchNote(id, content), [queryKeys.researchNote(id), queryKeys.researchTimeline(id), queryKeys.watchlist])
-export const useAddPriceAlertMutation = () => useInvalidatingMutation(({ symbol, threshold, condition }: { symbol: string; threshold: number; condition: string }) => api.addPriceAlert(symbol, threshold, condition), [queryKeys.priceAlerts])
-export const useDeletePriceAlertMutation = () => useInvalidatingMutation(api.deletePriceAlert, [queryKeys.priceAlerts])
+export const useAddPriceAlertMutation = () => useInvalidatingMutation(({ symbol, threshold, condition, evaluationPrice }: { symbol: string; threshold: number; condition: string; evaluationPrice: string }) => api.addPriceAlert(symbol, threshold, condition, evaluationPrice), [queryKeys.priceAlerts.list])
+export function useDeletePriceAlertMutation() {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: api.deletePriceAlert, onSuccess: async (_, id) => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.priceAlerts.list }),
+      client.invalidateQueries({ queryKey: queryKeys.priceAlerts.triggers(id) }),
+    ])
+  } })
+}
+export const useDismissPriceAlertMutation = () => useInvalidatingMutation(api.dismissPriceAlert, [queryKeys.priceAlerts.list])
+export const useReactivatePriceAlertMutation = () => useInvalidatingMutation(api.reactivatePriceAlert, [queryKeys.priceAlerts.list])
 export const useCalculateMutation = () => useMutation({ mutationFn: ({ tool, values }: { tool: string; values: Record<string, unknown> }) => api.calculate(tool, values) })
 export const useCreateAgentMutation = () => useMutation({ mutationFn: api.createAgent })
 

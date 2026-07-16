@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import type { PriceAlert, RotationItem, WatchlistItem } from './features/api'
+import { priceAlertCreateErrorKind, type PriceAlert, type RotationItem, type WatchlistItem } from './features/api'
 import {
   useAddPriceAlertMutation, useAddWatchlistMutation, useArticleQuery, useArticlesQuery,
-  useCalculateMutation, useCreateAgentMutation, useDeletePriceAlertMutation, usePartnersQuery,
-  usePriceAlertsQuery, useRemoveWatchlistMutation, useResearchNoteQuery, useResearchTimelineQuery,
-  useBootstrapQuery, useRotationQuery, useRotationUniversesQuery, useSaveResearchNoteMutation, useWatchlistQuery,
+  useCalculateMutation, useCreateAgentMutation, useDeletePriceAlertMutation, useDismissPriceAlertMutation, usePartnersQuery,
+  usePriceAlertTriggersQuery, usePriceAlertsQuery, useRemoveWatchlistMutation, useResearchNoteQuery, useResearchTimelineQuery,
+  useBootstrapQuery, useReactivatePriceAlertMutation, useRotationQuery, useRotationUniversesQuery, useSaveResearchNoteMutation, useWatchlistQuery,
 } from './features/queries'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
 import { PageSkeleton, SectionError, useCockpit } from './App'
@@ -58,12 +58,64 @@ function Research({ item }: { item: WatchlistItem }) {
 
 export function PriceAlertsPage() {
   const result = usePriceAlertsQuery()
-  const [symbol, setSymbol] = useState(''); const [price, setPrice] = useState(''); const [direction, setDirection] = useState('above')
-  const addPriceAlert = useAddPriceAlertMutation(); const deletePriceAlert = useDeletePriceAlertMutation()
-  async function add(e: FormEvent) { e.preventDefault(); await addPriceAlert.mutateAsync({ symbol: symbol.trim().toUpperCase(), threshold: Number(price), condition: direction }); setSymbol(''); setPrice('') }
+  const [symbol, setSymbol] = useState('')
+  const [price, setPrice] = useState('')
+  const [direction, setDirection] = useState('above')
+  const [evaluationPrice, setEvaluationPrice] = useState('close')
+  const [historyAlertId, setHistoryAlertId] = useState<string | null>(null)
+  const addPriceAlert = useAddPriceAlertMutation()
+  const deletePriceAlert = useDeletePriceAlertMutation()
+  const dismissPriceAlert = useDismissPriceAlertMutation()
+  const reactivatePriceAlert = useReactivatePriceAlertMutation()
+  async function add(e: FormEvent) {
+    e.preventDefault()
+    try {
+      await addPriceAlert.mutateAsync({ symbol: symbol.trim().toUpperCase(), threshold: Number(price), condition: direction, evaluationPrice })
+      setSymbol('')
+      setPrice('')
+    } catch {
+      // The mutation state renders a safe, actionable error message.
+    }
+  }
   async function remove(x: PriceAlert) { await deletePriceAlert.mutateAsync(x.id) }
   const items = result.data?.items ?? []
-  return <><PageHeader title="Price alerts" subtitle="Levels worth looking up from the screen" /><Card flush><form className="alert-form__body" onSubmit={add}><div className="form-row"><Field label="Symbol"><TextInput required value={symbol} onChange={e => setSymbol(e.target.value)} /></Field><Field label="Direction"><SelectBox value={direction} onChange={e => setDirection(e.target.value)}><option value="above">Above</option><option value="below">Below</option></SelectBox></Field><Field label="Target price"><TextInput required min="0.0001" step="any" type="number" value={price} onChange={e => setPrice(e.target.value)} /></Field></div><div className="form-actions"><Button variant="primary" type="submit" loading={addPriceAlert.isPending}>Create alert</Button></div></form></Card><ListState loading={result.isLoading} error={result.isError ? 'error' : undefined} empty={!items.length} retry={() => { void result.refetch() }}><ul className="compact-list">{items.map(x => <li key={x.id}><Card><div className="row-main"><strong>{x.symbol}</strong><span>{x.conditionType} {x.threshold.toLocaleString()}</span></div><Badge tone={x.status === 'triggered' ? 'warn' : 'primary'}>{x.status}</Badge><IconButton icon="trash" label={`Delete ${x.symbol} alert`} onClick={() => remove(x)} /></Card></li>)}</ul></ListState></>
+  const createError = addPriceAlert.error ? ({
+    no_published_price: 'Symbol has no published daily price.',
+    invalid_request: 'Invalid alert request.',
+    unavailable: 'Market data unavailable.',
+    timeout: 'Price alert request timed out.',
+    unknown: 'Could not create the price alert.',
+  } as const)[priceAlertCreateErrorKind(addPriceAlert.error)] : null
+  return <>
+    <PageHeader title="Price alerts" subtitle="Daily-bar levels worth reviewing" />
+    <Card flush><form className="alert-form__body" onSubmit={add}><div className="form-row">
+      <Field label="Symbol"><TextInput required value={symbol} onChange={e => setSymbol(e.target.value)} /></Field>
+      <Field label="Direction"><SelectBox value={direction} onChange={e => setDirection(e.target.value)}><option value="above">Above</option><option value="below">Below</option></SelectBox></Field>
+      <Field label="Target price"><TextInput required min="0.0001" step="any" type="number" value={price} onChange={e => setPrice(e.target.value)} /></Field>
+      <Field label="Evaluate using" hint="Evaluated after the daily bar is published."><SelectBox aria-label="Evaluate using" value={evaluationPrice} onChange={e => setEvaluationPrice(e.target.value)}><option value="close">Close</option><option value="open">Open</option></SelectBox></Field>
+    </div>{createError ? <p role="alert" className="form-error">{createError}</p> : null}<div className="form-actions"><Button variant="primary" type="submit" loading={addPriceAlert.isPending}>Create alert</Button></div></form></Card>
+    {result.isLoading ? <PageSkeleton rows={2} /> : result.isError ? <SectionError onRetry={() => { void result.refetch() }} /> : !items.length ? <EmptyBox title="No price alerts" hint="Create an alert to evaluate the next published daily bar." /> : <ul className="compact-list">{items.map(x => <li key={x.id}><Card>
+      <div className="row-main"><strong>{x.symbol}</strong><span>{x.conditionType === 'above' ? 'Above' : 'Below'} {x.threshold.toLocaleString()}</span><span>Evaluate using {x.evaluationPrice === 'open' ? 'Open' : 'Close'}</span><span>{x.lastEvaluatedDate ? `Last evaluated ${x.lastEvaluatedDate}` : 'Not evaluated yet'}</span>{x.baselineClose == null ? null : <span>Baseline close {x.baselineClose.toLocaleString()}</span>}</div>
+      <Badge tone={x.status === 'triggered' ? 'warn' : 'primary'}>{x.status}</Badge>
+      {x.status === 'dismissed' ? <Button size="sm" onClick={() => reactivatePriceAlert.mutate(x.id)} aria-label={`Reactivate ${x.symbol} alert`}>Reactivate</Button> : <Button size="sm" onClick={() => dismissPriceAlert.mutate(x.id)} aria-label={`Dismiss ${x.symbol} alert`}>Dismiss</Button>}
+      <Button size="sm" onClick={() => setHistoryAlertId(current => current === x.id ? null : x.id)} aria-label={`View ${x.symbol} trigger history`}>Trigger history</Button>
+      <IconButton icon="trash" label={`Delete ${x.symbol} alert`} onClick={() => remove(x)} />
+      {historyAlertId === x.id ? <PriceAlertHistory alertId={x.id} /> : null}
+    </Card></li>)}</ul>}
+  </>
+}
+
+function PriceAlertHistory({ alertId }: { alertId: string }) {
+  const history = usePriceAlertTriggersQuery(alertId)
+  if (history.isLoading) return <p className="is-muted">Loading trigger history…</p>
+  if (history.isError) return <section aria-label="Trigger history unavailable"><p>Trigger history unavailable.</p><Button size="sm" onClick={() => { void history.refetch() }}>Retry</Button></section>
+  const items = history.data?.items ?? []
+  if (!items.length) return <p className="is-muted">No trigger history.</p>
+  return <section aria-label="Trigger history"><h3>Trigger history</h3><ul className="timeline">{items.map(item => <li key={item.id}>
+    <strong>{item.priceType === 'open' ? 'Open' : 'Close'} price {item.observedPrice.toLocaleString()}</strong>
+    <span>Trading date {item.tradingDate}</span>
+    <time>{new Date(item.triggeredAt).toLocaleString()}</time>
+  </li>)}</ul></section>
 }
 
 const rotationScopes = ['universe', 'sector'] as const

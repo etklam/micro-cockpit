@@ -98,13 +98,14 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON market.symbols, market.provider_runs, ma
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA market TO market_data_service;
 GRANT SELECT ON market.published_symbols_v1, market.published_daily_bars_v1, market.published_provider_health_v1 TO market_data_service;
 GRANT USAGE ON SCHEMA market_data_public TO market_data_service;
-GRANT SELECT ON market_data_public.adjusted_daily_bars_v1 TO market_data_service;
+GRANT SELECT ON market_data_public.adjusted_daily_bars_v1, market_data_public.daily_bar_prices_v1 TO market_data_service;
 
 -- Cross-service market access is view-only. No consumer gets access to market base tables.
 GRANT USAGE ON SCHEMA market TO price_alert_service;
 GRANT SELECT ON market.published_provider_health_v1 TO price_alert_service;
 GRANT USAGE ON SCHEMA market_data_public TO price_alert_service, rotation_service;
-GRANT SELECT ON market_data_public.adjusted_daily_bars_v1 TO price_alert_service, rotation_service;
+GRANT SELECT ON market_data_public.daily_bar_prices_v1 TO price_alert_service;
+GRANT SELECT ON market_data_public.adjusted_daily_bars_v1 TO rotation_service;
 
 -- Future objects created by the migration owner inherit the same narrow runtime grants.
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA identity GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO identity_service;
@@ -131,7 +132,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA operations GRAN
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA operations GRANT USAGE,SELECT ON SEQUENCES TO operations_service;
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA market GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO market_data_service;
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA market GRANT USAGE,SELECT ON SEQUENCES TO market_data_service;
-ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA market_data_public GRANT SELECT ON TABLES TO market_data_service,price_alert_service,rotation_service;
+ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA market_data_public GRANT SELECT ON TABLES TO market_data_service;
 
 REVOKE CREATE ON DATABASE trade_diary FROM identity_service,journal_service,performance_service,discipline_service,reminder_service,market_data_service,price_alert_service,rotation_service,stock_research_service,partner_service,content_service,operations_service;
 REVOKE ALL ON SCHEMA platform_migrations FROM identity_service,journal_service,performance_service,discipline_service,reminder_service,market_data_service,price_alert_service,rotation_service,stock_research_service,partner_service,content_service,operations_service;
