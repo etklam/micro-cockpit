@@ -1,0 +1,101 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import * as api from './api'
+
+export const queryKeys = {
+  bootstrap: ['bootstrap'] as const,
+  dashboard: ['dashboard'] as const,
+  diaries: ['diaries'] as const,
+  diary: (id: string) => ['diary', id] as const,
+  transactions: (id: string) => ['transactions', id] as const,
+  calendar: (year: number, month: number) => ['calendar', year, month] as const,
+  disciplines: ['disciplines'] as const,
+  alerts: ['alerts'] as const,
+  watchlist: ['watchlist'] as const,
+  researchNote: (id: string) => ['research-note', id] as const,
+  researchTimeline: (id: string) => ['research-timeline', id] as const,
+  priceAlerts: ['price-alerts'] as const,
+  rotation: ['rotation'] as const,
+  partners: ['partners'] as const,
+  articles: ['articles'] as const,
+  article: (slug: string) => ['article', slug] as const,
+}
+
+export const useBootstrapQuery = () => useQuery({ queryKey: queryKeys.bootstrap, queryFn: api.getBootstrap, staleTime: 60_000 })
+export const useDashboardQuery = () => useQuery({ queryKey: queryKeys.dashboard, queryFn: api.getDashboard })
+export const useDiariesQuery = () => useQuery({ queryKey: queryKeys.diaries, queryFn: api.getDiaries })
+export const useDiaryQuery = (id: string) => useQuery({ queryKey: queryKeys.diary(id), queryFn: () => api.getDiary(id), enabled: !!id })
+export const useTransactionsQuery = (id: string) => useQuery({ queryKey: queryKeys.transactions(id), queryFn: () => api.getTransactions(id), enabled: !!id })
+export const useCalendarQuery = (year: number, month: number) => useQuery({ queryKey: queryKeys.calendar(year, month), queryFn: () => api.getCalendar(year, month) })
+export const useDisciplinesQuery = () => useQuery({ queryKey: queryKeys.disciplines, queryFn: api.getDisciplines })
+export const useAlertsQuery = () => useQuery({ queryKey: queryKeys.alerts, queryFn: api.getAlerts })
+export const useWatchlistQuery = () => useQuery({ queryKey: queryKeys.watchlist, queryFn: api.getWatchlist })
+export const useResearchNoteQuery = (id: string) => useQuery({ queryKey: queryKeys.researchNote(id), queryFn: () => api.getResearchNote(id), enabled: !!id })
+export const useResearchTimelineQuery = (id: string) => useQuery({ queryKey: queryKeys.researchTimeline(id), queryFn: () => api.getResearchTimeline(id), enabled: !!id })
+export const usePriceAlertsQuery = () => useQuery({ queryKey: queryKeys.priceAlerts, queryFn: api.getPriceAlerts })
+export const useRotationQuery = () => useQuery({ queryKey: queryKeys.rotation, queryFn: api.getMarketRotation })
+export const usePartnersQuery = () => useQuery({ queryKey: queryKeys.partners, queryFn: api.getPartners })
+export const useArticlesQuery = () => useQuery({ queryKey: queryKeys.articles, queryFn: api.getArticles })
+export const useArticleQuery = (slug: string) => useQuery({ queryKey: queryKeys.article(slug), queryFn: () => api.getArticle(slug), enabled: !!slug })
+
+const calendarPrefix = ['calendar'] as const
+const invalidateCalendar = (client: ReturnType<typeof useQueryClient>) => client.invalidateQueries({ queryKey: calendarPrefix })
+
+export function useQuickNoteMutation() {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: ({ date, content, key }: { date: string; content: string; key: string }) => api.saveQuickNote(date, content, key), onSuccess: async () => {
+    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.diaries }), client.invalidateQueries({ queryKey: queryKeys.dashboard }), invalidateCalendar(client)])
+  } })
+}
+
+export function useSaveDiaryMutation() {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: ({ id, date, title, content, key }: { id?: string; date: string; title: string; content: string; key: string }) => id ? api.updateDiary(id, date, title, content) : api.createDiary(date, title, content, key), onSuccess: async () => {
+    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.diaries }), client.invalidateQueries({ queryKey: queryKeys.dashboard }), invalidateCalendar(client)])
+  } })
+}
+
+export function useDeleteDiaryMutation() {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: api.deleteDiary, onSuccess: async () => {
+    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.diaries }), client.invalidateQueries({ queryKey: queryKeys.dashboard }), invalidateCalendar(client)])
+  } })
+}
+
+export function useCreateTransactionMutation(diaryId: string) {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: ({ body, key }: { body: Parameters<typeof api.createTransaction>[1]; key: string }) => api.createTransaction(diaryId, body, key), onSuccess: async () => {
+    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.transactions(diaryId) }), invalidateCalendar(client)])
+  } })
+}
+
+export function useDeleteTransactionMutation(diaryId: string) {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: (id: string) => api.deleteTransaction(diaryId, id), onSuccess: async () => {
+    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.transactions(diaryId) }), invalidateCalendar(client)])
+  } })
+}
+
+export function useSavePerformanceMutation() {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: ({ date, amount, capital, note }: { date: string; amount: number; capital: number | null; note: string }) => api.savePerformance(date, amount, capital, note), onSuccess: async () => {
+    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.dashboard }), invalidateCalendar(client)])
+  } })
+}
+
+function useInvalidatingMutation<T>(operation: (value: T) => Promise<unknown>, keys: readonly (readonly unknown[])[]) {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: operation, onSuccess: async () => { await Promise.all(keys.map(queryKey => client.invalidateQueries({ queryKey }))) } })
+}
+
+export const useCreateDisciplineMutation = () => useInvalidatingMutation(api.createDiscipline, [queryKeys.disciplines, queryKeys.dashboard])
+export const useDeleteDisciplineMutation = () => useInvalidatingMutation(api.deleteDiscipline, [queryKeys.disciplines, queryKeys.dashboard])
+export const useCreateAlertMutation = () => useInvalidatingMutation(api.createAlert, [queryKeys.alerts, queryKeys.dashboard, calendarPrefix])
+export const useDismissAlertMutation = () => useInvalidatingMutation(api.dismissAlert, [queryKeys.alerts, queryKeys.dashboard, calendarPrefix])
+export const useDeleteAlertMutation = () => useInvalidatingMutation(api.deleteAlert, [queryKeys.alerts, queryKeys.dashboard, calendarPrefix])
+export const useAddWatchlistMutation = () => useInvalidatingMutation(api.addWatchlist, [queryKeys.watchlist])
+export const useRemoveWatchlistMutation = () => useInvalidatingMutation(api.removeWatchlist, [queryKeys.watchlist])
+export const useSaveResearchNoteMutation = (id: string) => useInvalidatingMutation((content: string) => api.saveResearchNote(id, content), [queryKeys.researchNote(id), queryKeys.researchTimeline(id), queryKeys.watchlist])
+export const useAddPriceAlertMutation = () => useInvalidatingMutation(({ symbol, threshold, condition }: { symbol: string; threshold: number; condition: string }) => api.addPriceAlert(symbol, threshold, condition), [queryKeys.priceAlerts])
+export const useDeletePriceAlertMutation = () => useInvalidatingMutation(api.deletePriceAlert, [queryKeys.priceAlerts])
+export const useCalculateMutation = () => useMutation({ mutationFn: ({ tool, values }: { tool: string; values: Record<string, unknown> }) => api.calculate(tool, values) })
+export const useCreateAgentMutation = () => useMutation({ mutationFn: api.createAgent })

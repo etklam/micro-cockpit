@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 
-public sealed class CockpitReadModelsTests
+public sealed class CockpitCompositionTests
 {
     [Fact]
     public async Task Dashboard_returns_503_when_required_dependency_fails()
@@ -49,6 +49,112 @@ public sealed class CockpitReadModelsTests
     }
 
     [Fact]
+    public async Task Bootstrap_returns_safe_typed_user_context()
+    {
+        using var factory = CreateFactory((service, _) => service == "identity"
+            ? Json(HttpStatusCode.OK, "{\"id\":\"33333333-3333-3333-3333-333333333333\",\"email\":\"owner@example.com\",\"displayName\":\"Owner\",\"timezone\":\"Asia/Taipei\",\"baseCurrency\":\"USD\",\"role\":\"user\",\"accountType\":\"human\",\"status\":\"active\",\"statusVersion\":1}")
+            : Json(HttpStatusCode.OK, "{}"));
+        using var response = await factory.CreateClient().GetAsync("/api/app/bootstrap");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("owner@example.com", document.RootElement.GetProperty("currentUser").GetProperty("email").GetString());
+        Assert.False(document.RootElement.TryGetProperty("accessToken", out _));
+        Assert.False(document.RootElement.TryGetProperty("serviceUrl", out _));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task Optional_authorization_failure_fails_the_whole_dashboard(HttpStatusCode status)
+    {
+        using var factory = CreateFactory((service, path) => service == "reminder"
+            ? Json(status, "{}")
+            : DashboardResponse(service, path));
+        using var response = await factory.CreateClient().GetAsync("/api/app/dashboard");
+
+        Assert.Equal(status, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Missing_daily_performance_remains_null()
+    {
+        using var factory = CreateFactory((service, path) => service == "performance"
+            ? Json(HttpStatusCode.NotFound, "{}")
+            : DashboardResponse(service, path));
+        using var response = await factory.CreateClient().GetAsync("/api/app/dashboard");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(JsonValueKind.Null, document.RootElement.GetProperty("performance").ValueKind);
+    }
+
+    [Fact]
+    public async Task Invalid_required_payload_returns_502_problem()
+    {
+        using var factory = CreateFactory((service, path) => service == "journal"
+            ? Json(HttpStatusCode.OK, "not-json")
+            : DashboardResponse(service, path));
+        using var response = await factory.CreateClient().GetAsync("/api/app/dashboard");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal("downstream_invalid_response", document.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Stock_page_succeeds_without_market_data()
+    {
+        using var factory = CreateFactory((service, _) => service switch
+        {
+            "stock-research" => Json(HttpStatusCode.OK, "{\"id\":\"44444444-4444-4444-4444-444444444444\",\"symbol\":\"AAPL\",\"name\":\"Apple\",\"exchange\":\"NASDAQ\",\"assetType\":\"stock\",\"createdAt\":\"2026-07-01T00:00:00Z\"}"),
+            "market-data" => Json(HttpStatusCode.ServiceUnavailable, "{}"),
+            _ => Json(HttpStatusCode.OK, "{}")
+        });
+        using var response = await factory.CreateClient().GetAsync("/api/app/stocks/AAPL/page");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(JsonValueKind.Null, document.RootElement.GetProperty("bars").ValueKind);
+        Assert.Equal("unavailable", document.RootElement.GetProperty("capabilities").GetProperty("marketData").GetString());
+    }
+
+    [Fact]
+    public async Task Required_downstream_timeout_returns_504()
+    {
+        using var factory = CreateAsyncFactory(async (service, path, cancellationToken) =>
+        {
+            if (service == "journal") await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return DashboardResponse(service, path);
+        });
+        using var response = await factory.CreateClient().GetAsync("/api/app/dashboard");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.GatewayTimeout, response.StatusCode);
+        Assert.Equal("downstream_timeout", document.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Request_cancellation_reaches_downstream_calls()
+    {
+        var observed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var factory = CreateAsyncFactory(async (service, path, cancellationToken) =>
+        {
+            if (service == "journal")
+            {
+                try { await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken); }
+                catch (OperationCanceledException) { observed.TrySetResult(); throw; }
+            }
+            return DashboardResponse(service, path);
+        });
+        using var client = factory.CreateClient();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.GetAsync("/api/app/dashboard", cancellation.Token));
+        await observed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
     public async Task Calendar_merges_journal_performance_and_alert_facts_by_date()
     {
         using var factory = CreateFactory(CalendarResponse);
@@ -78,7 +184,7 @@ public sealed class CockpitReadModelsTests
         var user = new ClaimsPrincipal(new ClaimsIdentity([new Claim("timezone", "America/Los_Angeles")]));
         var utc = new DateTimeOffset(2026, 7, 14, 1, 30, 0, TimeSpan.Zero);
 
-        Assert.Equal(new DateOnly(2026, 7, 13), CockpitReadModels.ResolveLocalDate(user, utc));
+        Assert.Equal(new DateOnly(2026, 7, 13), CockpitComposition.ResolveLocalDate(user, utc));
     }
 
     private static WebApplicationFactory<Program> CreateFactory(Func<string, string, HttpResponseMessage> responder)
@@ -93,12 +199,31 @@ public sealed class CockpitReadModelsTests
                     })
                     .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.Scheme, _ => { });
 
-                foreach (var service in new[] { "journal", "performance", "discipline", "reminder" })
+                foreach (var service in new[] { "identity", "journal", "performance", "discipline", "reminder", "stock-research", "market-data" })
                 {
                     services.AddHttpClient(service)
                         .ConfigurePrimaryHttpMessageHandler(() => new DownstreamHandler(service, responder));
                 }
             }));
+    }
+
+    private static WebApplicationFactory<Program> CreateAsyncFactory(Func<string, string, CancellationToken, Task<HttpResponseMessage>> responder)
+    {
+        return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Edge:DownstreamTimeoutSeconds", "1");
+            builder.ConfigureTestServices(services =>
+            {
+                services.AddAuthentication(options =>
+                    {
+                        options.DefaultAuthenticateScheme = TestAuthenticationHandler.Scheme;
+                        options.DefaultChallengeScheme = TestAuthenticationHandler.Scheme;
+                    })
+                    .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.Scheme, _ => { });
+                foreach (var service in new[] { "identity", "journal", "performance", "discipline", "reminder", "stock-research", "market-data" })
+                    services.AddHttpClient(service).ConfigurePrimaryHttpMessageHandler(() => new AsyncDownstreamHandler(service, responder));
+            });
+        });
     }
 
     private static HttpResponseMessage DashboardResponse(string service, string path)
@@ -163,6 +288,12 @@ public sealed class CockpitReadModelsTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(responder(service, request.RequestUri!.PathAndQuery));
+    }
+
+    private sealed class AsyncDownstreamHandler(string service, Func<string, string, CancellationToken, Task<HttpResponseMessage>> responder) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            responder(service, request.RequestUri!.PathAndQuery, cancellationToken);
     }
 
     private sealed class TestAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>

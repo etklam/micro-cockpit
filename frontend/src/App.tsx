@@ -1,18 +1,24 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
-import * as api from './api'
-import { Brand, Button, ErrorBox, Field, IconButton, TextInput, useConfirm } from './ui'
+import { createContext, useContext } from 'react'
+import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from './auth/AuthProvider'
+import { LoginPage } from './auth/LoginPage'
+import { Brand, Button, ErrorBox, IconButton, useConfirm } from './ui'
 import type { ConfirmOpts } from './ui'
 import { Icon } from './icons'
-import type { IconName } from './icons'
 import { cx } from './format'
 import './App.css'
-import { TodayPage, DiaryPage, CalendarPage, DisciplinePage, AlertsPage } from './pages'
-import { ArticlesPage, MorePage, PartnersPage, PriceAlertsPage, RotationPage, ToolsPage, WatchlistPage } from './latePages'
+import { AlertsPage, CalendarPage, DiaryDetailPage, DiaryPage, DisciplinePage, TodayPage } from './pages'
+import { ArticleDetailPage, ArticlesPage, MorePage, PartnersPage, PriceAlertsPage, RotationPage, ToolsPage, WatchlistPage } from './latePages'
+import { useBootstrapQuery } from './features/queries'
 
 export type Page = 'today' | 'diary' | 'calendar' | 'discipline' | 'alerts' | 'more' | 'watchlist' | 'price-alerts' | 'rotation' | 'partners' | 'articles' | 'tools'
 
-const NAV: { id: Page; label: string; icon: IconName }[] = [
+const PATHS: Record<Page, string> = {
+  today: '/today', diary: '/diary', calendar: currentCalendarPath(), discipline: '/discipline', alerts: '/alerts',
+  more: '/more', watchlist: '/watchlist', 'price-alerts': '/price-alerts', rotation: '/rotation', partners: '/partners',
+  articles: '/articles', tools: '/tools',
+}
+const NAV: { id: Page; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { id: 'today', label: 'Today', icon: 'today' },
   { id: 'diary', label: 'Diary', icon: 'diary' },
   { id: 'calendar', label: 'Calendar', icon: 'calendar' },
@@ -25,187 +31,94 @@ const MORE: { id: Page; label: string }[] = [
   { id: 'articles', label: 'Articles' }, { id: 'tools', label: 'Tools' },
 ]
 
-type Cockpit = { go: (p: Page) => void; confirm: (o: ConfirmOpts) => Promise<boolean> }
-const Ctx = createContext<Cockpit>(null!)
-export const useCockpit = () => useContext(Ctx)
+type Cockpit = { go: (page: Page) => void; confirm: (options: ConfirmOpts) => Promise<boolean> }
+const CockpitContext = createContext<Cockpit>(null!)
+export const useCockpit = () => useContext(CockpitContext)
 
 export default function App() {
-  const [authed, setAuthed] = useState(false)
-  const [booted, setBooted] = useState(false)
-  const [page, setPage] = useState<Page>('today')
-  const { confirm, confirmNode } = useConfirm()
-
-  // ponytail: access token is in-memory only, so on reload we have no token — restore the session
-  // via the refresh cookie before deciding whether to show Login. configureSession lets the
-  // transport signal session-end (refresh failed) so we drop back to Login.
-  useEffect(() => {
-    api.configureSession(() => setAuthed(false))
-    api.restoreSession().then(setAuthed).finally(() => setBooted(true))
-  }, [])
-
-  if (!booted) return null
-  if (!authed) return <Login onDone={() => setAuthed(true)} />
-
-  const signOut = async () => { await api.logout(); setAuthed(false) }
-  const go = (p: Page) => { setPage(p); scrollTo({ top: 0, behavior: 'smooth' }) }
-
   return (
-    <Ctx.Provider value={{ go, confirm }}>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<RequireAuth />}>
+        <Route element={<Shell />}>
+          <Route index element={<Navigate to="/today" replace />} />
+          <Route path="/today" element={<TodayPage />} />
+          <Route path="/diary" element={<DiaryPage />} />
+          <Route path="/diary/:diaryId" element={<DiaryDetailPage />} />
+          <Route path="/calendar/:year/:month" element={<CalendarPage />} />
+          <Route path="/discipline" element={<DisciplinePage />} />
+          <Route path="/alerts" element={<AlertsPage />} />
+          <Route path="/more" element={<MorePage />} />
+          <Route path="/watchlist" element={<WatchlistPage />} />
+          <Route path="/price-alerts" element={<PriceAlertsPage />} />
+          <Route path="/rotation" element={<RotationPage />} />
+          <Route path="/partners" element={<PartnersPage />} />
+          <Route path="/articles" element={<ArticlesPage />} />
+          <Route path="/articles/:slug" element={<ArticleDetailPage />} />
+          <Route path="/tools" element={<ToolsPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Route>
+    </Routes>
+  )
+}
+
+function RequireAuth() {
+  const { state } = useAuth()
+  const location = useLocation()
+  if (state === 'restoring') return null
+  if (state === 'anonymous') return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  return <Outlet />
+}
+
+function Shell() {
+  const navigate = useNavigate()
+  const { logout } = useAuth()
+  const { confirm, confirmNode } = useConfirm()
+  const bootstrap = useBootstrapQuery()
+  if (bootstrap.isLoading) return null
+  if (bootstrap.isError) return <SectionError onRetry={() => { void bootstrap.refetch() }} />
+  const go = (page: Page) => { navigate(PATHS[page]); scrollTo({ top: 0, behavior: 'smooth' }) }
+  return (
+    <CockpitContext.Provider value={{ go, confirm }}>
       <div className="shell">
-        <Sidebar page={page} onNav={go} onSignOut={signOut} />
+        <Sidebar onSignOut={logout} />
         <div className="main">
-          <MobileTop onSignOut={signOut} />
-          <main className="content" id="content">
-            {page === 'today' && <TodayPage />}
-            {page === 'diary' && <DiaryPage />}
-            {page === 'calendar' && <CalendarPage />}
-            {page === 'discipline' && <DisciplinePage />}
-            {page === 'alerts' && <AlertsPage />}
-            {page === 'more' && <MorePage />}
-            {page === 'watchlist' && <WatchlistPage />}
-            {page === 'price-alerts' && <PriceAlertsPage />}
-            {page === 'rotation' && <RotationPage />}
-            {page === 'partners' && <PartnersPage />}
-            {page === 'articles' && <ArticlesPage />}
-            {page === 'tools' && <ToolsPage />}
-          </main>
+          <MobileTop onSignOut={logout} />
+          <main className="content" id="content"><Outlet /></main>
         </div>
-        <MobileNav page={page} onNav={go} />
+        <MobileNav />
         {confirmNode}
       </div>
-    </Ctx.Provider>
+    </CockpitContext.Provider>
   )
 }
 
-/* ----------------------------- Sidebar ----------------------------- */
-function Sidebar({ page, onNav, onSignOut }: { page: Page; onNav: (p: Page) => void; onSignOut: () => void }) {
-  return (
-    <aside className="sidebar" aria-label="Primary">
-      <Brand />
-      <nav className="nav" aria-label="Sections">
-        {NAV.map((n) => (
-          <button
-            key={n.id}
-            type="button"
-            className={cx('nav__item', page === n.id && 'is-active')}
-            aria-current={page === n.id ? 'page' : undefined}
-            onClick={() => onNav(n.id)}
-          >
-            <Icon name={n.icon} size={18} />
-            <span>{n.label}</span>
-          </button>
-        ))}
-      </nav>
-      <details className="more-nav" open={MORE.some(x => x.id === page)}>
-        <summary>More</summary>
-        {MORE.map(x => <button key={x.id} className={cx('nav__item', page === x.id && 'is-active')} onClick={() => onNav(x.id)}>{x.label}</button>)}
-      </details>
-      <div className="sidebar__foot">
-        <Button variant="ghost" icon="logout" onClick={onSignOut} className="signout-btn">Sign out</Button>
-      </div>
-    </aside>
-  )
+function Sidebar({ onSignOut }: { onSignOut: () => void }) {
+  const location = useLocation()
+  return <aside className="sidebar" aria-label="Primary"><Brand /><nav className="nav" aria-label="Sections">{NAV.map(item => <NavItem key={item.id} item={item} />)}</nav><details className="more-nav" open={MORE.some(item => location.pathname.startsWith(PATHS[item.id]))}><summary>More</summary>{MORE.map(item => <NavLink key={item.id} className={({ isActive }) => cx('nav__item', isActive && 'is-active')} to={PATHS[item.id]}>{item.label}</NavLink>)}</details><div className="sidebar__foot"><Button variant="ghost" icon="logout" onClick={onSignOut} className="signout-btn">Sign out</Button></div></aside>
 }
 
-/* --------------------------- Mobile chrome ------------------------- */
-function MobileTop({ onSignOut }: { onSignOut: () => void }) {
-  return (
-    <header className="mobile-top">
-      <Brand compact />
-      <IconButton icon="logout" label="Sign out" onClick={onSignOut} />
-    </header>
-  )
+function NavItem({ item }: { item: (typeof NAV)[number] }) {
+  return <NavLink to={PATHS[item.id]} className={({ isActive }) => cx('nav__item', isActive && 'is-active')}><Icon name={item.icon} size={18} /><span>{item.label}</span></NavLink>
 }
 
-function MobileNav({ page, onNav }: { page: Page; onNav: (p: Page) => void }) {
+function MobileTop({ onSignOut }: { onSignOut: () => void }) { return <header className="mobile-top"><Brand compact /><IconButton icon="logout" label="Sign out" onClick={onSignOut} /></header> }
+function MobileNav() {
   const mobile = NAV.slice(0, 4)
-  const moreActive = page === 'more' || page === 'alerts' || MORE.some(x => x.id === page)
-  return (
-    <nav className="mobile-nav" aria-label="Sections">
-      {mobile.map((n) => (
-        <button
-          key={n.id}
-          type="button"
-          className={cx('mobile-nav__item', page === n.id && 'is-active')}
-          aria-current={page === n.id ? 'page' : undefined}
-          onClick={() => onNav(n.id)}
-        >
-          <Icon name={n.icon} size={20} />
-          <span>{n.label}</span>
-        </button>
-      ))}
-      <button type="button" className={cx('mobile-nav__item', moreActive && 'is-active')} aria-current={moreActive ? 'page' : undefined} onClick={() => onNav('more')}><Icon name="layers" size={20} /><span>More</span></button>
-    </nav>
-  )
+  const location = useLocation()
+  const moreActive = location.pathname.startsWith('/more') || location.pathname.startsWith('/alerts') || MORE.some(item => location.pathname.startsWith(PATHS[item.id]))
+  return <nav className="mobile-nav" aria-label="Sections">{mobile.map(item => <NavLink key={item.id} to={PATHS[item.id]} className={({ isActive }) => cx('mobile-nav__item', isActive && 'is-active')}><Icon name={item.icon} size={20} /><span>{item.label}</span></NavLink>)}<NavLink to="/more" className={cx('mobile-nav__item', moreActive && 'is-active')}><Icon name="layers" size={20} /><span>More</span></NavLink></nav>
 }
 
-/* ------------------------------ Login ------------------------------ */
-function Login({ onDone }: { onDone: () => void }) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
+function NotFoundPage() { return <ErrorBox message="Page not found." /> }
 
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      await api.login(email, password)
-      onDone()
-    } catch {
-      setError('That email and password didn’t match.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <main className="login">
-      <div className="login__glow" aria-hidden="true" />
-      <form className="login__card" onSubmit={submit}>
-        <Brand />
-        <div className="login__head">
-          <h1>Your decisions, remembered.</h1>
-          <p>Sign in to your trade journal.</p>
-        </div>
-        <Field label="Email">
-          <TextInput type="email" autoComplete="username" required value={email}
-            onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-        </Field>
-        <Field label="Password">
-          <TextInput type="password" autoComplete="current-password" required value={password}
-            onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-        </Field>
-        {error ? <p className="login__error" role="alert">{error}</p> : null}
-        <Button variant="primary" block type="submit" loading={busy}>
-          {busy ? null : 'Sign in'}
-        </Button>
-        <p className="login__foot">A diary-first trade journal.</p>
-      </form>
-    </main>
-  )
+function currentCalendarPath() {
+  const now = new Date()
+  return `/calendar/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
-/* ----------------------- Shared loading/error ---------------------- */
-export function SectionError({ onRetry }: { onRetry: () => void }) {
-  return <ErrorBox message="Couldn’t reach the cockpit." onRetry={onRetry} />
-}
+export function SectionError({ onRetry }: { onRetry: () => void }) { return <ErrorBox message="Couldn’t reach the cockpit." onRetry={onRetry} /> }
 export function PageSkeleton({ rows = 3 }: { rows?: number }) {
-  return (
-    <div className="page-skel">
-      <div className="skel" style={{ height: 34, width: 220 }} />
-      <div className="card-grid">
-        {Array.from({ length: 3 }, (_, i) => (
-          <div className="card" key={i}>
-            <div className="skel" style={{ height: 12, width: 90 }} />
-            <div className="skel" style={{ height: 30, width: 120, marginTop: 16 }} />
-          </div>
-        ))}
-      </div>
-      {Array.from({ length: rows }, (_, i) => (
-        <div className="skel" key={i} style={{ height: 56, marginTop: 12 }} />
-      ))}
-    </div>
-  )
+  return <div className="page-skel"><div className="skel" style={{ height: 34, width: 220 }} /><div className="card-grid">{Array.from({ length: 3 }, (_, index) => <div className="card" key={index}><div className="skel" style={{ height: 12, width: 90 }} /><div className="skel" style={{ height: 30, width: 120, marginTop: 16 }} /></div>)}</div>{Array.from({ length: rows }, (_, index) => <div className="skel" key={index} style={{ height: 56, marginTop: 12 }} />)}</div>
 }

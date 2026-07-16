@@ -1,0 +1,137 @@
+using System.Text.Json.Serialization;
+
+public enum CapabilityStatus
+{
+    Available,
+    Empty,
+    Unavailable
+}
+
+public sealed record CurrentUserResponse(
+    Guid Id,
+    string Email,
+    string DisplayName);
+
+public sealed record AppBootstrapResponse(
+    CurrentUserResponse CurrentUser,
+    string Timezone,
+    string BaseCurrency,
+    string Role,
+    string AccountType,
+    DateOnly CurrentLocalDate,
+    IReadOnlyList<string> AvailableProductAreas);
+
+public sealed record DashboardResponse(
+    DateOnly LocalDate,
+    DashboardDiaryResponse Diary,
+    DailyPerformanceResponse? Performance,
+    long? PendingAlerts,
+    DisciplineResponse? Discipline,
+    IReadOnlyList<DiaryResponse> RecentDiaries,
+    DashboardCapabilitiesResponse Capabilities);
+
+public sealed record DashboardDiaryResponse(bool WrittenToday, long Count);
+public sealed record DashboardCapabilitiesResponse(CapabilityStatus Alerts, CapabilityStatus Discipline);
+
+public sealed record CalendarResponse(
+    int Year,
+    int Month,
+    MonthSummaryResponse? Summary,
+    IReadOnlyList<CalendarDayResponse> Days,
+    CalendarCapabilitiesResponse Capabilities);
+
+public sealed record CalendarDayResponse(
+    DateOnly Date,
+    DailyPerformanceResponse? Performance,
+    long DiaryCount,
+    long TransactionCount,
+    long? AlertCount);
+
+public sealed record CalendarCapabilitiesResponse(CapabilityStatus Alerts);
+
+public sealed record StockPageResponse(
+    StockResponse Stock,
+    BarsResponse? Bars,
+    StockPageCapabilitiesResponse Capabilities);
+
+public sealed record StockPageCapabilitiesResponse(CapabilityStatus MarketData);
+
+public sealed record DiaryResponse(
+    Guid Id,
+    DateOnly LocalDate,
+    string Title,
+    string Content,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+public sealed record DailyPerformanceResponse(
+    DateOnly LocalDate,
+    decimal PnlAmount,
+    decimal? CapitalBase,
+    decimal? PnlPercent,
+    string Note);
+
+public sealed record DisciplineResponse(
+    Guid Id,
+    string Content,
+    int Position,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+public sealed record MonthSummaryResponse(
+    int Year,
+    int Month,
+    decimal Total,
+    long RecordedDays,
+    long ProfitDays,
+    long LossDays,
+    long FlatDays,
+    decimal? BestDay,
+    decimal? WorstDay);
+
+public sealed record StockResponse(
+    Guid Id,
+    string Symbol,
+    string Name,
+    string Exchange,
+    string AssetType,
+    DateTime CreatedAt);
+
+public sealed record BarsResponse(int ContractVersion, string Symbol, IReadOnlyList<BarResponse> Items);
+public sealed record BarResponse(
+    DateOnly TradingDate,
+    decimal Open,
+    decimal High,
+    decimal Low,
+    decimal Close,
+    decimal Volume,
+    string Provider,
+    DateTime PublishedAt);
+
+internal sealed record IdentityUserResponse(
+    Guid Id,
+    string Email,
+    string DisplayName,
+    string Timezone,
+    string BaseCurrency,
+    string Role,
+    string AccountType,
+    string Status,
+    int StatusVersion);
+
+internal sealed record IdentityTokensResponse(string AccessToken, DateTime ExpiresAt, string RefreshToken);
+internal sealed record RefreshRequest(string RefreshToken);
+
+internal sealed record CollectionResponse<T>(IReadOnlyList<T> Items);
+internal sealed record DiaryDayFact(DateOnly LocalDate, long DiaryCount, long TransactionCount);
+internal sealed record DayAlertFact(DateOnly Date, long Count);
+internal sealed record CalendarAlertFact(DateOnly LocalDate, long Count);
+
+public sealed record EdgeProblemDetails(
+    string Code,
+    string Title,
+    int Status,
+    string Detail,
+    string CorrelationId);
+
+public sealed record SessionTokensResponse(string AccessToken, DateTime ExpiresAt);

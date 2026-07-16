@@ -4,11 +4,13 @@ export type AgentRequest = { "name": string; "displayName": string; "timezone": 
 export type AgentResponse = { "userId": string; "keyId": string; "apiKey": string; "scopes": Array<string> }
 export type ApiKeyTokenRequest = { "apiKey": string }
 export type ApiKeyTokenResponse = { "accessToken": string; "expiresAt": string }
+export type AppBootstrapResponse = { "currentUser": { "id": string; "email": string; "displayName": string }; "timezone": string; "baseCurrency": string; "role": string; "accountType": string; "currentLocalDate": string; "availableProductAreas": Array<string> }
 export type AuditResponse = { "id": string; "actorUserId": null | string; "action": string; "resourceType": string; "resourceId": null | string; "details": JsonElement; "occurredAt": string }
 export type AuthorizationResponse = { "allowed": boolean }
 export type BarsResponse = { "contractVersion": number | string; "symbol": string; "items": Array<PublishedBarResponse> }
 export type CalculateResponse = { "universeId": string; "snapshotDate": string; "status": string; "formulaVersion": string }
-export type Calendar = { "year": number; "month": number; "summary": MonthSummaryResponse; "days": Array<{ "date": string; "performance"?: PerformanceResponse | null; "diaryCount": number; "transactionCount": number; "alertCount"?: number | null }>; "capabilities": { "alerts": "available" | "unavailable" | "empty" } }
+export type CalendarResponse = { "year": number; "month": number; "summary": MonthSummaryResponse | null; "days": Array<{ "date": string; "performance": PerformanceResponse | null; "diaryCount": number; "transactionCount": number; "alertCount": number | null }>; "capabilities": { "alerts": CapabilityStatus } }
+export type CapabilityStatus = "available" | "empty" | "unavailable"
 export type CollectionResponseOfAuditResponse = { "items": Array<AuditResponse> }
 export type CollectionResponseOfDiaryAlertResponse = { "items": Array<DiaryAlertResponse> }
 export type CollectionResponseOfDiaryResponse = { "items": Array<DiaryResponse> }
@@ -24,18 +26,18 @@ export type CollectionResponseOfTriggerResponse = { "items": Array<TriggerRespon
 export type CollectionResponseOfUniverseResponse = { "items": Array<UniverseResponse> }
 export type CollectionResponseOfWatchlistResponse = { "items": Array<WatchlistResponse> }
 export type CreatedResponse = { "id": string }
-export type Dashboard = { "localDate": string; "diary": { "writtenToday": boolean; "count": number }; "performance"?: PerformanceResponse | null; "pendingAlerts"?: number | null; "discipline"?: { "content"?: string } | null; "recentDiaries"?: Array<DiaryResponse>; "capabilities": { "alerts": "available" | "unavailable" | "empty"; "discipline": "available" | "unavailable" | "empty" } }
+export type DashboardResponse = { "localDate": string; "diary": { "writtenToday": boolean; "count": number }; "performance": PerformanceResponse | null; "pendingAlerts": number | null; "discipline": DisciplineResponse | null; "recentDiaries": Array<DiaryResponse>; "capabilities": { "alerts": CapabilityStatus; "discipline": CapabilityStatus } }
 export type DiaryAlertResponse = { "id": string; "diaryId": string; "startLocalDate": string; "nextLocalDate": null | string; "localTime": string; "timezone": string; "repeatMode": string; "recurrenceEndLocalDate": string; "nextTriggerAt": null | string; "status": string; "createdAt": string; "updatedAt": string }
 export type DiaryAlertWrite = { "diaryId": string; "startLocalDate": string; "localTime": string; "timezone": string; "repeatMode": string }
 export type DiaryResponse = { "id": string; "localDate": string; "title": string; "content": string; "createdAt": string; "updatedAt": string }
 export type DiaryWrite = { "localDate": string; "title": string; "content": null | string }
 export type DisciplineResponse = { "id": string; "content": string; "position": number | string; "createdAt": string; "updatedAt": string }
 export type DisciplineWrite = { "content": string }
+export type EdgeProblemDetails = { "code": string; "title": string; "status": number; "detail": string; "correlationId": string }
 export type EtfSnapshotResponse = { "symbol": string; "label": string; "sector": null | string; "close": number | null; "return2w": number | null; "return1m": number | null; "return3m": number | null; "rank2w": null | number | string; "percentile2w": number | null; "aboveMa20": null | boolean; "aboveMa50": null | boolean; "aboveMa200": null | boolean; "status": string }
 export type Fire = { "annualExpenses": number; "withdrawalRatePercent": number; "investedAssets": number }
 export type FireResponse = { "target": number; "gap": number }
 export type HealthWrite = { "serviceName": string; "status": string }
-export type HttpValidationProblemDetails = { "type"?: null | string; "title"?: null | string; "status"?: null | number | string; "detail"?: null | string; "instance"?: null | string; "errors"?: { [key: string]: Array<string> } }
 export type JobAcceptedResponse = { "id": string; "status": string }
 export type JobResponse = { "id": string; "jobType": string; "status": string; "requestedBy": string; "createdAt": string; "updatedAt": string }
 export type JobWrite = { "jobType": string; "payload": JsonElement }
@@ -57,7 +59,6 @@ export type PostResponse = { "id": string; "slug": string; "title": string; "bod
 export type PostWrite = { "slug": string; "title": string; "body": null | string; "status": string }
 export type PriceAlertResponse = { "id": string; "symbol": string; "conditionType": string; "threshold": number; "lookbackDays": null | number | string; "direction": null | string; "status": string; "baselineClose": number | null; "lastEvaluatedDate": null | string; "createdAt": string; "updatedAt": string }
 export type PriceAlertWrite = { "symbol": string; "conditionType": string; "threshold": number; "lookbackDays": null | number | string; "direction": null | string }
-export type ProblemDetails = { "title"?: string; "status"?: number; "detail"?: string }
 export type ProviderHealthResponse = { "provider": string; "lastSuccessAt": string; "healthy": boolean }
 export type ProvidersHealthResponse = { "contractVersion": number | string; "healthy": boolean; "items": Array<ProviderHealthResponse> }
 export type PublishedBarResponse = { "tradingDate": string; "open": number; "high": number; "low": number; "close": number; "volume": number; "provider": string; "publishedAt": string }
@@ -75,7 +76,7 @@ export type SeasonalityResponse = { "observations": number | string; "averageRet
 export type SectorBreadthResponse = { "sector": string; "memberCount": number | string; "availableCount": number | string; "aboveMa20Percent": number | null; "aboveMa50Percent": number | null; "aboveMa200Percent": number | null; "status": string }
 export type SessionTokens = { "accessToken": string; "expiresAt": string }
 export type SharePolicy = { "shareDiaries": boolean; "shareTransactions": boolean; "sharePerformance": boolean }
-export type StockPage = { "stock": StockResponse; "bars"?: BarsResponse | null; "capabilities": { "marketData": "available" | "unavailable" } }
+export type StockPageResponse = { "stock": StockResponse; "bars": BarsResponse | null; "capabilities": { "marketData": CapabilityStatus } }
 export type StockResponse = { "id": string; "symbol": string; "name": string; "exchange": string; "assetType": string; "createdAt": string }
 export type StockWrite = { "symbol": null | string; "name": null | string; "exchange": null | string; "assetType": null | string }
 export type SymbolsResponse = { "contractVersion": number | string; "items": Array<PublishedSymbolResponse> }
@@ -116,6 +117,49 @@ const withQuery = (query: Record<string, unknown>) => {
   return params.size ? `?${params}` : ''
 }
 
+export const getApiAppPartners = (extra?: RequestInit) => request<CollectionResponseOfLink>("/api/app/partners", { method: "GET", ...extra })
+export const postApiAppPartners = (body: LinkWrite, extra?: RequestInit) => request<Link>("/api/app/partners", { method: "POST", body: JSON.stringify(body), ...extra })
+export const deleteApiAppPartnersId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/partners/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const postApiAppPartnersIdAccept = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/partners/${encodeURIComponent(String(id))}/accept`, { method: "POST", ...extra })
+export const putApiAppPartnersIdSharePolicy = (id: string, body: SharePolicy, extra?: RequestInit) => request<unknown>(`/api/app/partners/${encodeURIComponent(String(id))}/share-policy`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const getApiAppPartnersOwnerIdAuthorization = (ownerId: string, query: { "resource": string }, extra?: RequestInit) => request<AuthorizationResponse>(`/api/app/partners/${encodeURIComponent(String(ownerId))}/authorization` + withQuery(query), { method: "GET", ...extra })
+export const postApiAppToolsPositionSizing = (body: PositionSizing, extra?: RequestInit) => request<PositionSizingResponse>("/api/app/tools/position-sizing", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppToolsRiskReward = (body: RiskReward, extra?: RequestInit) => request<RiskRewardResponse>("/api/app/tools/risk-reward", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppToolsFire = (body: Fire, extra?: RequestInit) => request<FireResponse>("/api/app/tools/fire", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppToolsRelativeValue = (body: RelativeValue, extra?: RequestInit) => request<RelativeValueResponse>("/api/app/tools/relative-value", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppToolsSeasonality = (body: Seasonality, extra?: RequestInit) => request<SeasonalityResponse>("/api/app/tools/seasonality", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAdminPosts = (body: PostWrite, extra?: RequestInit) => request<CreatedResponse>("/api/admin/posts", { method: "POST", body: JSON.stringify(body), ...extra })
+export const putApiAdminPostsId = (id: string, body: PostWrite, extra?: RequestInit) => request<unknown>(`/api/admin/posts/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const deleteApiAdminPostsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/admin/posts/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const getApiAdminOperationsAudit = (query: { "limit"?: number | string }, extra?: RequestInit) => request<CollectionResponseOfAuditResponse>("/api/admin/operations/audit" + withQuery(query), { method: "GET", ...extra })
+export const getApiAdminOperationsJobs = (extra?: RequestInit) => request<CollectionResponseOfJobResponse>("/api/admin/operations/jobs", { method: "GET", ...extra })
+export const postApiAdminOperationsJobs = (body: JobWrite, extra?: RequestInit) => request<JobAcceptedResponse>("/api/admin/operations/jobs", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAdminOperationsHealth = (body: HealthWrite, extra?: RequestInit) => request<unknown>("/api/admin/operations/health", { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiContentPosts = (extra?: RequestInit) => request<CollectionResponseOfPostResponse>("/api/content/posts", { method: "GET", ...extra })
+export const getApiContentPostsSlug = (slug: string, extra?: RequestInit) => request<PostResponse>(`/api/content/posts/${encodeURIComponent(String(slug))}`, { method: "GET", ...extra })
+export const postApiAuthRegister = (body: RegisterRequest, extra?: RequestInit) => request<RegisterResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAuthApiKeyToken = (body: ApiKeyTokenRequest, extra?: RequestInit) => request<ApiKeyTokenResponse>("/api/auth/api-key/token", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppAgents = (body: AgentRequest, extra?: RequestInit) => request<AgentResponse>("/api/app/agents", { method: "POST", body: JSON.stringify(body), ...extra })
+export const deleteApiAppApiKeysId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/api-keys/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const putApiAppDailyPerformanceDate = (date: string, body: PerformanceWrite, extra?: RequestInit) => request<PerformanceResponse>(`/api/app/daily-performance/${encodeURIComponent(String(date))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const getApiAppDisciplines = (extra?: RequestInit) => request<CollectionResponseOfDisciplineResponse>("/api/app/disciplines", { method: "GET", ...extra })
+export const postApiAppDisciplines = (body: DisciplineWrite, extra?: RequestInit) => request<DisciplineResponse>("/api/app/disciplines", { method: "POST", body: JSON.stringify(body), ...extra })
+export const putApiAppDisciplinesId = (id: string, body: DisciplineWrite, extra?: RequestInit) => request<unknown>(`/api/app/disciplines/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const deleteApiAppDisciplinesId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/disciplines/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const getApiAppDiaryAlerts = (extra?: RequestInit) => request<CollectionResponseOfDiaryAlertResponse>("/api/app/diary-alerts", { method: "GET", ...extra })
+export const postApiAppDiaryAlerts = (body: DiaryAlertWrite, extra?: RequestInit) => request<DiaryAlertResponse>("/api/app/diary-alerts", { method: "POST", body: JSON.stringify(body), ...extra })
+export const deleteApiAppDiaryAlertsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diary-alerts/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const postApiAppDiaryAlertsIdDismiss = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diary-alerts/${encodeURIComponent(String(id))}/dismiss`, { method: "POST", ...extra })
+export const postApiAppQuickNote = (body: QuickNote, extra?: RequestInit) => request<QuickNoteResponse>("/api/app/quick-note", { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppDiaries = (extra?: RequestInit) => request<CollectionResponseOfDiaryResponse>("/api/app/diaries", { method: "GET", ...extra })
+export const postApiAppDiaries = (body: DiaryWrite, extra?: RequestInit) => request<DiaryResponse>("/api/app/diaries", { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppDiariesId = (id: string, extra?: RequestInit) => request<DiaryResponse>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "GET", ...extra })
+export const putApiAppDiariesId = (id: string, body: DiaryWrite, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const deleteApiAppDiariesId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const getApiAppDiariesDiaryIdTransactions = (diaryId: string, extra?: RequestInit) => request<CollectionResponseOfTransactionResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions`, { method: "GET", ...extra })
+export const postApiAppDiariesDiaryIdTransactions = (diaryId: string, body: TransactionWrite, extra?: RequestInit) => request<TransactionResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions`, { method: "POST", body: JSON.stringify(body), ...extra })
+export const putApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: string, body: TransactionWrite, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const deleteApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const getApiAppStocks = (query: { "query"?: string }, extra?: RequestInit) => request<CollectionResponseOfStockResponse>("/api/app/stocks" + withQuery(query), { method: "GET", ...extra })
 export const postApiAppStocks = (body: StockWrite, extra?: RequestInit) => request<StockResponse>("/api/app/stocks", { method: "POST", body: JSON.stringify(body), ...extra })
 export const getApiAppStocksSymbol = (symbol: string, extra?: RequestInit) => request<StockResponse>(`/api/app/stocks/${encodeURIComponent(String(symbol))}`, { method: "GET", ...extra })
@@ -145,51 +189,10 @@ export const deleteApiAppRotationUniversesId = (id: string, extra?: RequestInit)
 export const putApiAppRotationUniversesIdSymbols = (id: string, body: Array<UniverseSymbolWrite>, extra?: RequestInit) => request<unknown>(`/api/app/rotation/universes/${encodeURIComponent(String(id))}/symbols`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const postApiAppRotationUniversesIdCalculate = (id: string, query: { "date": string }, extra?: RequestInit) => request<CalculateResponse>(`/api/app/rotation/universes/${encodeURIComponent(String(id))}/calculate` + withQuery(query), { method: "POST", ...extra })
 export const getApiAppRotationMonitor = (query: { "universe": string; "date"?: string }, extra?: RequestInit) => request<MonitorResponse>("/api/app/rotation/monitor" + withQuery(query), { method: "GET", ...extra })
-export const getApiAppPartners = (extra?: RequestInit) => request<CollectionResponseOfLink>("/api/app/partners", { method: "GET", ...extra })
-export const postApiAppPartners = (body: LinkWrite, extra?: RequestInit) => request<Link>("/api/app/partners", { method: "POST", body: JSON.stringify(body), ...extra })
-export const deleteApiAppPartnersId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/partners/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const postApiAppPartnersIdAccept = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/partners/${encodeURIComponent(String(id))}/accept`, { method: "POST", ...extra })
-export const putApiAppPartnersIdSharePolicy = (id: string, body: SharePolicy, extra?: RequestInit) => request<unknown>(`/api/app/partners/${encodeURIComponent(String(id))}/share-policy`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const getApiAppPartnersOwnerIdAuthorization = (ownerId: string, query: { "resource": string }, extra?: RequestInit) => request<AuthorizationResponse>(`/api/app/partners/${encodeURIComponent(String(ownerId))}/authorization` + withQuery(query), { method: "GET", ...extra })
-export const postApiAppToolsPositionSizing = (body: PositionSizing, extra?: RequestInit) => request<PositionSizingResponse>("/api/app/tools/position-sizing", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppToolsRiskReward = (body: RiskReward, extra?: RequestInit) => request<RiskRewardResponse>("/api/app/tools/risk-reward", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppToolsFire = (body: Fire, extra?: RequestInit) => request<FireResponse>("/api/app/tools/fire", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppToolsRelativeValue = (body: RelativeValue, extra?: RequestInit) => request<RelativeValueResponse>("/api/app/tools/relative-value", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppToolsSeasonality = (body: Seasonality, extra?: RequestInit) => request<SeasonalityResponse>("/api/app/tools/seasonality", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAdminPosts = (body: PostWrite, extra?: RequestInit) => request<CreatedResponse>("/api/admin/posts", { method: "POST", body: JSON.stringify(body), ...extra })
-export const putApiAdminPostsId = (id: string, body: PostWrite, extra?: RequestInit) => request<unknown>(`/api/admin/posts/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const deleteApiAdminPostsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/admin/posts/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const getApiAdminOperationsAudit = (query: { "limit"?: number | string }, extra?: RequestInit) => request<CollectionResponseOfAuditResponse>("/api/admin/operations/audit" + withQuery(query), { method: "GET", ...extra })
-export const getApiAdminOperationsJobs = (extra?: RequestInit) => request<CollectionResponseOfJobResponse>("/api/admin/operations/jobs", { method: "GET", ...extra })
-export const postApiAdminOperationsJobs = (body: JobWrite, extra?: RequestInit) => request<JobAcceptedResponse>("/api/admin/operations/jobs", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAdminOperationsHealth = (body: HealthWrite, extra?: RequestInit) => request<unknown>("/api/admin/operations/health", { method: "POST", body: JSON.stringify(body), ...extra })
-export const getApiContentPosts = (extra?: RequestInit) => request<CollectionResponseOfPostResponse>("/api/content/posts", { method: "GET", ...extra })
-export const getApiContentPostsSlug = (slug: string, extra?: RequestInit) => request<PostResponse>(`/api/content/posts/${encodeURIComponent(String(slug))}`, { method: "GET", ...extra })
-export const postApiAuthApiKeyToken = (body: ApiKeyTokenRequest, extra?: RequestInit) => request<ApiKeyTokenResponse>("/api/auth/api-key/token", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppAgents = (body: AgentRequest, extra?: RequestInit) => request<AgentResponse>("/api/app/agents", { method: "POST", body: JSON.stringify(body), ...extra })
-export const deleteApiAppApiKeysId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/api-keys/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const postApiAppQuickNote = (body: QuickNote, extra?: RequestInit) => request<QuickNoteResponse>("/api/app/quick-note", { method: "POST", body: JSON.stringify(body), ...extra })
-export const getApiAppDiaries = (extra?: RequestInit) => request<CollectionResponseOfDiaryResponse>("/api/app/diaries", { method: "GET", ...extra })
-export const postApiAppDiaries = (body: DiaryWrite, extra?: RequestInit) => request<DiaryResponse>("/api/app/diaries", { method: "POST", body: JSON.stringify(body), ...extra })
-export const putApiAppDiariesId = (id: string, body: DiaryWrite, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const deleteApiAppDiariesId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const getApiAppDiariesDiaryIdTransactions = (diaryId: string, extra?: RequestInit) => request<CollectionResponseOfTransactionResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions`, { method: "GET", ...extra })
-export const postApiAppDiariesDiaryIdTransactions = (diaryId: string, body: TransactionWrite, extra?: RequestInit) => request<TransactionResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions`, { method: "POST", body: JSON.stringify(body), ...extra })
-export const putApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: string, body: TransactionWrite, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const deleteApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const putApiAppDailyPerformanceDate = (date: string, body: PerformanceWrite, extra?: RequestInit) => request<PerformanceResponse>(`/api/app/daily-performance/${encodeURIComponent(String(date))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const getApiAppDisciplines = (extra?: RequestInit) => request<CollectionResponseOfDisciplineResponse>("/api/app/disciplines", { method: "GET", ...extra })
-export const postApiAppDisciplines = (body: DisciplineWrite, extra?: RequestInit) => request<DisciplineResponse>("/api/app/disciplines", { method: "POST", body: JSON.stringify(body), ...extra })
-export const putApiAppDisciplinesId = (id: string, body: DisciplineWrite, extra?: RequestInit) => request<unknown>(`/api/app/disciplines/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const deleteApiAppDisciplinesId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/disciplines/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const getApiAppDiaryAlerts = (extra?: RequestInit) => request<CollectionResponseOfDiaryAlertResponse>("/api/app/diary-alerts", { method: "GET", ...extra })
-export const postApiAppDiaryAlerts = (body: DiaryAlertWrite, extra?: RequestInit) => request<DiaryAlertResponse>("/api/app/diary-alerts", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppDiaryAlertsIdDismiss = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diary-alerts/${encodeURIComponent(String(id))}/dismiss`, { method: "POST", ...extra })
-export const deleteApiAppDiaryAlertsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diary-alerts/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const getApiAppDashboard = (extra?: RequestInit) => request<Dashboard>("/api/app/dashboard", { method: "GET", ...extra })
-export const getApiAppCalendar = (query: { "year": number; "month": number }, extra?: RequestInit) => request<Calendar>("/api/app/calendar" + withQuery(query), { method: "GET", ...extra })
-export const getApiAppStocksSymbolPage = (symbol: string, extra?: RequestInit) => request<StockPage>(`/api/app/stocks/${encodeURIComponent(String(symbol))}/page`, { method: "GET", ...extra })
-export const postApiAuthRegister = (body: RegisterRequest, extra?: RequestInit) => request<RegisterResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppBootstrap = (extra?: RequestInit) => request<AppBootstrapResponse>("/api/app/bootstrap", { method: "GET", ...extra })
+export const getApiAppDashboard = (extra?: RequestInit) => request<DashboardResponse>("/api/app/dashboard", { method: "GET", ...extra })
+export const getApiAppCalendar = (query: { "year": number; "month": number }, extra?: RequestInit) => request<CalendarResponse>("/api/app/calendar" + withQuery(query), { method: "GET", ...extra })
+export const getApiAppStocksSymbolPage = (symbol: string, extra?: RequestInit) => request<StockPageResponse>(`/api/app/stocks/${encodeURIComponent(String(symbol))}/page`, { method: "GET", ...extra })
 export const postApiAuthLogin = (body: LoginRequest, extra?: RequestInit) => request<SessionTokens>("/api/auth/login", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAuthRefresh = (extra?: RequestInit) => request<SessionTokens>("/api/auth/refresh", { method: "POST", ...extra })
 export const postApiAuthLogout = (extra?: RequestInit) => request<unknown>("/api/auth/logout", { method: "POST", ...extra })

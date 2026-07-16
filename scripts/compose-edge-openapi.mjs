@@ -4,7 +4,7 @@
 // real request/response schemas from the owning service (path rewritten to public);
 // the three aggregation endpoints declare Edge-owned response shapes that reference
 // the same service schemas by resolved name.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
@@ -17,7 +17,12 @@ const serviceFiles = [
 const docs = Object.fromEntries(serviceFiles.map((s) => [s, JSON.parse(readFileSync(resolve(docsDir, `${s}.openapi.json`), 'utf8'))]))
 const docFor = (svc) => docs[`${svc}-service`] // every Edge alias maps to `<alias>-service`
 
-const edgeSource = readFileSync(resolve(root, 'gateway/TradeDiary.EdgeApi/Program.cs'), 'utf8')
+const edgeRoot = resolve(root, 'gateway/TradeDiary.EdgeApi')
+const edgeFiles = (directory) => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+  const path = resolve(directory, entry.name)
+  return entry.isDirectory() ? edgeFiles(path) : entry.name.endsWith('.cs') ? [path] : []
+})
+const edgeSource = edgeFiles(edgeRoot).map((file) => readFileSync(file, 'utf8')).join('\n')
 const norm = (p) => p.replace(/\{([^}:]+):[^}]+\}/g, '{$1}')
 // Structural form ignores param NAMES so e.g. Edge's {symbol} matches the service's {raw}.
 const struct = (p) => p.replace(/\{[^}]+\}/g, '{_}')
@@ -105,6 +110,9 @@ for (const r of routes) {
   }
   op.security = ANON_PUBLIC(r.pub) ? [] : [{ bearerAuth: [] }]
   op.operationId = opId(r.method, r.pub)
+  for (const status of Object.keys(op.responses || {})) {
+    if (!status.startsWith('2')) op.responses[status] = { $ref: '#/components/responses/Problem' }
+  }
   collectFromObj({ requestBody: op.requestBody, responses: op.responses, parameters: op.parameters }, doc)
   ;(paths[r.pub] ??= {})[r.method] = op
 }
@@ -113,24 +121,26 @@ for (const r of routes) {
 const perfDay = refName(successSchemaByStruct(docFor('performance'), '/internal/performance/day/{date}', 'get'))
 const monthSummary = refName(successSchemaByStruct(docFor('performance'), '/internal/performance/month-summary', 'get'))
 const diaryItem = collectionItemName(docFor('journal'), '/internal/diaries', 'get')
+const discipline = refName(successSchemaByStruct(docFor('discipline'), '/internal/disciplines/today', 'get'))
 const stock = refName(successSchemaByStruct(docFor('stock-research'), '/internal/stocks/{symbol}', 'get'))
 const bars = refName(successSchemaByStruct(docFor('market-data'), '/internal/v1/bars/{symbol}', 'get'))
 collectFromObj({ $ref: `#/components/schemas/${perfDay}` }, docFor('performance'))
 collectFromObj({ $ref: `#/components/schemas/${monthSummary}` }, docFor('performance'))
 if (diaryItem) collectFromObj({ $ref: `#/components/schemas/${diaryItem}` }, docFor('journal'))
+if (discipline) collectFromObj({ $ref: `#/components/schemas/${discipline}` }, docFor('discipline'))
 if (stock) collectFromObj({ $ref: `#/components/schemas/${stock}` }, docFor('stock-research'))
 if (bars) collectFromObj({ $ref: `#/components/schemas/${bars}` }, docFor('market-data'))
 
 const ref = (n) => (n ? { $ref: `#/components/schemas/${n}` } : {})
-const capability = { type: 'string', enum: ['available', 'unavailable', 'empty'] }
+const capability = { $ref: '#/components/schemas/CapabilityStatus' }
 const dashboardSchema = {
-  type: 'object', required: ['localDate', 'diary', 'capabilities'],
+  type: 'object', required: ['localDate', 'diary', 'performance', 'pendingAlerts', 'discipline', 'recentDiaries', 'capabilities'],
   properties: {
     localDate: { type: 'string' },
     diary: { type: 'object', required: ['writtenToday', 'count'], properties: { writtenToday: { type: 'boolean' }, count: { type: 'integer' } } },
     performance: perfDay ? { oneOf: [ref(perfDay), { type: 'null' }] } : { type: 'null' },
     pendingAlerts: { type: ['integer', 'null'] },
-    discipline: { type: ['object', 'null'], properties: { content: { type: 'string' } } },
+    discipline: discipline ? { oneOf: [ref(discipline), { type: 'null' }] } : { type: 'null' },
     recentDiaries: diaryItem ? { type: 'array', items: ref(diaryItem) } : { type: 'array', items: {} },
     capabilities: { type: 'object', required: ['alerts', 'discipline'], properties: { alerts: capability, discipline: capability } },
   },
@@ -139,8 +149,8 @@ const calendarSchema = {
   type: 'object', required: ['year', 'month', 'summary', 'days', 'capabilities'],
   properties: {
     year: { type: 'integer' }, month: { type: 'integer' },
-    summary: monthSummary ? ref(monthSummary) : {},
-    days: { type: 'array', items: { type: 'object', required: ['date', 'diaryCount', 'transactionCount'], properties: {
+    summary: monthSummary ? { oneOf: [ref(monthSummary), { type: 'null' }] } : { type: 'null' },
+    days: { type: 'array', items: { type: 'object', required: ['date', 'performance', 'diaryCount', 'transactionCount', 'alertCount'], properties: {
       date: { type: 'string' },
       performance: perfDay ? { oneOf: [ref(perfDay), { type: 'null' }] } : { type: 'null' },
       diaryCount: { type: 'integer' }, transactionCount: { type: 'integer' }, alertCount: { type: ['integer', 'null'] },
@@ -149,15 +159,35 @@ const calendarSchema = {
   },
 }
 const stockPageSchema = {
-  type: 'object', required: ['stock', 'capabilities'],
+  type: 'object', required: ['stock', 'bars', 'capabilities'],
   properties: {
     stock: stock ? ref(stock) : {},
     bars: bars ? { oneOf: [ref(bars), { type: 'null' }] } : { type: 'null' },
-    capabilities: { type: 'object', required: ['marketData'], properties: { marketData: { type: 'string', enum: ['available', 'unavailable'] } } },
+    capabilities: { type: 'object', required: ['marketData'], properties: { marketData: capability } },
   },
 }
-collected.set('Dashboard', dashboardSchema); collected.set('Calendar', calendarSchema); collected.set('StockPage', stockPageSchema)
-collected.set('ProblemDetails', { type: 'object', properties: { title: { type: 'string' }, status: { type: 'integer' }, detail: { type: 'string' } } })
+const bootstrapSchema = {
+  type: 'object',
+  required: ['currentUser', 'timezone', 'baseCurrency', 'role', 'accountType', 'currentLocalDate', 'availableProductAreas'],
+  properties: {
+    currentUser: {
+      type: 'object', required: ['id', 'email', 'displayName'],
+      properties: { id: { type: 'string', format: 'uuid' }, email: { type: 'string' }, displayName: { type: 'string' } },
+    },
+    timezone: { type: 'string' }, baseCurrency: { type: 'string' }, role: { type: 'string' }, accountType: { type: 'string' },
+    currentLocalDate: { type: 'string', format: 'date' },
+    availableProductAreas: { type: 'array', items: { type: 'string' } },
+  },
+}
+collected.set('CapabilityStatus', { type: 'string', enum: ['available', 'empty', 'unavailable'] })
+collected.set('AppBootstrapResponse', bootstrapSchema)
+collected.set('DashboardResponse', dashboardSchema)
+collected.set('CalendarResponse', calendarSchema)
+collected.set('StockPageResponse', stockPageSchema)
+collected.set('EdgeProblemDetails', {
+  type: 'object', required: ['code', 'title', 'status', 'detail', 'correlationId'],
+  properties: { code: { type: 'string' }, title: { type: 'string' }, status: { type: 'integer' }, detail: { type: 'string' }, correlationId: { type: 'string' } },
+})
 
 const agg = (path, schema, parameters = []) => ({
   [path]: {
@@ -168,7 +198,12 @@ const agg = (path, schema, parameters = []) => ({
       parameters,
       responses: {
         200: { description: 'Success', content: { 'application/json': { schema: { $ref: `#/components/schemas/${schema}` } } } },
+        400: { $ref: '#/components/responses/Problem' },
+        401: { $ref: '#/components/responses/Problem' },
+        403: { $ref: '#/components/responses/Problem' },
+        502: { $ref: '#/components/responses/Problem' },
         503: { $ref: '#/components/responses/Problem' },
+        504: { $ref: '#/components/responses/Problem' },
       },
     },
   },
@@ -176,9 +211,10 @@ const agg = (path, schema, parameters = []) => ({
 const intParam = (name) => ({ name, in: 'query', required: true, schema: { type: 'integer' } })
 const strPathParam = (name) => ({ name, in: 'path', required: true, schema: { type: 'string' } })
 Object.assign(paths,
-  agg('/api/app/dashboard', 'Dashboard'),
-  agg('/api/app/calendar', 'Calendar', [intParam('year'), intParam('month')]),
-  agg('/api/app/stocks/{symbol}/page', 'StockPage', [strPathParam('symbol')]),
+  agg('/api/app/bootstrap', 'AppBootstrapResponse'),
+  agg('/api/app/dashboard', 'DashboardResponse'),
+  agg('/api/app/calendar', 'CalendarResponse', [intParam('year'), intParam('month')]),
+  agg('/api/app/stocks/{symbol}/page', 'StockPageResponse', [strPathParam('symbol')]),
 )
 
 // Auth endpoints: Edge owns the browser-facing session shape. The refresh token lives only in the
@@ -210,7 +246,7 @@ const document = {
       serviceKey: { type: 'apiKey', in: 'header', name: 'X-Service-Key' },
     },
     schemas: Object.fromEntries([...collected].sort((a, b) => a[0].localeCompare(b[0]))),
-    responses: { Problem: { description: 'Request failed', content: { 'application/problem+json': { schema: { $ref: '#/components/schemas/ProblemDetails' } } } } },
+    responses: { Problem: { description: 'Request failed', content: { 'application/problem+json': { schema: { $ref: '#/components/schemas/EdgeProblemDetails' } } } } },
   },
 }
 

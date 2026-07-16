@@ -1,8 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import * as api from './api'
-import type { Alert, Diary, Discipline, Transaction } from './api'
-import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput, useAsync } from './ui'
+import { useNavigate, useParams } from 'react-router-dom'
+import type { Alert, Diary, Discipline, Transaction } from './features/api'
+import { useIdempotencyKey } from './features/api'
+import {
+  useAlertsQuery, useCalendarQuery, useCreateAlertMutation, useCreateDisciplineMutation,
+  useCreateTransactionMutation, useDashboardQuery, useDeleteAlertMutation, useDeleteDiaryMutation,
+  useDeleteDisciplineMutation, useDeleteTransactionMutation, useDiariesQuery, useDiaryQuery,
+  useDismissAlertMutation, useQuickNoteMutation, useSaveDiaryMutation, useSavePerformanceMutation,
+  useDisciplinesQuery,
+  useTransactionsQuery,
+} from './features/queries'
+import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
 import { Icon } from './icons'
 import { PageSkeleton, SectionError, useCockpit } from './App'
 import { cx, formatDate, formatLongDate, formatTime, monthLabel, pct, quantity, repeatLabel, signed, signedCompact, todayISO } from './format'
@@ -17,25 +26,21 @@ const PanelLink = ({ children, onClick }: { children: ReactNode; onClick: () => 
 /* =============================== TODAY ============================== */
 export function TodayPage() {
   const { go } = useCockpit()
-  const { data, loading, error, reload } = useAsync(() => api.getDashboard(), [])
+  const { data, isLoading: loading, isError: error, refetch: reload } = useDashboardQuery()
   const [note, setNote] = useState('')
-  const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const idem = api.useIdempotencyKey()
+  const idem = useIdempotencyKey()
+  const saveQuickNote = useQuickNoteMutation()
 
   async function saveNote() {
     if (!note.trim() || !data) return
-    setSaving(true)
     try {
-      await api.saveQuickNote(data.localDate, note.trim(), idem.key())
+      await saveQuickNote.mutateAsync({ date: data.localDate, content: note.trim(), key: idem.key() })
       setNote('')
       idem.reset()
       setSaved(true)
-      await reload()
       setTimeout(() => setSaved(false), 2500)
-    } finally {
-      setSaving(false)
-    }
+    } finally { /* Mutation state drives the button. */ }
   }
 
   const hour = new Date().getHours()
@@ -76,7 +81,7 @@ export function TodayPage() {
           <span className={cx('quick-note__status', saved && 'is-ok')}>
             {saved ? <><Icon name="check" size={14} /> Saved</> : 'Captures the moment, dated for today.'}
           </span>
-          <Button variant="primary" icon="plus" loading={saving} onClick={saveNote} disabled={!note.trim()}>
+          <Button variant="primary" icon="plus" loading={saveQuickNote.isPending} onClick={saveNote} disabled={!note.trim()}>
             Save note
           </Button>
         </div>
@@ -152,16 +157,17 @@ export function TodayPage() {
 /* =============================== DIARY ============================== */
 export function DiaryPage() {
   const { confirm } = useCockpit()
-  const { data, loading, error, reload } = useAsync(() => api.getDiaries(), [])
+  const navigate = useNavigate()
+  const { data, isLoading: loading, isError: error, refetch: reload } = useDiariesQuery()
   const items = data?.items ?? []
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [date, setDate] = useState(todayISO())
   const [editing, setEditing] = useState<Diary | null>(null)
-  const [openTrades, setOpenTrades] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
-  const [saving, setSaving] = useState(false)
-  const idem = api.useIdempotencyKey()
+  const idem = useIdempotencyKey()
+  const saveDiary = useSaveDiaryMutation()
+  const deleteDiary = useDeleteDiaryMutation()
 
   function startEdit(d: Diary) {
     setEditing(d); setTitle(d.title); setContent(d.content); setDate(d.localDate)
@@ -171,25 +177,20 @@ export function DiaryPage() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    setSaving(true); setFormError('')
+    setFormError('')
     try {
-      if (editing) await api.updateDiary(editing.id, date, title, content)
-      else await api.createDiary(date, title, content, idem.key())
+      await saveDiary.mutateAsync({ id: editing?.id, date, title, content, key: idem.key() })
       reset()
-      await reload()
     } catch {
       setFormError('Could not save the entry.')
-    } finally {
-      setSaving(false)
     }
   }
 
   async function remove(d: Diary) {
     const ok = await confirm({ title: 'Delete entry?', message: `“${d.title}” and its trades will be removed.`, confirmText: 'Delete', tone: 'danger' })
     if (!ok) return
-    await api.deleteDiary(d.id)
+    await deleteDiary.mutateAsync(d.id)
     if (editing?.id === d.id) reset()
-    await reload()
   }
 
   return (
@@ -216,7 +217,7 @@ export function DiaryPage() {
           {formError ? <p className="form-error" role="alert">{formError}</p> : null}
           <div className="form-actions">
             {editing ? <Button variant="ghost" onClick={reset}>Cancel</Button> : null}
-            <Button variant="primary" type="submit" icon="check" loading={saving}>
+            <Button variant="primary" type="submit" icon="check" loading={saveDiary.isPending}>
               {editing ? 'Update entry' : 'Add entry'}
             </Button>
           </div>
@@ -237,15 +238,13 @@ export function DiaryPage() {
                 <div className="entry__head">
                   <span className="entry__date">{d.localDate}</span>
                   <div className="entry__actions">
-                    <IconButton icon="layers" label="Trades" size={16}
-                      onClick={() => setOpenTrades(openTrades === d.id ? null : d.id)} />
+                    <IconButton icon="layers" label="Trades" size={16} onClick={() => navigate(`/diary/${d.id}`)} />
                     <IconButton icon="edit" label="Edit entry" size={16} onClick={() => startEdit(d)} />
                     <IconButton icon="trash" label="Delete entry" size={16} className="icon-btn--danger" onClick={() => remove(d)} />
                   </div>
                 </div>
                 <h3 className="entry__title">{d.title}</h3>
                 {d.content ? <p className="prose entry__body">{d.content}</p> : <p className="entry__body is-muted">No reflection written.</p>}
-                {openTrades === d.id ? <TransactionPanel diaryId={d.id} /> : null}
               </Card>
             </li>
           ))}
@@ -253,6 +252,24 @@ export function DiaryPage() {
       )}
     </>
   )
+}
+
+export function DiaryDetailPage() {
+  const { diaryId = '' } = useParams()
+  const navigate = useNavigate()
+  const { confirm } = useCockpit()
+  const diary = useDiaryQuery(diaryId)
+  const removeDiary = useDeleteDiaryMutation()
+  async function remove() {
+    if (!diary.data) return
+    const ok = await confirm({ title: 'Delete entry?', message: `“${diary.data.title}” and its trades will be removed.`, confirmText: 'Delete', tone: 'danger' })
+    if (!ok) return
+    await removeDiary.mutateAsync(diaryId)
+    navigate('/diary', { replace: true })
+  }
+  if (diary.isLoading) return <PageSkeleton rows={2} />
+  if (diary.isError || !diary.data) return <SectionError onRetry={() => { void diary.refetch() }} />
+  return <><PageHeader title={diary.data.title} subtitle={diary.data.localDate} /><Card as="article" className="entry"><p className="prose entry__body">{diary.data.content}</p><div className="form-actions"><Button variant="ghost" onClick={() => navigate('/diary')}>Back to diary</Button><Button variant="danger" loading={removeDiary.isPending} onClick={remove}>Delete entry</Button></div><TransactionPanel diaryId={diaryId} /></Card></>
 }
 
 function DiaryListSkeleton() {
@@ -279,7 +296,7 @@ const localDateTimeLocal = () => {
 
 function TransactionPanel({ diaryId }: { diaryId: string }) {
   const { confirm } = useCockpit()
-  const { data, loading, error, reload } = useAsync(() => api.getTransactions(diaryId), [diaryId])
+  const { data, isLoading: loading, isError: error, refetch: reload } = useTransactionsQuery(diaryId)
   const items = data?.items ?? []
   const [symbol, setSymbol] = useState('')
   const [side, setSide] = useState('buy')
@@ -289,32 +306,29 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
   const [tradedAt, setTradedAt] = useState(localDateTimeLocal)
   const [notes, setNotes] = useState('')
   const [formError, setFormError] = useState('')
-  const [saving, setSaving] = useState(false)
-  const idem = api.useIdempotencyKey()
+  const idem = useIdempotencyKey()
+  const createTransaction = useCreateTransactionMutation(diaryId)
+  const deleteTransaction = useDeleteTransactionMutation(diaryId)
 
   async function add(e: FormEvent) {
     e.preventDefault()
-    setSaving(true); setFormError('')
+    setFormError('')
     try {
-      await api.createTransaction(diaryId, {
+      await createTransaction.mutateAsync({ body: {
         symbol, side, quantity: Number(qty), price: Number(price), currency,
         tradedAt: new Date(tradedAt).toISOString(), notes,
-      }, idem.key())
+      }, key: idem.key() })
       setSymbol(''); setQty(''); setPrice(''); setNotes('')
       idem.reset()
-      await reload()
     } catch {
       setFormError('Could not add the trade.')
-    } finally {
-      setSaving(false)
     }
   }
 
   async function remove(t: Transaction) {
     const ok = await confirm({ title: 'Delete trade?', message: `${t.side.toUpperCase()} ${t.symbol} will be removed.`, confirmText: 'Delete', tone: 'danger' })
     if (!ok) return
-    await api.deleteTransaction(diaryId, t.id)
-    await reload()
+    await deleteTransaction.mutateAsync(t.id)
   }
 
   return (
@@ -329,7 +343,7 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
         <TextInput aria-label="Price" type="number" min="0" step="any" inputMode="decimal" placeholder="Price" required value={price} onChange={(e) => setPrice(e.target.value)} className="num" />
         <TextInput aria-label="Currency" placeholder="CCY" required value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} className="input--ccy" />
         <TextInput aria-label="Traded at" type="datetime-local" required value={tradedAt} onChange={(e) => setTradedAt(e.target.value)} className="input--when" />
-        <Button variant="primary" type="submit" icon="plus" loading={saving} className="trades__add">Add</Button>
+        <Button variant="primary" type="submit" icon="plus" loading={createTransaction.isPending} className="trades__add">Add</Button>
       </form>
       {formError ? <p className="form-error" role="alert">{formError}</p> : null}
 
@@ -358,15 +372,19 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
 
 /* ============================= CALENDAR ============================= */
 export function CalendarPage() {
+  const navigate = useNavigate()
+  const params = useParams()
   const now = new Date()
-  const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 })
-  const { data, loading, error, reload } = useAsync(() => api.getCalendar(cursor.year, cursor.month), [cursor.year, cursor.month])
+  const year = Number(params.year) || now.getFullYear()
+  const month = Number(params.month) || now.getMonth() + 1
+  const cursor = { year, month }
+  const { data, isLoading: loading, isError: error, refetch: reload } = useCalendarQuery(year, month)
   const [selected, setSelected] = useState(todayISO())
   const [amount, setAmount] = useState('')
   const [capital, setCapital] = useState('')
   const [note, setNote] = useState('')
   const [formError, setFormError] = useState('')
-  const [saving, setSaving] = useState(false)
+  const savePerformance = useSavePerformanceMutation()
 
   const day = data?.days.find((d) => d.date === selected)
   useEffect(() => {
@@ -376,19 +394,16 @@ export function CalendarPage() {
 
   const shift = (delta: number) => {
     const d = new Date(cursor.year, cursor.month - 1 + delta, 1)
-    setCursor({ year: d.getFullYear(), month: d.getMonth() + 1 })
+    navigate(`/calendar/${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}`)
   }
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    setSaving(true); setFormError('')
+    setFormError('')
     try {
-      await api.savePerformance(selected, Number(amount), capital ? Number(capital) : null, note)
-      await reload()
+      await savePerformance.mutateAsync({ date: selected, amount: Number(amount), capital: capital ? Number(capital) : null, note })
     } catch {
       setFormError('Could not save P/L.')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -475,7 +490,7 @@ export function CalendarPage() {
           </Field>
           {formError ? <p className="form-error" role="alert">{formError}</p> : null}
           <div className="form-actions">
-            <Button variant="primary" type="submit" icon="check" loading={saving}>Save P/L</Button>
+            <Button variant="primary" type="submit" icon="check" loading={savePerformance.isPending}>Save P/L</Button>
           </div>
         </form>
       </Card>
@@ -486,31 +501,28 @@ export function CalendarPage() {
 /* ============================ DISCIPLINE =========================== */
 export function DisciplinePage() {
   const { confirm } = useCockpit()
-  const { data, loading, error, reload } = useAsync(() => api.getDisciplines(), [])
+  const { data, isLoading: loading, isError: error, refetch: reload } = useDisciplinesQuery()
   const items = data?.items ?? []
   const [content, setContent] = useState('')
-  const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const createDiscipline = useCreateDisciplineMutation()
+  const deleteDiscipline = useDeleteDisciplineMutation()
 
   async function add(e: FormEvent) {
     e.preventDefault()
-    setSaving(true); setFormError('')
+    setFormError('')
     try {
-      await api.createDiscipline(content.trim())
+      await createDiscipline.mutateAsync(content.trim())
       setContent('')
-      await reload()
     } catch {
       setFormError('Could not add the principle.')
-    } finally {
-      setSaving(false)
     }
   }
 
   async function remove(d: Discipline) {
     const ok = await confirm({ title: 'Remove principle?', message: 'This will no longer appear as a daily discipline.', confirmText: 'Remove', tone: 'danger' })
     if (!ok) return
-    await api.deleteDiscipline(d.id)
-    await reload()
+    await deleteDiscipline.mutateAsync(d.id)
   }
 
   return (
@@ -520,7 +532,7 @@ export function DisciplinePage() {
       <Card as="section" className="inline-form-wrap">
         <form className="inline-form" onSubmit={add}>
           <TextInput value={content} onChange={(e) => setContent(e.target.value)} placeholder="A principle worth remembering" required maxLength={280} />
-          <Button variant="primary" type="submit" icon="plus" loading={saving}>Add</Button>
+          <Button variant="primary" type="submit" icon="plus" loading={createDiscipline.isPending}>Add</Button>
         </form>
         {formError ? <p className="form-error" role="alert">{formError}</p> : null}
       </Card>
@@ -550,41 +562,40 @@ export function DisciplinePage() {
 /* ============================== ALERTS ============================= */
 export function AlertsPage() {
   const { confirm } = useCockpit()
-  const { data, loading, error, reload } = useAsync(async () => {
-    const [alerts, diaries] = await Promise.all([api.getAlerts(), api.getDiaries()])
-    return { alerts: alerts.items, diaries: diaries.items }
-  }, [])
-  const alerts = data?.alerts ?? []
-  const diaries = data?.diaries ?? []
+  const alertsQuery = useAlertsQuery()
+  const diariesQuery = useDiariesQuery()
+  const alerts = alertsQuery.data?.items ?? []
+  const diaries = useMemo(() => diariesQuery.data?.items ?? [], [diariesQuery.data?.items])
+  const loading = alertsQuery.isLoading || diariesQuery.isLoading
+  const error = alertsQuery.isError || diariesQuery.isError
+  const reload = () => { void alertsQuery.refetch(); void diariesQuery.refetch() }
   const [diaryId, setDiaryId] = useState('')
   const [date, setDate] = useState(todayISO())
   const [time, setTime] = useState('09:00')
   const [repeat, setRepeat] = useState('none')
-  const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const createAlert = useCreateAlertMutation()
+  const dismissAlert = useDismissAlertMutation()
+  const deleteAlert = useDeleteAlertMutation()
 
   useEffect(() => { if (!diaryId && diaries.length) setDiaryId(diaries[0].id) }, [diaryId, diaries])
 
   async function add(e: FormEvent) {
     e.preventDefault()
-    setSaving(true); setFormError('')
+    setFormError('')
     try {
-      await api.createAlert({ diaryId, startLocalDate: date, localTime: time, timezone, repeatMode: repeat })
-      await reload()
+      await createAlert.mutateAsync({ diaryId, startLocalDate: date, localTime: time, timezone, repeatMode: repeat })
     } catch {
       setFormError('Could not create the alert.')
-    } finally {
-      setSaving(false)
     }
   }
 
-  async function dismiss(a: Alert) { await api.dismissAlert(a.id); await reload() }
+  async function dismiss(a: Alert) { await dismissAlert.mutateAsync(a.id) }
   async function remove(a: Alert) {
     const ok = await confirm({ title: 'Delete alert?', confirmText: 'Delete', tone: 'danger' })
     if (!ok) return
-    await api.deleteAlert(a.id)
-    await reload()
+    await deleteAlert.mutateAsync(a.id)
   }
 
   const titleFor = (id: string) => diaries.find((d) => d.id === id)?.title ?? 'Diary reminder'
@@ -620,7 +631,7 @@ export function AlertsPage() {
           </div>
           {formError ? <p className="form-error" role="alert">{formError}</p> : null}
           <div className="form-actions">
-            <Button variant="primary" type="submit" icon="bell" loading={saving} disabled={!diaries.length}>
+            <Button variant="primary" type="submit" icon="bell" loading={createAlert.isPending} disabled={!diaries.length}>
               Create alert
             </Button>
             {!diaries.length && !loading ? <span className="form-hint">Create a diary entry first.</span> : null}

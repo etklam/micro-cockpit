@@ -318,28 +318,3 @@ export function useConfirm() {
 
   return { confirm, confirmNode: node }
 }
-
-/* ----------------------------- useAsync ---------------------------- */
-// Fetcher is kept in a ref so deps only need the values that should re-fetch.
-export function useAsync<T>(fetcher: () => Promise<T>, deps: unknown[]) {
-  const [data, setData] = useState<T | undefined>(undefined)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | undefined>(undefined)
-  const [tick, setTick] = useState(0)
-  const ref = useRef(fetcher)
-  ref.current = fetcher
-
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    setError(undefined)
-    ref.current()
-      .then((d) => { if (active) { setData(d); setLoading(false) } })
-      .catch(() => { if (active) { setError('Could not load this right now.'); setLoading(false) } })
-    return () => { active = false }
-    // deps + tick drive reloads; fetcher identity intentionally excluded.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, tick])
-
-  return { data, loading, error, reload: () => setTick((t) => t + 1) }
-}
