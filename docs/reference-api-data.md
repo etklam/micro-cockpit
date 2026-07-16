@@ -157,7 +157,9 @@ Timeline evidence is append-only. Corrections create a new linked record; there 
 | POST | `/api/app/price-alerts/{id}/reactivate` |
 | GET | `/api/app/price-alerts/{id}/triggers` |
 
-Price alerts are evaluated from the read-only `market_data_public.daily_bar_prices_v1` contract only after a daily bar is published. `evaluationPrice` accepts `open` or `close` and defaults to `close`; open means the opening value inside the completed daily bar, not a real-time market-open quote. Trigger responses retain `observedClose` for compatibility and also identify the actual `observedPrice` and `priceType`. A trade date is evaluated at most once per alert.
+Price alerts are evaluated from the read-only `market_data_public.daily_bar_prices_v1` contract only after a daily bar is published. `evaluationPrice` and trigger `priceType` are lowercase `open | close` enums and default to `close`; alert `status` is `active | triggered | dismissed`. Open means the opening value inside the completed daily bar, not a real-time market-open quote. Trigger responses retain `observedClose` for compatibility and also identify the actual `observedPrice` and `priceType`.
+
+Only active alerts whose latest published trade date is newer than `lastEvaluatedDate` consume a worker batch slot. A trade date is evaluated at most once per alert, and concurrent workers lock only claimed alert rows. Dismissing a triggered alert timestamps its latest active trigger; dismissing an active alert only pauses evaluation. Reactivation preserves `lastEvaluatedDate` and waits for a newer bar.
 
 Market ingestion is not browser-facing. An external authenticated loader uses the Market Data service-key admin flow documented in [`services/market-data-service/SERVICE.md`](../services/market-data-service/SERVICE.md).
 

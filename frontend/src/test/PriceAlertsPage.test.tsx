@@ -6,6 +6,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { expect, test } from 'vitest'
 import App from '../App'
 import { AuthProvider } from '../auth/AuthProvider'
+import type { EvaluationPrice, PriceAlertResponse, PriceAlertStatus, TriggerResponse } from '../generated/edge'
 import { server } from './setup'
 
 const bootstrap = {
@@ -91,7 +92,7 @@ test.each([
   expect(await screen.findByRole('alert')).toHaveTextContent(message)
 })
 
-test('dismiss and reactivate refresh only the alert list', async () => {
+test('dismiss and reactivate refresh only the alert list and affected trigger history', async () => {
   let listRequests = 0
   server.use(...handlers({ alerts, onList: () => { listRequests += 1 } }))
   const { client } = renderPriceAlerts()
@@ -102,13 +103,19 @@ test('dismiss and reactivate refresh only the alert list', async () => {
   await user.click(screen.getByRole('button', { name: 'Dismiss AAPL alert' }))
   await waitFor(() => expect(listRequests).toBe(2))
   expect(client.getQueryData(['price-alerts', 'triggers', 'alert-open'])).toEqual({ items: [{ id: 'cached-trigger' }] })
+  expect(client.getQueryState(['price-alerts', 'triggers', 'alert-open'])?.isInvalidated).toBe(true)
 
+  client.setQueryData(['price-alerts', 'triggers', 'alert-close'], { items: [{ id: 'cached-trigger' }] })
   await user.click(screen.getByRole('button', { name: 'Reactivate MSFT alert' }))
   await waitFor(() => expect(listRequests).toBe(3))
+  expect(client.getQueryState(['price-alerts', 'triggers', 'alert-close'])?.isInvalidated).toBe(true)
 })
 
-test('trigger history displays the observed price and its daily price type', async () => {
-  server.use(...handlers({ alerts, triggers: { items: [{ id: 'trigger-1', tradingDate: '2026-07-15', observedClose: 249.8, observedPrice: 251.25, priceType: 'open', triggeredAt: '2026-07-15T22:00:00Z', dismissedAt: null }] } }))
+test('trigger history displays price type and trigger dismissal timestamps', async () => {
+  server.use(...handlers({ alerts, triggers: { items: [
+    { id: 'trigger-1', tradingDate: '2026-07-15', observedClose: 249.8, observedPrice: 251.25, priceType: 'open', triggeredAt: '2026-07-15T22:00:00Z', dismissedAt: null },
+    { id: 'trigger-2', tradingDate: '2026-07-14', observedClose: 249, observedPrice: 249, priceType: 'close', triggeredAt: '2026-07-14T22:00:00Z', dismissedAt: '2026-07-15T01:00:00Z' },
+  ] } }))
   renderPriceAlerts()
   const user = userEvent.setup()
 
@@ -117,6 +124,9 @@ test('trigger history displays the observed price and its daily price type', asy
 
   expect(await screen.findByText('Open price 251.25')).toBeInTheDocument()
   expect(screen.getByText('Trading date 2026-07-15')).toBeInTheDocument()
+  expect(screen.getAllByText(/^Triggered /)).toHaveLength(2)
+  expect(screen.getByText(/^Dismissed /)).toBeInTheDocument()
+  expect(screen.getByText('Active trigger')).toBeInTheDocument()
 })
 
 test('valid empty alerts and trigger history differ from backend unavailability', async () => {
@@ -139,4 +149,14 @@ test('an alert without triggers has its own empty history state', async () => {
   await screen.findByText('AAPL')
   await user.click(screen.getByRole('button', { name: 'View AAPL trigger history' }))
   expect(await screen.findByText('No trigger history.')).toBeInTheDocument()
+})
+
+test('generated client exposes lowercase price and status unions', () => {
+  type Equal<Left, Right> = (<Value>() => Value extends Left ? 1 : 2) extends (<Value>() => Value extends Right ? 1 : 2) ? true : false
+  const evaluationPriceIsExact: Equal<EvaluationPrice, 'open' | 'close'> = true
+  const statusIsExact: Equal<PriceAlertStatus, 'active' | 'triggered' | 'dismissed'> = true
+  const responsePriceIsExact: Equal<PriceAlertResponse['evaluationPrice'], EvaluationPrice> = true
+  const responseStatusIsExact: Equal<PriceAlertResponse['status'], PriceAlertStatus> = true
+  const triggerPriceIsExact: Equal<TriggerResponse['priceType'], EvaluationPrice> = true
+  expect([evaluationPriceIsExact, statusIsExact, responsePriceIsExact, responseStatusIsExact, triggerPriceIsExact]).toEqual([true, true, true, true, true])
 })

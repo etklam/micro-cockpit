@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { priceAlertCreateErrorKind, type PriceAlert, type RotationItem, type WatchlistItem } from './features/api'
+import { priceAlertCreateErrorKind, type PriceAlert, type PriceAlertEvaluationPrice, type RotationItem, type WatchlistItem } from './features/api'
 import {
   useAddPriceAlertMutation, useAddWatchlistMutation, useArticleQuery, useArticlesQuery,
   useCalculateMutation, useCreateAgentMutation, useDeletePriceAlertMutation, useDismissPriceAlertMutation, usePartnersQuery,
@@ -61,7 +61,7 @@ export function PriceAlertsPage() {
   const [symbol, setSymbol] = useState('')
   const [price, setPrice] = useState('')
   const [direction, setDirection] = useState('above')
-  const [evaluationPrice, setEvaluationPrice] = useState('close')
+  const [evaluationPrice, setEvaluationPrice] = useState<PriceAlertEvaluationPrice>('close')
   const [historyAlertId, setHistoryAlertId] = useState<string | null>(null)
   const addPriceAlert = useAddPriceAlertMutation()
   const deletePriceAlert = useDeletePriceAlertMutation()
@@ -92,7 +92,7 @@ export function PriceAlertsPage() {
       <Field label="Symbol"><TextInput required value={symbol} onChange={e => setSymbol(e.target.value)} /></Field>
       <Field label="Direction"><SelectBox value={direction} onChange={e => setDirection(e.target.value)}><option value="above">Above</option><option value="below">Below</option></SelectBox></Field>
       <Field label="Target price"><TextInput required min="0.0001" step="any" type="number" value={price} onChange={e => setPrice(e.target.value)} /></Field>
-      <Field label="Evaluate using" hint="Evaluated after the daily bar is published."><SelectBox aria-label="Evaluate using" value={evaluationPrice} onChange={e => setEvaluationPrice(e.target.value)}><option value="close">Close</option><option value="open">Open</option></SelectBox></Field>
+      <Field label="Evaluate using" hint="Evaluated after the daily bar is published."><SelectBox aria-label="Evaluate using" value={evaluationPrice} onChange={e => setEvaluationPrice(e.target.value as PriceAlertEvaluationPrice)}><option value="close">Close</option><option value="open">Open</option></SelectBox></Field>
     </div>{createError ? <p role="alert" className="form-error">{createError}</p> : null}<div className="form-actions"><Button variant="primary" type="submit" loading={addPriceAlert.isPending}>Create alert</Button></div></form></Card>
     {result.isLoading ? <PageSkeleton rows={2} /> : result.isError ? <SectionError onRetry={() => { void result.refetch() }} /> : !items.length ? <EmptyBox title="No price alerts" hint="Create an alert to evaluate the next published daily bar." /> : <ul className="compact-list">{items.map(x => <li key={x.id}><Card>
       <div className="row-main"><strong>{x.symbol}</strong><span>{x.conditionType === 'above' ? 'Above' : 'Below'} {x.threshold.toLocaleString()}</span><span>Evaluate using {x.evaluationPrice === 'open' ? 'Open' : 'Close'}</span><span>{x.lastEvaluatedDate ? `Last evaluated ${x.lastEvaluatedDate}` : 'Not evaluated yet'}</span>{x.baselineClose == null ? null : <span>Baseline close {x.baselineClose.toLocaleString()}</span>}</div>
@@ -114,7 +114,8 @@ function PriceAlertHistory({ alertId }: { alertId: string }) {
   return <section aria-label="Trigger history"><h3>Trigger history</h3><ul className="timeline">{items.map(item => <li key={item.id}>
     <strong>{item.priceType === 'open' ? 'Open' : 'Close'} price {item.observedPrice.toLocaleString()}</strong>
     <span>Trading date {item.tradingDate}</span>
-    <time>{new Date(item.triggeredAt).toLocaleString()}</time>
+    <span>Triggered {new Date(item.triggeredAt).toLocaleString()}</span>
+    <span>{item.dismissedAt ? `Dismissed ${new Date(item.dismissedAt).toLocaleString()}` : 'Active trigger'}</span>
   </li>)}</ul></section>
 }
 

@@ -115,6 +115,64 @@ public sealed class PriceAlertWorkerIntegrationTests : IAsyncLifetime
         Assert.Equal(0L, await ScalarAsync<long>($"SELECT count(*) FROM price_alert.alerts WHERE id='{alertId}' AND last_evaluated_date IS NOT NULL"));
     }
 
+    [Fact]
+    public async Task One_hundred_stale_alerts_do_not_block_a_due_alert()
+    {
+        await ResetAsync();
+        var tradeDate = new DateOnly(2026, 7, 16);
+        await SeedBarAsync(tradeDate, 110m, 120m, 100m, 110m);
+        await ExecuteAsync($"""
+            INSERT INTO price_alert.alerts(id,user_id,symbol,condition_type,threshold,status,evaluation_price,last_evaluated_date,created_at,updated_at)
+            SELECT md5('stale-' || value)::uuid,'{Guid.NewGuid()}','TEST','above',100,'active','close','{tradeDate:yyyy-MM-dd}',now() - interval '1 day',now() - interval '1 day'
+            FROM generate_series(1,100) AS value
+            """);
+        var dueAlertId = await SeedAlertAsync("above", 100m, "close");
+
+        Assert.Equal(1, await PriceAlertEngine.Evaluate(_dataSource, 100));
+
+        Assert.Equal(tradeDate, await ScalarAsync<DateOnly>($"SELECT last_evaluated_date FROM price_alert.alerts WHERE id='{dueAlertId}'"));
+        Assert.Equal(1L, await ScalarAsync<long>($"SELECT count(*) FROM price_alert.triggers WHERE alert_id='{dueAlertId}'"));
+        Assert.Equal(100L, await ScalarAsync<long>($"SELECT count(*) FROM price_alert.alerts WHERE status='active' AND last_evaluated_date='{tradeDate:yyyy-MM-dd}'"));
+        Assert.Equal(100L, await ScalarAsync<long>("SELECT count(*) FROM price_alert.alerts WHERE status='active' AND updated_at < now() - interval '12 hours'"));
+    }
+
+    [Fact]
+    public async Task More_than_one_batch_eventually_processes_all_due_alerts()
+    {
+        await ResetAsync();
+        await SeedBarAsync(new DateOnly(2026, 7, 16), 110m, 120m, 100m, 110m);
+        await ExecuteAsync($"""
+            INSERT INTO price_alert.alerts(id,user_id,symbol,condition_type,threshold,status,evaluation_price,created_at)
+            SELECT md5('due-' || value)::uuid,'{Guid.NewGuid()}','TEST','above',100,'active','close',now() + value * interval '1 millisecond'
+            FROM generate_series(1,205) AS value
+            """);
+
+        Assert.Equal(100, await PriceAlertEngine.Evaluate(_dataSource, 100));
+        Assert.Equal(100, await PriceAlertEngine.Evaluate(_dataSource, 100));
+        Assert.Equal(5, await PriceAlertEngine.Evaluate(_dataSource, 100));
+
+        Assert.Equal(205L, await ScalarAsync<long>("SELECT count(*) FROM price_alert.triggers"));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM price_alert.alerts WHERE status='active'"));
+    }
+
+    [Fact]
+    public async Task Concurrent_workers_do_not_duplicate_evaluation()
+    {
+        await ResetAsync();
+        await SeedBarAsync(new DateOnly(2026, 7, 16), 110m, 120m, 100m, 110m);
+        await ExecuteAsync($"""
+            INSERT INTO price_alert.alerts(id,user_id,symbol,condition_type,threshold,status,evaluation_price,created_at)
+            SELECT md5('concurrent-' || value)::uuid,'{Guid.NewGuid()}','TEST','above',100,'active','close',now() + value * interval '1 millisecond'
+            FROM generate_series(1,200) AS value
+            """);
+
+        var workers = await Task.WhenAll(PriceAlertEngine.Evaluate(_dataSource, 100), PriceAlertEngine.Evaluate(_dataSource, 100));
+
+        Assert.Equal(200, workers.Sum());
+        Assert.Equal(200L, await ScalarAsync<long>("SELECT count(*) FROM price_alert.triggers"));
+        Assert.Equal(200L, await ScalarAsync<long>("SELECT count(DISTINCT alert_id) FROM price_alert.triggers"));
+    }
+
     private async Task ResetAsync()
     {
         await ExecuteAsync("TRUNCATE price_alert.triggers,price_alert.alerts,market.daily_bars,market.provider_runs,market.symbols CASCADE");

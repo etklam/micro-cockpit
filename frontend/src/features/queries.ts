@@ -115,7 +115,7 @@ export const useDeleteAlertMutation = () => useInvalidatingMutation(api.deleteAl
 export const useAddWatchlistMutation = () => useInvalidatingMutation(api.addWatchlist, [queryKeys.watchlist])
 export const useRemoveWatchlistMutation = () => useInvalidatingMutation(api.removeWatchlist, [queryKeys.watchlist])
 export const useSaveResearchNoteMutation = (id: string) => useInvalidatingMutation((content: string) => api.saveResearchNote(id, content), [queryKeys.researchNote(id), queryKeys.researchTimeline(id), queryKeys.watchlist])
-export const useAddPriceAlertMutation = () => useInvalidatingMutation(({ symbol, threshold, condition, evaluationPrice }: { symbol: string; threshold: number; condition: string; evaluationPrice: string }) => api.addPriceAlert(symbol, threshold, condition, evaluationPrice), [queryKeys.priceAlerts.list])
+export const useAddPriceAlertMutation = () => useInvalidatingMutation(({ symbol, threshold, condition, evaluationPrice }: { symbol: string; threshold: number; condition: string; evaluationPrice: api.PriceAlertEvaluationPrice }) => api.addPriceAlert(symbol, threshold, condition, evaluationPrice), [queryKeys.priceAlerts.list])
 export function useDeletePriceAlertMutation() {
   const client = useQueryClient()
   return useMutation({ mutationFn: api.deletePriceAlert, onSuccess: async (_, id) => {
@@ -125,8 +125,17 @@ export function useDeletePriceAlertMutation() {
     ])
   } })
 }
-export const useDismissPriceAlertMutation = () => useInvalidatingMutation(api.dismissPriceAlert, [queryKeys.priceAlerts.list])
-export const useReactivatePriceAlertMutation = () => useInvalidatingMutation(api.reactivatePriceAlert, [queryKeys.priceAlerts.list])
+function usePriceAlertLifecycleMutation(operation: (id: string) => Promise<unknown>) {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: operation, onSuccess: async (_, id) => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.priceAlerts.list }),
+      client.invalidateQueries({ queryKey: queryKeys.priceAlerts.triggers(id) }),
+    ])
+  } })
+}
+export const useDismissPriceAlertMutation = () => usePriceAlertLifecycleMutation(api.dismissPriceAlert)
+export const useReactivatePriceAlertMutation = () => usePriceAlertLifecycleMutation(api.reactivatePriceAlert)
 export const useCalculateMutation = () => useMutation({ mutationFn: ({ tool, values }: { tool: string; values: Record<string, unknown> }) => api.calculate(tool, values) })
 export const useCreateAgentMutation = () => useMutation({ mutationFn: api.createAgent })
 

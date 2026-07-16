@@ -18,6 +18,7 @@ export type Discipline = G.DisciplineResponse
 export type Alert = G.DiaryAlertResponse
 export type PriceAlert = G.PriceAlertResponse
 export type PriceAlertTrigger = G.TriggerResponse
+export type PriceAlertEvaluationPrice = G.EvaluationPrice
 export type WatchlistItem = G.WatchlistResponse
 export type ResearchNote = G.NoteResponse
 export type RotationItem = G.EtfSnapshotResponse
@@ -68,7 +69,7 @@ export async function getResearchNote(id: string): Promise<ResearchNote | null> 
 export const saveResearchNote = (id: string, content: string) => G.putApiAppStocksStockIdNote(id, { content })
 export const getResearchTimeline = (id: string) => G.getApiAppStocksStockIdTimeline(id)
 export const getPriceAlerts = () => G.getApiAppPriceAlerts()
-export const addPriceAlert = (symbol: string, threshold: number, conditionType: string, evaluationPrice: string) =>
+export const addPriceAlert = (symbol: string, threshold: number, conditionType: string, evaluationPrice: PriceAlertEvaluationPrice) =>
   G.postApiAppPriceAlerts({ symbol, threshold, conditionType, evaluationPrice, lookbackDays: null, direction: null })
 export const deletePriceAlert = (id: string) => G.deleteApiAppPriceAlertsId(id)
 export const dismissPriceAlert = (id: string) => G.postApiAppPriceAlertsIdDismiss(id)

@@ -452,6 +452,12 @@
           }
         }
       },
+      "EvaluationPrice": {
+        "enum": [
+          "open",
+          "close"
+        ]
+      },
       "PriceAlertResponse": {
         "required": [
           "id",
@@ -503,10 +509,10 @@
             ]
           },
           "evaluationPrice": {
-            "type": "string"
+            "$ref": "#/components/schemas/EvaluationPrice"
           },
           "status": {
-            "type": "string"
+            "$ref": "#/components/schemas/PriceAlertStatus"
           },
           "baselineClose": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
@@ -533,6 +539,13 @@
             "format": "date-time"
           }
         }
+      },
+      "PriceAlertStatus": {
+        "enum": [
+          "active",
+          "triggered",
+          "dismissed"
+        ]
       },
       "PriceAlertWrite": {
         "required": [
@@ -574,9 +587,13 @@
             ]
           },
           "evaluationPrice": {
-            "type": [
-              "null",
-              "string"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvaluationPrice"
+              }
             ]
           }
         }
@@ -656,7 +673,7 @@
             "format": "double"
           },
           "priceType": {
-            "type": "string"
+            "$ref": "#/components/schemas/EvaluationPrice"
           },
           "triggeredAt": {
             "type": "string",

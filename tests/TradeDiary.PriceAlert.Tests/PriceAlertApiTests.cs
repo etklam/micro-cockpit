@@ -45,17 +45,36 @@ public sealed class PriceAlertApiTests
         Assert.Equal("close", document.RootElement.GetProperty("evaluationPrice").GetString());
         var alertId = document.RootElement.GetProperty("id").GetGuid();
 
-        await new NpgsqlCommand($"UPDATE price_alert.alerts SET last_evaluated_date='2026-07-16' WHERE id='{alertId}'", setup).ExecuteNonQueryAsync();
+        await new NpgsqlCommand($"""
+            UPDATE price_alert.alerts SET status='triggered',last_evaluated_date='2026-07-16' WHERE id='{alertId}';
+            INSERT INTO price_alert.triggers(id,alert_id,trading_date,observed_close,observed_price,price_type,triggered_at)
+            VALUES ('{Guid.NewGuid()}','{alertId}','2026-07-14',100,100,'close','2026-07-14T22:00:00Z'),
+                   ('{Guid.NewGuid()}','{alertId}','2026-07-15',105,105,'close','2026-07-15T22:00:00Z');
+            """, setup).ExecuteNonQueryAsync();
         using var otherClient = factory.CreateClient(); otherClient.DefaultRequestHeaders.Add("X-Test-User", other.ToString());
         Assert.Equal(HttpStatusCode.NotFound, (await otherClient.GetAsync($"/internal/price-alerts/{alertId}/triggers")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await otherClient.PostAsync($"/internal/price-alerts/{alertId}/dismiss", null)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await otherClient.PostAsync($"/internal/price-alerts/{alertId}/reactivate", null)).StatusCode);
 
         Assert.Equal(HttpStatusCode.NoContent, (await ownerClient.PostAsync($"/internal/price-alerts/{alertId}/dismiss", null)).StatusCode);
+        await using (var dismissed = new NpgsqlCommand("SELECT status,(SELECT count(*) FROM price_alert.triggers WHERE alert_id=$1 AND dismissed_at IS NOT NULL),(SELECT dismissed_at IS NULL FROM price_alert.triggers WHERE alert_id=$1 ORDER BY triggered_at LIMIT 1) FROM price_alert.alerts WHERE id=$1", setup))
+        {
+            dismissed.Parameters.AddWithValue(alertId);
+            await using var reader = await dismissed.ExecuteReaderAsync(); Assert.True(await reader.ReadAsync());
+            Assert.Equal("dismissed", reader.GetString(0)); Assert.Equal(1L, reader.GetInt64(1)); Assert.True(reader.GetBoolean(2));
+        }
         Assert.Equal(HttpStatusCode.NoContent, (await ownerClient.PostAsync($"/internal/price-alerts/{alertId}/reactivate", null)).StatusCode);
-        await using var verify = new NpgsqlCommand("SELECT status,last_evaluated_date FROM price_alert.alerts WHERE id=$1", setup); verify.Parameters.AddWithValue(alertId);
-        await using var reader = await verify.ExecuteReaderAsync(); Assert.True(await reader.ReadAsync());
-        Assert.Equal("active", reader.GetString(0)); Assert.Equal(new DateOnly(2026, 7, 16), reader.GetFieldValue<DateOnly>(1));
+        Assert.Equal(HttpStatusCode.NoContent, (await ownerClient.PostAsync($"/internal/price-alerts/{alertId}/dismiss", null)).StatusCode);
+        Assert.Equal(1L, (long)(await new NpgsqlCommand($"SELECT count(*) FROM price_alert.triggers WHERE alert_id='{alertId}' AND dismissed_at IS NOT NULL", setup).ExecuteScalarAsync())!);
+        Assert.Equal(HttpStatusCode.NoContent, (await ownerClient.PostAsync($"/internal/price-alerts/{alertId}/reactivate", null)).StatusCode);
+        await using (var verify = new NpgsqlCommand("SELECT status,last_evaluated_date FROM price_alert.alerts WHERE id=$1", setup))
+        {
+            verify.Parameters.AddWithValue(alertId);
+            await using var reader = await verify.ExecuteReaderAsync(); Assert.True(await reader.ReadAsync());
+            Assert.Equal("active", reader.GetString(0)); Assert.Equal(new DateOnly(2026, 7, 16), reader.GetFieldValue<DateOnly>(1));
+        }
+        Assert.Equal(0, await PriceAlertEngine.Evaluate(dataSource, 100));
+        Assert.Equal(2L, (long)(await new NpgsqlCommand($"SELECT count(*) FROM price_alert.triggers WHERE alert_id='{alertId}'", setup).ExecuteScalarAsync())!);
     }
 
     private sealed class TestAuth(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
