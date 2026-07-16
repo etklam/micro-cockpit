@@ -212,24 +212,23 @@ Admin
 ## 3.4 Route Structure
 
 ```text
-/dashboard
+/today
 /diary
-/diary/new
-/diary/:id
-/quick-note
-/calendar
-/watchlist
-/stocks/:symbol
+/diary/:diaryId
+/calendar/:year/:month
 /discipline
-/alerts/diary
-/alerts/price
+/alerts
+/more
+/watchlist
+/price-alerts
+/rotation
 /partners
 /articles
 /articles/:slug
 /tools
-/tools/market-rotation-monitor
-/admin
 ```
+
+Quick Note is an action in the diary-first workflow rather than a separate route. Unknown routes show the not-found state.
 
 ---
 

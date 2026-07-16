@@ -1,32 +1,37 @@
-# React + TypeScript + Vite
+# Micro Cockpit frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 19 application built with TypeScript, Vite, React Router, and TanStack Query.
 
-Currently, two official plugins are available:
+The dependency boundary is:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```text
+Route page -> query/mutation hook -> feature API adapter -> generated Edge client
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+- `src/App.tsx` owns URL routing and the authenticated application shell.
+- `src/auth/AuthProvider.tsx` owns restoring/authenticated/anonymous session state.
+- `src/features/queries.ts` owns server-state keys, caching, and targeted invalidation.
+- `src/features/api.ts` adapts screen operations to the generated client.
+- `src/generated/edge.ts` is generated from `contracts/openapi/edge-api.openapi.json`; do not edit it manually.
+- `src/test/` contains Vitest, Testing Library, user-event, and MSW tests.
+
+The access token stays in memory. Session restoration uses the HttpOnly refresh cookie through Edge. Frontend code calls Edge only and contains no internal service URLs.
+
+## Commands
+
+```sh
+npm ci
+npm run dev
+npm run lint
+npm run build
+npm run test
+npm run api:generate
+npm run api:verify
+```
+
+For integrated development, startup, architecture, routes, API behavior, and verification:
+
+- [Getting started](../docs/tutorial-getting-started.md)
+- [How to develop and verify changes](../docs/how-to-development.md)
+- [System reference](../docs/reference-system.md)
+- [API and data reference](../docs/reference-api-data.md)

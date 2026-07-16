@@ -1,6 +1,18 @@
 # Micro Cockpit
 
-Diary-first trade journal. The current build targets the v0.1 boundary in `development-plan.md`.
+Diary-first investment decision journal with a React application, a typed Edge BFF, independently buildable .NET services, and schema-isolated PostgreSQL ownership.
+
+## Documentation
+
+| Read this | When you need to |
+|---|---|
+| [Run Micro Cockpit locally](docs/tutorial-getting-started.md) | Start the complete stack and exercise the first diary workflow |
+| [Develop and verify changes](docs/how-to-development.md) | Run local development loops, tests, contract generation, and migrations |
+| [System reference](docs/reference-system.md) | Look up processes, repository layout, routes, configuration, and health endpoints |
+| [API and data reference](docs/reference-api-data.md) | Look up public routes, authentication, ProblemDetails, composition, ownership, and null rules |
+| [Architecture](docs/explanation-architecture.md) | Understand the Edge boundary, session model, schema isolation, migration runner, and trade-offs |
+
+Operational procedures remain in [Operations](docs/operations.md), [Database migrations](docs/database-migrations.md), and [Rollback](docs/rollback.md). Product boundaries are in [PRODUCT.md](PRODUCT.md), UI direction is in [DESIGN.md](DESIGN.md), and service ownership is summarized in [SERVICE_CATALOG.md](SERVICE_CATALOG.md).
 
 ## Run the production-like stack
 
@@ -39,15 +51,15 @@ The system uses one shared PostgreSQL database and one deployment-time migration
 ## Run for development
 
 ```sh
-docker compose up --build db-role-finalize
-dotnet build TradeDiary.slnx
-cd frontend && npm install && npm run dev
-dotnet run --project gateway/TradeDiary.EdgeApi
+docker compose up -d --build --wait --wait-timeout 300
+docker compose stop frontend
+npm --prefix frontend ci
+npm --prefix frontend run dev -- --host 127.0.0.1
 ```
 
-Journal and Performance default to the local Compose PostgreSQL connection. Internal APIs accept only Identity-issued Bearer JWTs; user ID headers are not trusted.
+This runs Vite against the composed Edge API on port `5099`. For backend service iteration, contract generation, focused tests, and the complete CI-equivalent command set, follow [Develop and verify changes](docs/how-to-development.md).
 
-The frontend is dark-first and responsive. The gateway exposes `/health/live`, `/health/ready`, `/version`, and the initial `/api/app/dashboard` contract.
+Internal APIs accept only Identity-issued Bearer JWTs or explicitly service-key protected machine calls; user ID headers are not trusted. Edge exposes `/health/live`, `/health/ready`, `/version`, and typed `/api/app/*` contracts.
 
 ## Boundaries
 
