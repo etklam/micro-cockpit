@@ -114,9 +114,15 @@ static class JournalAccess
         return Results.Json(result.Body, statusCode: result.StatusCode);
     }
 
-    internal static DiaryResponse ReadDiary(NpgsqlDataReader reader) => new(
-        reader.GetGuid(0), reader.GetFieldValue<DateOnly>(1), reader.GetString(2), reader.GetString(3),
-        reader.GetDateTime(4), reader.GetDateTime(5));
+    internal static DiaryResponse ReadDiary(NpgsqlDataReader reader)
+    {
+        var tags = reader.FieldCount > 6
+            ? reader.GetFieldValue<string[]>(6)
+            : Array.Empty<string>();
+        return new(
+            reader.GetGuid(0), reader.GetFieldValue<DateOnly>(1), reader.GetString(2), reader.GetString(3),
+            reader.GetDateTime(4), reader.GetDateTime(5), tags);
+    }
 
     internal static async Task<bool> OwnsDiary(NpgsqlDataSource db, Guid diaryId, Guid userId)
     {

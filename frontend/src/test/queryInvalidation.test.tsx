@@ -30,7 +30,7 @@ beforeEach(() => { client = new QueryClient({ defaultOptions: { mutations: { ret
 test('diary mutation invalidates diaries, dashboard, and calendar queries', async () => {
   const invalidation = vi.spyOn(client, 'invalidateQueries')
   const { result } = renderHook(() => useSaveDiaryMutation(), { wrapper })
-  await act(() => result.current.mutateAsync({ date: '2026-07-16', title: 'Day', content: 'Notes', key: 'idempotency-key' }))
+  await act(() => result.current.mutateAsync({ date: '2026-07-16', title: 'Day', content: 'Notes', tags: ['fomo'], key: 'idempotency-key' }))
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diaries'] })
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['dashboard'] })
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['calendar'] })

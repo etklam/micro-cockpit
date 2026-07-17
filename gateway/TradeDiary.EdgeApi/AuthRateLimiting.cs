@@ -1,4 +1,6 @@
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.RateLimiting;
 
 internal static class AuthRateLimiting
@@ -6,7 +8,7 @@ internal static class AuthRateLimiting
     internal const string Register = "auth-register";
     internal const string Login = "auth-login";
     internal const string Refresh = "auth-refresh";
-    private const long AuthBodyBytes = 16_384;
+    internal const long AuthBodyBytes = 16_384;
 
     // Partition by RemoteIpAddress after UseForwardedHeaders. Without configured trusted
     // proxies, X-Forwarded-For is ignored and the direct peer IP is used.
@@ -43,14 +45,10 @@ internal static class AuthRateLimiting
             }));
     }
 
+    // Endpoint metadata is applied by AuthBodyLimitMiddleware before model binding.
+    // Do not use an endpoint filter alone: filters run after Minimal API body binding.
     internal static RouteHandlerBuilder LimitAuthBody(this RouteHandlerBuilder builder) =>
-        builder.AddEndpointFilter(async (context, next) =>
-        {
-            var feature = context.HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
-            if (feature is { IsReadOnly: false })
-                feature.MaxRequestBodySize = AuthBodyBytes;
-            return await next(context);
-        });
+        builder.WithMetadata(new AuthBodySizeLimit(AuthBodyBytes));
 
     private static string PartitionKey(HttpContext context) =>
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -63,5 +61,36 @@ internal static class AuthRateLimiting
             : 60;
         httpContext.Response.Headers.RetryAfter = retryAfterSeconds.ToString();
         await EdgeProblems.TooManyRequests(httpContext).ExecuteAsync(httpContext);
+    }
+}
+
+internal sealed class AuthBodySizeLimit(long maxRequestBodySize) : IRequestSizeLimitMetadata
+{
+    public long? MaxRequestBodySize { get; } = maxRequestBodySize;
+}
+
+/// <summary>
+/// Applies auth body size limits after endpoint selection and before body binding.
+/// Rejects oversized Content-Length immediately so Identity/password hashing is never reached.
+/// </summary>
+internal sealed class AuthBodyLimitMiddleware(RequestDelegate next)
+{
+    public async Task InvokeAsync(HttpContext context)
+    {
+        var limit = context.GetEndpoint()?.Metadata.GetMetadata<IRequestSizeLimitMetadata>()?.MaxRequestBodySize;
+        if (limit is long max)
+        {
+            var feature = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+            if (feature is { IsReadOnly: false })
+                feature.MaxRequestBodySize = max;
+
+            if (context.Request.ContentLength is long length && length > max)
+            {
+                await EdgeProblems.PayloadTooLarge(context).ExecuteAsync(context);
+                return;
+            }
+        }
+
+        await next(context);
     }
 }

@@ -62,7 +62,12 @@ public sealed record DiaryResponse(
     string Title,
     string Content,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    IReadOnlyList<string> Tags);
+
+public sealed record DiaryPageResponse(
+    IReadOnlyList<DiaryResponse> Items,
+    string? NextCursor);
 
 public sealed record DiaryReviewWrite(
     string? Thesis,

@@ -117,6 +117,33 @@ public sealed class AuthRateLimitingTests
         Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("/api/auth/register")]
+    [InlineData("/api/auth/login")]
+    [InlineData("/api/auth/api-key/token")]
+    public async Task Oversized_auth_bodies_return_413_and_do_not_reach_identity(string path)
+    {
+        var observed = new List<(string Path, bool HasRegistrationKey)>();
+        using var factory = CreateFactory(observed);
+        using var client = factory.CreateClient();
+
+        var oversized = new string('x', 16_385);
+        using var content = new StringContent(
+            path.Contains("api-key", StringComparison.Ordinal)
+                ? $$"""{"apiKey":"{{oversized}}"}"""
+                : path.Contains("login", StringComparison.Ordinal)
+                    ? $$"""{"email":"a@b.co","password":"{{oversized}}"}"""
+                    : $$"""{"email":"a@b.co","password":"{{oversized}}","displayName":"T","timezone":"UTC","baseCurrency":"USD"}""",
+            Encoding.UTF8,
+            "application/json");
+        using var response = await client.PostAsync(path, content);
+
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("payload_too_large", problem.GetProperty("code").GetString());
+        Assert.DoesNotContain(observed, r => r.Path.Contains("/internal/auth/", StringComparison.Ordinal));
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(List<(string Path, bool HasRegistrationKey)>? observed = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {

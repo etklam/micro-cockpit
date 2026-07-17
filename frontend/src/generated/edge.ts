@@ -13,7 +13,6 @@ export type CalendarResponse = { "year": number; "month": number; "summary": Mon
 export type CapabilityStatus = "available" | "empty" | "unavailable"
 export type CollectionResponseOfAuditResponse = { "items": Array<AuditResponse> }
 export type CollectionResponseOfDiaryAlertResponse = { "items": Array<DiaryAlertResponse> }
-export type CollectionResponseOfDiaryResponse = { "items": Array<DiaryResponse> }
 export type CollectionResponseOfDisciplineResponse = { "items": Array<DisciplineResponse> }
 export type CollectionResponseOfJobResponse = { "items": Array<JobResponse> }
 export type CollectionResponseOfLink = { "items": Array<Link> }
@@ -29,7 +28,8 @@ export type CreatedResponse = { "id": string }
 export type DashboardResponse = { "localDate": string; "diary": { "writtenToday": boolean; "count": number }; "performance": PerformanceResponse | null; "pendingAlerts": number | null; "discipline": DisciplineResponse | null; "recentDiaries": Array<DiaryResponse>; "capabilities": { "alerts": CapabilityStatus; "discipline": CapabilityStatus } }
 export type DiaryAlertResponse = { "id": string; "diaryId": string; "startLocalDate": string; "nextLocalDate": null | string; "localTime": string; "timezone": string; "repeatMode": string; "recurrenceEndLocalDate": string; "nextTriggerAt": null | string; "status": string; "createdAt": string; "updatedAt": string }
 export type DiaryAlertWrite = { "diaryId": string; "startLocalDate": string; "localTime": string; "timezone": string; "repeatMode": string }
-export type DiaryResponse = { "id": string; "localDate": string; "title": string; "content": string; "createdAt": string; "updatedAt": string }
+export type DiaryPage = { "items": Array<DiaryResponse>; "nextCursor": null | string }
+export type DiaryResponse = { "id": string; "localDate": string; "title": string; "content": string; "createdAt": string; "updatedAt": string; "tags": Array<string> }
 export type DiaryReviewAssessmentFilter = "all" | "good" | "mixed" | "poor"
 export type DiaryReviewFilterStatus = "all" | "reviewed" | "unreviewed"
 export type DiaryReviewItemResponse = { "diaryId": string; "localDate": string; "title": string; "contentPreview": string; "reviewStatus": DiaryReviewStatus; "processAssessment": null | DiaryReviewProcessAssessment; "emotion": null | string; "disciplineScore": null | number | string; "executionScore": null | number | string; "mistakeTags": Array<string>; "lesson": null | string; "nextAction": null | string; "reviewUpdatedAt": null | string }
@@ -39,7 +39,7 @@ export type DiaryReviewResponse = { "diaryId": string; "thesis": null | string; 
 export type DiaryReviewStatus = "reviewed" | "unreviewed"
 export type DiaryReviewSummaryResponse = { "reviewedCount": number | string; "averageDisciplineScore": number | null; "averageExecutionScore": number | null; "emotionCounts": { [key: string]: number | string }; "processAssessmentCounts": { [key: string]: number | string }; "topMistakeTags": Array<MistakeTagCountResponse> }
 export type DiaryReviewWrite = { "thesis": null | string; "plannedAction": null | string; "actualAction": null | string; "emotion": null | string; "disciplineScore": null | number | string; "executionScore": null | number | string; "processAssessment": null | string; "mistakeTags": null | Array<string>; "lesson": null | string; "nextAction": null | string }
-export type DiaryWrite = { "localDate": string; "title": string; "content": null | string }
+export type DiaryWrite = { "localDate": string; "title": string; "content": null | string; "tags"?: null | Array<string> }
 export type DisciplineResponse = { "id": string; "content": string; "position": number | string; "createdAt": string; "updatedAt": string }
 export type DisciplineWrite = { "content": string }
 export type EdgeProblemDetails = { "code": string; "title": string; "status": number; "detail": string; "correlationId": string }
@@ -158,7 +158,6 @@ export const postApiAdminOperationsJobs = (body: JobWrite, extra?: RequestInit) 
 export const postApiAdminOperationsHealth = (body: HealthWrite, extra?: RequestInit) => request<unknown>("/api/admin/operations/health", { method: "POST", body: JSON.stringify(body), ...extra })
 export const getApiContentPosts = (extra?: RequestInit) => request<CollectionResponseOfPostResponse>("/api/content/posts", { method: "GET", ...extra })
 export const getApiContentPostsSlug = (slug: string, extra?: RequestInit) => request<PostResponse>(`/api/content/posts/${encodeURIComponent(String(slug))}`, { method: "GET", ...extra })
-export const postApiAuthRegister = (body: RegisterRequest, extra?: RequestInit) => request<RegisterResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAuthApiKeyToken = (body: ApiKeyTokenRequest, extra?: RequestInit) => request<ApiKeyTokenResponse>("/api/auth/api-key/token", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAppAgents = (body: AgentRequest, extra?: RequestInit) => request<AgentResponse>("/api/app/agents", { method: "POST", body: JSON.stringify(body), ...extra })
 export const deleteApiAppApiKeysId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/api-keys/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
@@ -172,7 +171,7 @@ export const postApiAppDiaryAlerts = (body: DiaryAlertWrite, extra?: RequestInit
 export const deleteApiAppDiaryAlertsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diary-alerts/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const postApiAppDiaryAlertsIdDismiss = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diary-alerts/${encodeURIComponent(String(id))}/dismiss`, { method: "POST", ...extra })
 export const postApiAppQuickNote = (body: QuickNote, extra?: RequestInit) => request<QuickNoteResponse>("/api/app/quick-note", { method: "POST", body: JSON.stringify(body), ...extra })
-export const getApiAppDiaries = (extra?: RequestInit) => request<CollectionResponseOfDiaryResponse>("/api/app/diaries", { method: "GET", ...extra })
+export const getApiAppDiaries = (query: { "query"?: string; "from"?: string; "to"?: string; "reviewStatus"?: string; "symbol"?: string; "tag"?: string; "cursor"?: string; "limit"?: number | string }, extra?: RequestInit) => request<DiaryPage>("/api/app/diaries" + withQuery(query), { method: "GET", ...extra })
 export const postApiAppDiaries = (body: DiaryWrite, extra?: RequestInit) => request<DiaryResponse>("/api/app/diaries", { method: "POST", body: JSON.stringify(body), ...extra })
 export const getApiAppDiariesId = (id: string, extra?: RequestInit) => request<DiaryResponse>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "GET", ...extra })
 export const putApiAppDiariesId = (id: string, body: DiaryWrite, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
@@ -219,6 +218,7 @@ export const getApiAppBootstrap = (extra?: RequestInit) => request<AppBootstrapR
 export const getApiAppDashboard = (extra?: RequestInit) => request<DashboardResponse>("/api/app/dashboard", { method: "GET", ...extra })
 export const getApiAppCalendar = (query: { "year": number; "month": number }, extra?: RequestInit) => request<CalendarResponse>("/api/app/calendar" + withQuery(query), { method: "GET", ...extra })
 export const getApiAppStocksSymbolPage = (symbol: string, extra?: RequestInit) => request<StockPageResponse>(`/api/app/stocks/${encodeURIComponent(String(symbol))}/page`, { method: "GET", ...extra })
+export const postApiAuthRegister = (body: RegisterRequest, extra?: RequestInit) => request<RegisterResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAuthLogin = (body: LoginRequest, extra?: RequestInit) => request<SessionTokens>("/api/auth/login", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAuthRefresh = (extra?: RequestInit) => request<SessionTokens>("/api/auth/refresh", { method: "POST", ...extra })
 export const postApiAuthLogout = (extra?: RequestInit) => request<unknown>("/api/auth/logout", { method: "POST", ...extra })

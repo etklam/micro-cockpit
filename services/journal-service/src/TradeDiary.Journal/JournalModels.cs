@@ -1,8 +1,8 @@
 using System.Text.Json;
 
-record DiaryWrite(DateOnly LocalDate, string Title, string? Content);
+public record DiaryWrite(DateOnly LocalDate, string Title, string? Content, IReadOnlyList<string>? Tags = null);
 record QuickNote(DateOnly LocalDate, string Content, Guid? TargetDiaryId);
-record DiaryResponse(Guid Id, DateOnly LocalDate, string Title, string Content, DateTime CreatedAt, DateTime UpdatedAt);
+public record DiaryResponse(Guid Id, DateOnly LocalDate, string Title, string Content, DateTime CreatedAt, DateTime UpdatedAt, IReadOnlyList<string> Tags);
 record TransactionWrite(string Symbol, string Side, decimal Quantity, decimal Price, string Currency, DateTime TradedAt, string? Notes);
 record TransactionResponse(Guid Id, Guid DiaryId, string Symbol, string Side, decimal Quantity, decimal Price, string Currency, DateTime TradedAt, string Notes, DateTime CreatedAt, DateTime UpdatedAt);
 record StoredResult(int StatusCode, string? Location, JsonElement Body);

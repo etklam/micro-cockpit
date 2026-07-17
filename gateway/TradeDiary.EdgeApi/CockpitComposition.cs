@@ -57,7 +57,7 @@ internal static class CockpitComposition
     {
         var date = localDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var journalDayTask = transport.GetAsync<CollectionResponse<DiaryDayFact>>("journal", $"/internal/diary-day-summary?from={date}&to={date}", context);
-        var diariesTask = transport.GetAsync<CollectionResponse<DiaryResponse>>("journal", "/internal/diaries", context);
+        var diariesTask = transport.GetAsync<DiaryPageResponse>("journal", "/internal/diaries?limit=5", context);
         var performanceTask = transport.GetAsync<DailyPerformanceResponse>("performance", $"/internal/performance/day/{date}", context);
         var disciplineTask = transport.GetAsync<DisciplineResponse>("discipline", $"/internal/disciplines/today?date={date}", context);
         var alertsTask = transport.GetAsync<DayAlertFact>("reminder", $"/internal/diary-alerts/day-summary?date={date}", context);

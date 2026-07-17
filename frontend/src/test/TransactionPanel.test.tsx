@@ -61,10 +61,10 @@ function authenticatedHandlers(options?: {
       const url = new URL(request.url)
       return HttpResponse.json({ year: Number(url.searchParams.get('year')), month: Number(url.searchParams.get('month')), summary: null, days: [], capabilities: { alerts: 'unavailable' } })
     }),
-    http.get('/api/app/diaries', () => HttpResponse.json({ items: [] })),
+    http.get('/api/app/diaries', () => HttpResponse.json({ items: [], nextCursor: null })),
     http.get('/api/app/diary-review-summary', () => HttpResponse.json({ reviewedCount: 0, averageDisciplineScore: null, averageExecutionScore: null, emotionCounts: {}, processAssessmentCounts: {}, topMistakeTags: [] })),
     http.get('/api/app/diary-review-items', () => HttpResponse.json({ items: [], nextCursor: null })),
-    http.get('/api/app/diaries/:id', () => HttpResponse.json({ id: diaryId, localDate: '2026-07-16', title: 'Direct entry', content: 'Notes', createdAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T00:00:00Z' })),
+    http.get('/api/app/diaries/:id', () => HttpResponse.json({ id: diaryId, localDate: '2026-07-16', title: 'Direct entry', content: 'Notes', createdAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T00:00:00Z', tags: [] })),
     http.get('/api/app/diaries/:id/review', () => new HttpResponse(null, { status: 404 })),
     http.get('/api/app/diaries/:id/transactions', () => HttpResponse.json({ items })),
     http.post('/api/app/diaries/:id/transactions', async ({ params, request }) => {

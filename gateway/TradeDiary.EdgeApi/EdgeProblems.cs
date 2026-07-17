@@ -17,6 +17,9 @@ internal static class EdgeProblems
     internal static IResult TooManyRequests(HttpContext context) =>
         Create(context, StatusCodes.Status429TooManyRequests, "rate_limited", "Too many requests", "Too many authentication attempts. Retry later.");
 
+    internal static IResult PayloadTooLarge(HttpContext context) =>
+        Create(context, StatusCodes.Status413PayloadTooLarge, "payload_too_large", "Payload too large", "The request body exceeds the allowed size.");
+
     internal static IResult FromStatus(HttpContext context, int status) => status switch
     {
         StatusCodes.Status400BadRequest => InvalidRequest(context),
@@ -24,6 +27,7 @@ internal static class EdgeProblems
         StatusCodes.Status403Forbidden => Create(context, status, "access_denied", "Access denied", "You do not have access to this operation."),
         StatusCodes.Status404NotFound => Create(context, status, "resource_not_found", "Resource not found", "The requested resource was not found."),
         StatusCodes.Status409Conflict => Create(context, status, "conflict", "Conflict", "The request conflicts with the current resource state."),
+        StatusCodes.Status413PayloadTooLarge => PayloadTooLarge(context),
         StatusCodes.Status422UnprocessableEntity => Create(context, status, "validation_failed", "Validation failed", "The request failed validation."),
         StatusCodes.Status429TooManyRequests => TooManyRequests(context),
         StatusCodes.Status502BadGateway => DownstreamInvalid(context),
@@ -45,6 +49,7 @@ internal static class EdgeProblems
         StatusCodes.Status403Forbidden or
         StatusCodes.Status404NotFound or
         StatusCodes.Status409Conflict or
+        StatusCodes.Status413PayloadTooLarge or
         StatusCodes.Status422UnprocessableEntity or
         StatusCodes.Status429TooManyRequests or
         StatusCodes.Status502BadGateway or
@@ -70,10 +75,16 @@ internal sealed class EdgeExceptionMiddleware(RequestDelegate next, ILogger<Edge
         {
             throw;
         }
-        catch (BadHttpRequestException)
+        catch (BadHttpRequestException exception)
         {
             if (context.Response.HasStarted) throw;
             context.Response.Clear();
+            // Kestrel raises BadHttpRequestException with 413 when MaxRequestBodySize is exceeded.
+            if (exception.StatusCode == StatusCodes.Status413PayloadTooLarge)
+            {
+                await EdgeProblems.PayloadTooLarge(context).ExecuteAsync(context);
+                return;
+            }
             await EdgeProblems.InvalidRequest(context).ExecuteAsync(context);
         }
         catch (Exception exception)

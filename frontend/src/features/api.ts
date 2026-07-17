@@ -33,13 +33,58 @@ export const getBootstrap = () => G.getApiAppBootstrap()
 export const getDashboard = () => G.getApiAppDashboard()
 export const saveQuickNote = (localDate: string, content: string, key?: string) =>
   G.postApiAppQuickNote({ localDate, content, targetDiaryId: null }, idempotencyHeader(key))
-export const getDiaries = () => G.getApiAppDiaries()
+export type DiaryPage = G.DiaryPage
+export type DiaryListQuery = {
+  query?: string
+  from?: string
+  to?: string
+  reviewStatus?: 'all' | 'reviewed' | 'unreviewed'
+  symbol?: string
+  tag?: string
+  cursor?: string
+  limit?: number
+}
+export const getDiaries = (params: DiaryListQuery = {}) => G.getApiAppDiaries({
+  query: params.query || undefined,
+  from: params.from || undefined,
+  to: params.to || undefined,
+  reviewStatus: params.reviewStatus && params.reviewStatus !== 'all' ? params.reviewStatus : params.reviewStatus === 'all' ? 'all' : undefined,
+  symbol: params.symbol || undefined,
+  tag: params.tag || undefined,
+  cursor: params.cursor || undefined,
+  limit: params.limit ?? 20,
+})
 export const getDiary = (id: string) => G.getApiAppDiariesId(id)
-export const createDiary = (localDate: string, title: string, content: string, key?: string) =>
-  G.postApiAppDiaries({ localDate, title, content }, idempotencyHeader(key))
-export const updateDiary = (id: string, localDate: string, title: string, content: string) =>
-  G.putApiAppDiariesId(id, { localDate, title, content })
+export const createDiary = (localDate: string, title: string, content: string, tags: string[], key?: string) =>
+  G.postApiAppDiaries({ localDate, title, content, tags }, idempotencyHeader(key))
+export const updateDiary = (id: string, localDate: string, title: string, content: string, tags: string[]) =>
+  G.putApiAppDiariesId(id, { localDate, title, content, tags })
 export const deleteDiary = (id: string) => G.deleteApiAppDiariesId(id)
+export function diaryMutationErrorMessage(error: unknown) {
+  if (!(error instanceof G.ApiError)) return 'Could not save the entry. Try again.'
+  if (error.status === 400 || error.status === 422) {
+    if (error.responseBody.includes('too_many_tags')) return 'At most 10 tags are allowed.'
+    if (error.responseBody.includes('invalid_tag')) return 'One or more tags are invalid.'
+    if (error.responseBody.includes('title_required')) return 'Title is required.'
+    return 'Check the date, title, content, and tags.'
+  }
+  if (error.status === 404) return 'This diary entry no longer exists. Refresh and try again.'
+  if (error.status === 409) return 'This create request conflicts with a previous one. Refresh and try again.'
+  if (error.status === 503 || error.status === 504) return 'The diary service is temporarily unavailable. Try again.'
+  return 'Could not save the entry. Try again.'
+}
+export function diaryDeleteErrorMessage(error: unknown) {
+  if (!(error instanceof G.ApiError)) return 'Could not delete the entry. Try again.'
+  if (error.status === 404) return 'This diary entry no longer exists. Refresh and try again.'
+  if (error.status === 503 || error.status === 504) return 'The diary service is temporarily unavailable. Try again.'
+  return 'Could not delete the entry. Try again.'
+}
+export function transactionDeleteErrorMessage(error: unknown) {
+  if (!(error instanceof G.ApiError)) return 'Could not delete the trade. Try again.'
+  if (error.status === 404) return 'This trade no longer exists. Refresh the diary and try again.'
+  if (error.status === 503 || error.status === 504) return 'The transaction service is temporarily unavailable. Try again.'
+  return 'Could not delete the trade. Try again.'
+}
 export const getTransactions = (diaryId: string) => G.getApiAppDiariesDiaryIdTransactions(diaryId)
 export async function getDiaryReview(diaryId: string): Promise<DiaryReview | null> {
   try { return await G.getApiAppDiariesDiaryIdReview(diaryId) } catch (error) { if (String(error).includes('request_failed_404')) return null; throw error }

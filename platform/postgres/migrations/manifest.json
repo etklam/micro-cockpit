@@ -1,22 +1,95 @@
 {
   "format": 1,
   "migrations": [
-    { "id": "0001", "filename": "0001_initial_journal_performance.sql", "sha256": "8ee0c003796eb93e017430e4c04164c90337fb8b020e8af1742bc9a6c7079504" },
-    { "id": "0002", "filename": "0002_identity.sql", "sha256": "58fba6456bf0a3007b3f6b796ebe6ae510ce5481c994a8db6e1360443c3ffdae" },
-    { "id": "0003", "filename": "0003_extend_transactions.sql", "sha256": "490e488491d1a38bb2ac63620e8896b0de837d018f5cbdee2c5d7d26c39b6b28" },
-    { "id": "0004", "filename": "0004_discipline.sql", "sha256": "55db95a46e3f73c7efe02a4e517be482587a13dfec4a89b7d6b415c81caae370" },
-    { "id": "0005", "filename": "0005_reminder.sql", "sha256": "630e9a132c2d5062b4f3ad8076d84d09449229f47eafe256adb25b59403fcb7b" },
-    { "id": "0006", "filename": "0006_diary_deleted_events.sql", "sha256": "367d1db4b7cc4049bf289035705408887d51efebcaa7db527334d6003516c0dd" },
-    { "id": "0007", "filename": "0007_market_data.sql", "sha256": "9a309bb08b42339fdeb03f1ddcf56cfc0d1883191fa5d031f91a5355932f6228" },
-    { "id": "0008", "filename": "0008_stock_research.sql", "sha256": "32b6237c90c2b55f00ee6d0c093cd82f6a1d27381c309b03a17c177fba6c6d4a" },
-    { "id": "0009", "filename": "0009_price_alert.sql", "sha256": "1257ae6cf2c56135b028c4abe046f96e8032c076f9d9b6a8eb8b671d115d8ef3" },
-    { "id": "0010", "filename": "0010_rotation.sql", "sha256": "d2e832c64235224f68d0ac4acf49d17107462477f49ca08f7358c4f6ade5a006" },
-    { "id": "0011", "filename": "0011_partner_content_operations.sql", "sha256": "d5be115a259d1e0b523178f717b07a8cbc1dabdc00c27689b5696730e5e17d4e" },
-    { "id": "0012", "filename": "0012_identity_api_keys.sql", "sha256": "716ee592d783021169621e91e7ce6be64c9c4d7ccfa3866779d9953ac2d74e00" },
-    { "id": "0013", "filename": "0013_journal_idempotency.sql", "sha256": "d424bf4a04b0d41afc1f63e361224f92bd0afe70661794d163b65baaa3f5565c" },
-    { "id": "0014", "filename": "0014_structured_diary_review.sql", "sha256": "cdac3514e27c4232654d0497416057fa1ed9b2a1e88a9ee222bb5556b3e19538" },
-    { "id": "0015", "filename": "0015_diary_review_ownership.sql", "sha256": "7d7d226e00c90fedd443c3950afac19bf10ca21bf4c814ed2938891fedd7529c" },
-    { "id": "0016", "filename": "0016_market_daily_bar_price_contract.sql", "sha256": "4794c699600ad1876a63ac13dd4aca102a9169a11a760d1119804695917b4569" },
-    { "id": "0017", "filename": "0017_price_alert_evaluation_price.sql", "sha256": "9f86661257ef75d16fe37c85cd2dea20c6f5b076ea8e7311e0e894c26c30147b" }
+    {
+      "id": "0001",
+      "filename": "0001_initial_journal_performance.sql",
+      "sha256": "8ee0c003796eb93e017430e4c04164c90337fb8b020e8af1742bc9a6c7079504"
+    },
+    {
+      "id": "0002",
+      "filename": "0002_identity.sql",
+      "sha256": "58fba6456bf0a3007b3f6b796ebe6ae510ce5481c994a8db6e1360443c3ffdae"
+    },
+    {
+      "id": "0003",
+      "filename": "0003_extend_transactions.sql",
+      "sha256": "490e488491d1a38bb2ac63620e8896b0de837d018f5cbdee2c5d7d26c39b6b28"
+    },
+    {
+      "id": "0004",
+      "filename": "0004_discipline.sql",
+      "sha256": "55db95a46e3f73c7efe02a4e517be482587a13dfec4a89b7d6b415c81caae370"
+    },
+    {
+      "id": "0005",
+      "filename": "0005_reminder.sql",
+      "sha256": "630e9a132c2d5062b4f3ad8076d84d09449229f47eafe256adb25b59403fcb7b"
+    },
+    {
+      "id": "0006",
+      "filename": "0006_diary_deleted_events.sql",
+      "sha256": "367d1db4b7cc4049bf289035705408887d51efebcaa7db527334d6003516c0dd"
+    },
+    {
+      "id": "0007",
+      "filename": "0007_market_data.sql",
+      "sha256": "9a309bb08b42339fdeb03f1ddcf56cfc0d1883191fa5d031f91a5355932f6228"
+    },
+    {
+      "id": "0008",
+      "filename": "0008_stock_research.sql",
+      "sha256": "32b6237c90c2b55f00ee6d0c093cd82f6a1d27381c309b03a17c177fba6c6d4a"
+    },
+    {
+      "id": "0009",
+      "filename": "0009_price_alert.sql",
+      "sha256": "1257ae6cf2c56135b028c4abe046f96e8032c076f9d9b6a8eb8b671d115d8ef3"
+    },
+    {
+      "id": "0010",
+      "filename": "0010_rotation.sql",
+      "sha256": "d2e832c64235224f68d0ac4acf49d17107462477f49ca08f7358c4f6ade5a006"
+    },
+    {
+      "id": "0011",
+      "filename": "0011_partner_content_operations.sql",
+      "sha256": "d5be115a259d1e0b523178f717b07a8cbc1dabdc00c27689b5696730e5e17d4e"
+    },
+    {
+      "id": "0012",
+      "filename": "0012_identity_api_keys.sql",
+      "sha256": "716ee592d783021169621e91e7ce6be64c9c4d7ccfa3866779d9953ac2d74e00"
+    },
+    {
+      "id": "0013",
+      "filename": "0013_journal_idempotency.sql",
+      "sha256": "d424bf4a04b0d41afc1f63e361224f92bd0afe70661794d163b65baaa3f5565c"
+    },
+    {
+      "id": "0014",
+      "filename": "0014_structured_diary_review.sql",
+      "sha256": "cdac3514e27c4232654d0497416057fa1ed9b2a1e88a9ee222bb5556b3e19538"
+    },
+    {
+      "id": "0015",
+      "filename": "0015_diary_review_ownership.sql",
+      "sha256": "7d7d226e00c90fedd443c3950afac19bf10ca21bf4c814ed2938891fedd7529c"
+    },
+    {
+      "id": "0016",
+      "filename": "0016_market_daily_bar_price_contract.sql",
+      "sha256": "4794c699600ad1876a63ac13dd4aca102a9169a11a760d1119804695917b4569"
+    },
+    {
+      "id": "0017",
+      "filename": "0017_price_alert_evaluation_price.sql",
+      "sha256": "9f86661257ef75d16fe37c85cd2dea20c6f5b076ea8e7311e0e894c26c30147b"
+    },
+    {
+      "id": "0018",
+      "filename": "0018_diary_tags_and_list_indexes.sql",
+      "sha256": "2b73d3d458d42a194c83bf2e5edf6e123b98c54f2a9c35f2f016efc0d96c0613"
+    }
   ]
 }

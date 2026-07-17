@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, FormEvent } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import type { ChangeEvent, FormEvent, KeyboardEvent } from 'react'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { Diary, DiaryReviewWrite, Transaction } from '../features/api'
-import { transactionUpdateErrorMessage, useIdempotencyKey } from '../features/api'
+import {
+  diaryDeleteErrorMessage, diaryMutationErrorMessage, transactionDeleteErrorMessage,
+  transactionUpdateErrorMessage, useIdempotencyKey,
+} from '../features/api'
+import {
+  diaryFiltersActive, diaryFiltersToSearch, emptyDiaryFilters, normalizeTags, parseDiaryFilters,
+  type DiaryFilters,
+} from '../features/diaryFilters'
+import { MarkdownView, plainExcerpt } from '../features/markdown'
 import {
   useBootstrapQuery, useCreateTransactionMutation, useDeleteDiaryMutation, useDeleteTransactionMutation,
-  useDiariesQuery, useDiaryQuery, useSaveDiaryMutation,
+  useDiariesInfiniteQuery, useDiaryQuery, useSaveDiaryMutation,
   useDeleteDiaryReviewMutation, useDiaryReviewQuery, useDiaryReviewSummaryQuery, useSaveDiaryReviewMutation,
   useTransactionsQuery, useUpdateTransactionMutation,
 } from '../features/queries'
@@ -16,13 +24,41 @@ import { quantity, todayISO } from '../format'
 export function DiaryPage() {
   const { confirm } = useCockpit()
   const navigate = useNavigate()
-  const { data, isLoading: loading, isError: error, refetch: reload } = useDiariesQuery()
-  const items = data?.items ?? []
+  const [search, setSearch] = useSearchParams()
+  const filters = useMemo(() => parseDiaryFilters(search), [search])
+  const [keywordDraft, setKeywordDraft] = useState(filters.q)
+  useEffect(() => { setKeywordDraft(filters.q) }, [filters.q])
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      if (keywordDraft === filters.q) return
+      writeFilters({ ...filters, q: keywordDraft.trim() })
+    }, 300)
+    return () => window.clearTimeout(handle)
+  }, [keywordDraft]) // eslint-disable-line react-hooks/exhaustive-deps -- debounce keyword only
+
+  const list = useDiariesInfiniteQuery(filters)
+  const items = useMemo(() => {
+    const seen = new Set<string>()
+    const rows: Diary[] = []
+    for (const page of list.data?.pages ?? []) {
+      for (const item of page.items) {
+        if (seen.has(item.id)) continue
+        seen.add(item.id)
+        rows.push(item)
+      }
+    }
+    return rows
+  }, [list.data])
+
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [date, setDate] = useState(todayISO())
+  const [tags, setTags] = useState<string[]>([])
+  const [tagDraft, setTagDraft] = useState('')
+  const [mode, setMode] = useState<'write' | 'preview'>('write')
   const [editing, setEditing] = useState<Diary | null>(null)
   const [formError, setFormError] = useState('')
+  const [listError, setListError] = useState('')
   const idem = useIdempotencyKey()
   const saveDiary = useSaveDiaryMutation()
   const deleteDiary = useDeleteDiaryMutation()
@@ -34,34 +70,58 @@ export function DiaryPage() {
     return { from: fromDate.toISOString().slice(0, 10), to }
   }, [bootstrap.data?.currentLocalDate])
   const reviewSummary = useDiaryReviewSummaryQuery(reviewWindow.from, reviewWindow.to)
+  const activeFilters = diaryFiltersActive(filters)
+
+  function writeFilters(next: DiaryFilters) {
+    setSearch(diaryFiltersToSearch(next), { replace: false })
+  }
 
   function startEdit(d: Diary) {
     setEditing(d); setTitle(d.title); setContent(d.content); setDate(d.localDate)
+    setTags([...(d.tags ?? [])]); setTagDraft(''); setMode('write'); setFormError('')
     document.getElementById('diary-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
-  function reset() { setEditing(null); setTitle(''); setContent(''); setDate(todayISO()); setFormError(''); idem.reset() }
+  function reset() {
+    setEditing(null); setTitle(''); setContent(''); setDate(todayISO()); setTags([]); setTagDraft('')
+    setMode('write'); setFormError(''); idem.reset()
+  }
+
+  function commitTagDraft() {
+    const pieces = tagDraft.split(',').map(part => part.trim()).filter(Boolean)
+    if (!pieces.length) return
+    const next = normalizeTags([...tags, ...pieces])
+    if (next.error) { setFormError(next.error); return }
+    setTags(next.tags); setTagDraft(''); setFormError('')
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setFormError('')
+    const normalized = normalizeTags(tagDraft.trim() ? [...tags, ...tagDraft.split(',')] : tags)
+    if (normalized.error) { setFormError(normalized.error); return }
     try {
-      await saveDiary.mutateAsync({ id: editing?.id, date, title, content, key: idem.key() })
+      await saveDiary.mutateAsync({ id: editing?.id, date, title, content, tags: normalized.tags, key: idem.key() })
       reset()
-    } catch {
-      setFormError('Could not save the entry.')
+    } catch (error) {
+      setFormError(diaryMutationErrorMessage(error))
     }
   }
 
   async function remove(d: Diary) {
     const ok = await confirm({ title: 'Delete entry?', message: `“${d.title}” and its trades will be removed.`, confirmText: 'Delete', tone: 'danger' })
     if (!ok) return
-    await deleteDiary.mutateAsync(d.id)
-    if (editing?.id === d.id) reset()
+    setListError('')
+    try {
+      await deleteDiary.mutateAsync(d.id)
+      if (editing?.id === d.id) reset()
+    } catch (error) {
+      setListError(diaryDeleteErrorMessage(error))
+    }
   }
 
   return (
     <>
-      <PageHeader title="Diary" subtitle={`${items.length} reflection${items.length === 1 ? '' : 's'}`} />
+      <PageHeader title="Diary" subtitle={`${items.length} loaded reflection${items.length === 1 ? '' : 's'}`} />
       <Link className="text-link" to="/review">Open monthly review</Link>
 
       <Card as="section" className="review-patterns">
@@ -86,12 +146,44 @@ export function DiaryPage() {
               <TextInput required maxLength={160} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Name the day" />
             </Field>
           </div>
-          <Field label="Reflection">
-            <TextArea
-              required value={content} onChange={(e) => setContent(e.target.value)}
-              placeholder="What happened, and what will you remember about it?"
-              className="textarea--prose textarea--lg"
-            />
+          <div className="diary-mode" role="tablist" aria-label="Reflection editor mode">
+            <Button type="button" size="sm" variant={mode === 'write' ? 'primary' : 'ghost'} aria-selected={mode === 'write'} onClick={() => setMode('write')}>Write</Button>
+            <Button type="button" size="sm" variant={mode === 'preview' ? 'primary' : 'ghost'} aria-selected={mode === 'preview'} onClick={() => setMode('preview')}>Preview</Button>
+          </div>
+          {mode === 'write' ? (
+            <Field label="Reflection">
+              <TextArea
+                required value={content} onChange={(e) => setContent(e.target.value)}
+                placeholder="What happened, and what will you remember about it? Markdown is supported."
+                className="textarea--prose textarea--lg"
+              />
+            </Field>
+          ) : (
+            <Field label="Preview">
+              <MarkdownView content={content} className="prose entry__body diary-preview" />
+            </Field>
+          )}
+          <Field label="Tags" hint="Press Enter or comma. Max 10.">
+            <div className="tag-editor">
+              <div className="tag-chips">
+                {tags.map(tag => (
+                  <button key={tag} type="button" className="tag-chip" onClick={() => setTags(tags.filter(item => item !== tag))} aria-label={`Remove tag ${tag}`}>
+                    {tag} ×
+                  </button>
+                ))}
+              </div>
+              <TextInput
+                aria-label="Add tag"
+                value={tagDraft}
+                onChange={(e) => setTagDraft(e.target.value)}
+                onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+                  if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); commitTagDraft() }
+                }}
+                onBlur={commitTagDraft}
+                placeholder="fomo, breakout"
+                disabled={tags.length >= 10}
+              />
+            </div>
           </Field>
           {formError ? <p className="form-error" role="alert">{formError}</p> : null}
           <div className="form-actions">
@@ -103,31 +195,86 @@ export function DiaryPage() {
         </form>
       </Card>
 
-      {error ? (
-        <SectionError onRetry={reload} />
-      ) : loading ? (
+      <Card as="section" className="diary-filters">
+        <div className="form-row diary-filters__row">
+          <Field label="Search" className="field--grow">
+            <TextInput aria-label="Keyword" value={keywordDraft} onChange={(e) => setKeywordDraft(e.target.value)} placeholder="Title or content" />
+          </Field>
+          <Field label="From"><TextInput type="date" value={filters.from} onChange={(e) => writeFilters({ ...filters, from: e.target.value })} /></Field>
+          <Field label="To"><TextInput type="date" value={filters.to} onChange={(e) => writeFilters({ ...filters, to: e.target.value })} /></Field>
+          <Field label="Review">
+            <SelectBox value={filters.review} onChange={(e) => writeFilters({ ...filters, review: e.target.value as DiaryFilters['review'] })}>
+              <option value="all">All</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="unreviewed">Unreviewed</option>
+            </SelectBox>
+          </Field>
+          <Field label="Symbol"><TextInput value={filters.symbol} onChange={(e) => writeFilters({ ...filters, symbol: e.target.value.toUpperCase() })} placeholder="AAPL" /></Field>
+          <Field label="Tag"><TextInput value={filters.tag} onChange={(e) => writeFilters({ ...filters, tag: e.target.value.toLowerCase() })} placeholder="fomo" /></Field>
+        </div>
+        <div className="diary-filters__summary">
+          <span className="is-muted">{items.length} loaded{activeFilters ? ' · filters active' : ''}</span>
+          {activeFilters ? <Button size="sm" variant="ghost" onClick={() => { setKeywordDraft(''); writeFilters(emptyDiaryFilters) }}>Clear filters</Button> : null}
+        </div>
+        {activeFilters ? (
+          <div className="tag-chips" aria-label="Active filters">
+            {filters.q ? <span className="tag-chip">q: {filters.q}</span> : null}
+            {filters.from ? <span className="tag-chip">from: {filters.from}</span> : null}
+            {filters.to ? <span className="tag-chip">to: {filters.to}</span> : null}
+            {filters.review !== 'all' ? <span className="tag-chip">review: {filters.review}</span> : null}
+            {filters.symbol ? <span className="tag-chip">symbol: {filters.symbol}</span> : null}
+            {filters.tag ? <span className="tag-chip">tag: {filters.tag}</span> : null}
+          </div>
+        ) : null}
+      </Card>
+
+      {listError ? <p className="form-error" role="alert">{listError}</p> : null}
+
+      {list.isError ? (
+        <SectionError onRetry={() => { void list.refetch() }} />
+      ) : list.isLoading ? (
         <DiaryListSkeleton />
       ) : items.length === 0 ? (
-        <EmptyBox icon="diary" title="Your diary is empty" hint="Write your first reflection above — name the day, then be honest about it." />
+        <EmptyBox
+          icon="diary"
+          title={activeFilters ? 'No entries match these filters' : 'Your diary is empty'}
+          hint={activeFilters ? 'Try clearing a filter or widening the date range.' : 'Write your first reflection above — name the day, then be honest about it.'}
+        />
       ) : (
-        <ul className="entry-list">
-          {items.map((d) => (
-            <li key={d.id}>
-              <Card flush as="article" className="entry">
-                <div className="entry__head">
-                  <span className="entry__date">{d.localDate}</span>
-                  <div className="entry__actions">
-                    <IconButton icon="layers" label="Trades" size={16} onClick={() => navigate(`/diary/${d.id}`)} />
-                    <IconButton icon="edit" label="Edit entry" size={16} onClick={() => startEdit(d)} />
-                    <IconButton icon="trash" label="Delete entry" size={16} className="icon-btn--danger" onClick={() => remove(d)} />
+        <>
+          <ul className="entry-list">
+            {items.map((d) => (
+              <li key={d.id}>
+                <Card flush as="article" className="entry">
+                  <div className="entry__head">
+                    <span className="entry__date">{d.localDate}</span>
+                    <div className="entry__actions">
+                      <IconButton icon="layers" label="Trades" size={16} onClick={() => navigate(`/diary/${d.id}`, { state: { diarySearch: search.toString() } })} />
+                      <IconButton icon="edit" label="Edit entry" size={16} onClick={() => startEdit(d)} />
+                      <IconButton icon="trash" label="Delete entry" size={16} className="icon-btn--danger" onClick={() => { void remove(d) }} />
+                    </div>
                   </div>
-                </div>
-                <h3 className="entry__title">{d.title}</h3>
-                {d.content ? <p className="prose entry__body">{d.content}</p> : <p className="entry__body is-muted">No reflection written.</p>}
-              </Card>
-            </li>
-          ))}
-        </ul>
+                  <h3 className="entry__title">{d.title}</h3>
+                  {d.tags?.length ? (
+                    <div className="tag-chips entry__tags">
+                      {d.tags.map(tag => (
+                        <button key={tag} type="button" className="tag-chip" onClick={() => writeFilters({ ...filters, tag })}>{tag}</button>
+                      ))}
+                    </div>
+                  ) : null}
+                  {d.content
+                    ? <p className="entry__body">{plainExcerpt(d.content)}</p>
+                    : <p className="entry__body is-muted">No reflection written.</p>}
+                </Card>
+              </li>
+            ))}
+          </ul>
+          {list.hasNextPage ? (
+            <div className="form-actions">
+              <Button variant="subtle" loading={list.isFetchingNextPage} onClick={() => { void list.fetchNextPage() }}>Load more</Button>
+            </div>
+          ) : null}
+        </>
       )}
     </>
   )
@@ -136,19 +283,43 @@ export function DiaryPage() {
 export function DiaryDetailPage() {
   const { diaryId = '' } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const listSearch = (location.state as { diarySearch?: string } | null)?.diarySearch
+  const backToList = () => navigate({ pathname: '/diary', search: listSearch ? `?${listSearch}` : '' })
   const { confirm } = useCockpit()
   const diary = useDiaryQuery(diaryId)
   const removeDiary = useDeleteDiaryMutation()
+  const [deleteError, setDeleteError] = useState('')
   async function remove() {
     if (!diary.data) return
     const ok = await confirm({ title: 'Delete entry?', message: `“${diary.data.title}” and its trades will be removed.`, confirmText: 'Delete', tone: 'danger' })
     if (!ok) return
-    await removeDiary.mutateAsync(diaryId)
-    navigate('/diary', { replace: true })
+    setDeleteError('')
+    try {
+      await removeDiary.mutateAsync(diaryId)
+      navigate({ pathname: '/diary', search: listSearch ? `?${listSearch}` : '' }, { replace: true })
+    } catch (error) {
+      setDeleteError(diaryDeleteErrorMessage(error))
+    }
   }
   if (diary.isLoading) return <PageSkeleton rows={2} />
   if (diary.isError || !diary.data) return <SectionError onRetry={() => { void diary.refetch() }} />
-  return <><PageHeader title={diary.data.title} subtitle={diary.data.localDate} /><Card as="article" className="entry"><p className="prose entry__body">{diary.data.content}</p><div className="form-actions"><Button variant="ghost" onClick={() => navigate('/diary')}>Back to diary</Button><Button variant="danger" loading={removeDiary.isPending} onClick={remove}>Delete entry</Button></div><TransactionPanel diaryId={diaryId} /></Card><DecisionReview diaryId={diaryId} /></>
+  return <>
+    <PageHeader title={diary.data.title} subtitle={diary.data.localDate} />
+    <Card as="article" className="entry">
+      {diary.data.tags?.length ? <div className="tag-chips entry__tags">{diary.data.tags.map(tag => <span key={tag} className="tag-chip">{tag}</span>)}</div> : null}
+      {diary.data.content
+        ? <MarkdownView content={diary.data.content} className="prose entry__body" />
+        : <p className="entry__body is-muted">No reflection written.</p>}
+      {deleteError ? <p className="form-error" role="alert">{deleteError}</p> : null}
+      <div className="form-actions">
+        <Button variant="ghost" onClick={backToList}>Back to diary</Button>
+        <Button variant="danger" loading={removeDiary.isPending} onClick={() => { void remove() }}>Delete entry</Button>
+      </div>
+      <TransactionPanel diaryId={diaryId} />
+    </Card>
+    <DecisionReview diaryId={diaryId} />
+  </>
 }
 
 const reviewTags = ['no_plan', 'fomo', 'poor_timing', 'risk_violation', 'overtrading', 'ignored_signal', 'early_exit', 'late_exit', 'other']
@@ -281,8 +452,12 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
   async function remove(t: Transaction) {
     const ok = await confirm({ title: 'Delete trade?', message: `${t.side.toUpperCase()} ${t.symbol} will be removed.`, confirmText: 'Delete', tone: 'danger' })
     if (!ok) return
-    await deleteTransaction.mutateAsync(t.id)
-    if (editingId === t.id) resetEdit()
+    try {
+      await deleteTransaction.mutateAsync(t.id)
+      if (editingId === t.id) resetEdit()
+    } catch (mutationError: unknown) {
+      setFormError(transactionDeleteErrorMessage(mutationError))
+    }
   }
 
   return (

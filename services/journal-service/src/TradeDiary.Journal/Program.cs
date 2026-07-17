@@ -53,28 +53,37 @@ app.MapGet("/version", () => Results.Ok(new { service = "journal-service", versi
 
 var diary = app.MapGroup("/internal").RequireAuthorization("diaryAccess");
 
-diary.MapGet("/diaries", async (HttpRequest request, NpgsqlDataSource db) =>
+diary.MapGet("/diaries", async (
+    HttpRequest request,
+    NpgsqlDataSource db,
+    string? query = null,
+    DateOnly? from = null,
+    DateOnly? to = null,
+    string reviewStatus = "all",
+    string? symbol = null,
+    string? tag = null,
+    string? cursor = null,
+    int limit = 20) =>
 {
     if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
-    await using var command = db.CreateCommand("""
-        SELECT id, local_date, title, content, created_at, updated_at
-        FROM journal.diaries WHERE user_id = $1 AND deleted_at IS NULL
-        ORDER BY local_date DESC, created_at DESC
-        """);
-    command.Parameters.AddWithValue(userId);
-    await using var reader = await command.ExecuteReaderAsync();
-    var items = new List<DiaryResponse>();
-    while (await reader.ReadAsync()) items.Add(JournalAccess.ReadDiary(reader));
-    return Results.Ok(new CollectionResponse<DiaryResponse>(items));
+    var error = DiaryQuery.Validate(query, from, to, reviewStatus, symbol, tag, limit, cursor, out var parsed);
+    if (error is not null) return Results.Problem(error, statusCode: 400);
+    return Results.Ok(await DiaryQuery.ReadAsync(db, userId, parsed));
 })
-.Produces<CollectionResponse<DiaryResponse>>(200).ProducesProblem(401);
+.Produces<DiaryPage>(200).ProducesProblem(400).ProducesProblem(401);
 
 diary.MapGet("/diaries/{id:guid}", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
     await using var command = db.CreateCommand("""
-        SELECT id, local_date, title, content, created_at, updated_at
-        FROM journal.diaries WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+        SELECT d.id, d.local_date, d.title, d.content, d.created_at, d.updated_at,
+               coalesce((
+                 SELECT array_agg(t.tag ORDER BY t.tag)
+                 FROM journal.diary_tags t
+                 WHERE t.diary_id = d.id AND t.user_id = d.user_id
+               ), '{}'::text[]) AS tags
+        FROM journal.diaries d
+        WHERE d.id = $1 AND d.user_id = $2 AND d.deleted_at IS NULL
         """);
     command.Parameters.AddWithValue(id);
     command.Parameters.AddWithValue(userId);
@@ -110,6 +119,8 @@ diary.MapPost("/diaries", async (DiaryWrite input, HttpRequest request, NpgsqlDa
 {
     if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
     if (string.IsNullOrWhiteSpace(input.Title)) return Results.Problem("title_required", statusCode: 400);
+    var tagError = DiaryTags.NormalizeAll(input.Tags, out var tags);
+    if (tagError is not null) return Results.Problem(tagError, statusCode: 400);
     if (!JournalAccess.TryIdempotencyKey(request, out var key)) return Results.Problem("invalid_idempotency_key", statusCode: 400);
     var result = await JournalAccess.Idempotent(db, userId, "create-diary", key, input, async (connection, tx) =>
     {
@@ -122,7 +133,10 @@ diary.MapPost("/diaries", async (DiaryWrite input, HttpRequest request, NpgsqlDa
         command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(userId); command.Parameters.AddWithValue(input.LocalDate);
         command.Parameters.AddWithValue(input.Title.Trim()); command.Parameters.AddWithValue(input.Content ?? "");
         await using var reader = await command.ExecuteReaderAsync(); await reader.ReadAsync();
-        return JournalAccess.Stored(201, $"/internal/diaries/{id}", new DiaryResponse(id, input.LocalDate, input.Title.Trim(), input.Content ?? "", reader.GetDateTime(0), reader.GetDateTime(1)));
+        var createdAt = reader.GetDateTime(0); var updatedAt = reader.GetDateTime(1);
+        await reader.DisposeAsync();
+        await DiaryTags.ReplaceAsync(connection, tx, id, userId, tags);
+        return JournalAccess.Stored(201, $"/internal/diaries/{id}", new DiaryResponse(id, input.LocalDate, input.Title.Trim(), input.Content ?? "", createdAt, updatedAt, tags));
     });
     return JournalAccess.WriteResult(request.HttpContext, result);
 })
@@ -133,16 +147,23 @@ diary.MapPut("/diaries/{id:guid}", async (Guid id, DiaryWrite input, HttpRequest
 {
     if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
     if (string.IsNullOrWhiteSpace(input.Title)) return Results.Problem("title_required", statusCode: 400);
-    await using var command = db.CreateCommand("""
+    var tagError = DiaryTags.NormalizeAll(input.Tags, out var tags);
+    if (tagError is not null) return Results.Problem(tagError, statusCode: 400);
+    await using var connection = await db.OpenConnectionAsync();
+    await using var tx = await connection.BeginTransactionAsync();
+    await using var command = new NpgsqlCommand("""
         UPDATE journal.diaries SET local_date=$3, title=$4, content=$5, updated_at=now()
         WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
-        """);
+        """, connection, tx);
     command.Parameters.AddWithValue(id);
     command.Parameters.AddWithValue(userId);
     command.Parameters.AddWithValue(input.LocalDate);
     command.Parameters.AddWithValue(input.Title.Trim());
     command.Parameters.AddWithValue(input.Content ?? "");
-    return await command.ExecuteNonQueryAsync() == 0 ? Results.Problem("not_found", statusCode: 404) : Results.NoContent();
+    if (await command.ExecuteNonQueryAsync() == 0) return Results.Problem("not_found", statusCode: 404);
+    await DiaryTags.ReplaceAsync(connection, tx, id, userId, tags);
+    await tx.CommitAsync();
+    return Results.NoContent();
 })
 .Produces(204).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
 

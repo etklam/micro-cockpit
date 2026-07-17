@@ -1,10 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as api from './api'
+
+export type DiaryListKeyFilters = {
+  q: string
+  from: string
+  to: string
+  review: string
+  symbol: string
+  tag: string
+}
 
 export const queryKeys = {
   bootstrap: ['bootstrap'] as const,
   dashboard: ['dashboard'] as const,
   diaries: ['diaries'] as const,
+  diariesList: (filters: DiaryListKeyFilters) => ['diaries', 'list', filters.q, filters.from, filters.to, filters.review, filters.symbol, filters.tag] as const,
   diary: (id: string) => ['diary', id] as const,
   transactions: (id: string) => ['transactions', id] as const,
   calendar: (year: number, month: number) => ['calendar', year, month] as const,
@@ -36,7 +46,26 @@ export const queryKeys = {
 
 export const useBootstrapQuery = () => useQuery({ queryKey: queryKeys.bootstrap, queryFn: api.getBootstrap, staleTime: 60_000 })
 export const useDashboardQuery = () => useQuery({ queryKey: queryKeys.dashboard, queryFn: api.getDashboard })
-export const useDiariesQuery = () => useQuery({ queryKey: queryKeys.diaries, queryFn: api.getDiaries })
+export const useDiariesInfiniteQuery = (filters: DiaryListKeyFilters) => useInfiniteQuery({
+  queryKey: queryKeys.diariesList(filters),
+  initialPageParam: undefined as string | undefined,
+  queryFn: ({ pageParam }) => api.getDiaries({
+    query: filters.q || undefined,
+    from: filters.from || undefined,
+    to: filters.to || undefined,
+    reviewStatus: (filters.review as api.DiaryListQuery['reviewStatus']) || 'all',
+    symbol: filters.symbol || undefined,
+    tag: filters.tag || undefined,
+    cursor: pageParam,
+    limit: 20,
+  }),
+  getNextPageParam: (last) => last.nextCursor ?? undefined,
+})
+// Compact list for pickers (alerts). Not a full archive dump.
+export const useDiariesQuery = () => useQuery({
+  queryKey: queryKeys.diariesList({ q: '', from: '', to: '', review: 'all', symbol: '', tag: '' }),
+  queryFn: () => api.getDiaries({ limit: 100 }),
+})
 export const useDiaryQuery = (id: string) => useQuery({ queryKey: queryKeys.diary(id), queryFn: () => api.getDiary(id), enabled: !!id })
 export const useTransactionsQuery = (id: string) => useQuery({ queryKey: queryKeys.transactions(id), queryFn: () => api.getTransactions(id), enabled: !!id })
 export const useCalendarQuery = (year: number, month: number) => useQuery({ queryKey: queryKeys.calendar(year, month), queryFn: () => api.getCalendar(year, month) })
@@ -77,15 +106,26 @@ export function useQuickNoteMutation() {
 
 export function useSaveDiaryMutation() {
   const client = useQueryClient()
-  return useMutation({ mutationFn: ({ id, date, title, content, key }: { id?: string; date: string; title: string; content: string; key: string }) => id ? api.updateDiary(id, date, title, content) : api.createDiary(date, title, content, key), onSuccess: async () => {
-    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.diaries }), client.invalidateQueries({ queryKey: queryKeys.dashboard }), invalidateCalendar(client)])
+  return useMutation({ mutationFn: ({ id, date, title, content, tags, key }: { id?: string; date: string; title: string; content: string; tags: string[]; key: string }) => id ? api.updateDiary(id, date, title, content, tags) : api.createDiary(date, title, content, tags, key), onSuccess: async (result, vars) => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.diaries }),
+      client.invalidateQueries({ queryKey: queryKeys.dashboard }),
+      invalidateCalendar(client),
+      vars.id ? client.invalidateQueries({ queryKey: queryKeys.diary(vars.id) }) : Promise.resolve(),
+    ])
+    return result
   } })
 }
 
 export function useDeleteDiaryMutation() {
   const client = useQueryClient()
-  return useMutation({ mutationFn: api.deleteDiary, onSuccess: async () => {
-    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.diaries }), client.invalidateQueries({ queryKey: queryKeys.dashboard }), invalidateCalendar(client)])
+  return useMutation({ mutationFn: api.deleteDiary, onSuccess: async (_, id) => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.diaries }),
+      client.invalidateQueries({ queryKey: queryKeys.dashboard }),
+      invalidateCalendar(client),
+      client.invalidateQueries({ queryKey: queryKeys.diary(id) }),
+    ])
   } })
 }
 

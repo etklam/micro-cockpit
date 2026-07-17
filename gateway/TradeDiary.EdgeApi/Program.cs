@@ -40,6 +40,8 @@ app.UseStatusCodePages(EdgeProblems.WriteStatusCodeAsync);
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+// After endpoint selection, before Minimal API body binding / Identity proxy.
+app.UseMiddleware<AuthBodyLimitMiddleware>();
 
 HealthEndpoints.Map(app);
 AuthenticationEndpoints.Map(app);
