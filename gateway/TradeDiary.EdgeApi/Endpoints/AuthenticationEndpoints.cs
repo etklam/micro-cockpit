@@ -1,16 +1,26 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.RateLimiting;
 
 internal static class AuthenticationEndpoints
 {
     internal static void Map(WebApplication app)
     {
-        EdgeTransport.MapProxy(app, "/api/auth/register", "identity", "/internal/auth/register", [HttpMethods.Post])
-            .AllowAnonymous();
-        app.MapPost("/api/auth/login", LoginAsync).AllowAnonymous();
-        app.MapPost("/api/auth/refresh", RefreshAsync).AllowAnonymous();
+        EdgeTransport.MapProxy(app, "/api/auth/register", "identity", "/internal/auth/register", [HttpMethods.Post], forwardRegistrationKey: true)
+            .AllowAnonymous()
+            .RequireRateLimiting(AuthRateLimiting.Register)
+            .LimitAuthBody();
+        app.MapPost("/api/auth/login", LoginAsync)
+            .AllowAnonymous()
+            .RequireRateLimiting(AuthRateLimiting.Login)
+            .LimitAuthBody();
+        app.MapPost("/api/auth/refresh", RefreshAsync)
+            .AllowAnonymous()
+            .RequireRateLimiting(AuthRateLimiting.Refresh);
         app.MapPost("/api/auth/logout", LogoutAsync).AllowAnonymous();
         EdgeTransport.MapProxy(app, "/api/auth/api-key/token", "identity", "/internal/auth/api-key/token", [HttpMethods.Post])
-            .AllowAnonymous();
+            .AllowAnonymous()
+            .RequireRateLimiting(AuthRateLimiting.Login)
+            .LimitAuthBody();
         EdgeTransport.MapProxy(app, "/api/app/agents", "identity", "/internal/auth/agents", [HttpMethods.Post]);
         EdgeTransport.MapProxy(app, "/api/app/api-keys/{id:guid}", "identity", "/internal/auth/api-keys/{id}", [HttpMethods.Delete]);
     }

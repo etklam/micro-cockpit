@@ -28,9 +28,11 @@ docker compose ps
 Open <http://localhost:8080>. The Edge API is at <http://localhost:5099>; PostgreSQL is bound
 to localhost on `5433`. Backend services have no host ports — only Frontend and Edge are public.
 
-Compose enables local browser signup by default. Create the first user from
-`/register`; set `ALLOW_PUBLIC_REGISTRATION=false` to require
-`X-Registration-Key: <LOCAL_REGISTRATION_KEY>` on `POST /api/auth/register` instead.
+Public registration is disabled by default. For local browser signup, set
+`ALLOW_PUBLIC_REGISTRATION=true` in `.env`, restart Identity, then open `/register`.
+When public registration remains false, gated registration requires
+`X-Registration-Key: <LOCAL_REGISTRATION_KEY>` on `POST /api/auth/register` only
+(Edge does not forward that header to any other route).
 
 ```sh
 docker compose logs -f edge

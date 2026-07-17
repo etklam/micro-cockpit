@@ -19,7 +19,7 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Edit `.env` and replace every `change-me-*` value with an independently generated local value. The file contains the PostgreSQL administrator and migrator passwords, one password per stateful service, the registration key used when public signup is disabled, and the internal service key. Compose keeps `ALLOW_PUBLIC_REGISTRATION=true` by default for local development.
+Edit `.env` and replace every `change-me-*` value with an independently generated local value. The file contains the PostgreSQL administrator and migrator passwords, one password per stateful service, the registration key used when public signup is disabled, and the internal service key. Public registration is disabled by default; for local browser signup set `ALLOW_PUBLIC_REGISTRATION=true`.
 
 Confirm that Compose can resolve the configuration:
 
@@ -55,9 +55,9 @@ Open <http://localhost:8080>. The login screen is the first visible application 
 
 ## Step 3: Register the first user
 
-Compose enables public signup for local development. Open <http://localhost:8080/register>, enter your name, email, and a password of at least 12 characters. The browser creates the account and signs in automatically.
+For local browser signup, set `ALLOW_PUBLIC_REGISTRATION=true` in `.env` and restart Identity (`docker compose up -d identity`). Open <http://localhost:8080/register>, enter your name, email, and a password of at least 12 characters. The browser creates the account and signs in automatically.
 
-For a gated deployment, set `ALLOW_PUBLIC_REGISTRATION=false`, load the local registration key without printing it, choose a local password, and submit the request:
+When public registration stays disabled (the default), load the local registration key without printing it, choose a local password, and submit a gated request:
 
 ```sh
 set -a
@@ -147,7 +147,7 @@ Application startup waits for all three jobs. Do not delete an existing database
 
 ### Registration is unavailable
 
-If the browser signup page reports that registration is unavailable, confirm `ALLOW_PUBLIC_REGISTRATION=true` in `.env` and restart the Identity container. For gated registration, confirm that the `X-Registration-Key` value came from the same `.env` used to start Compose. Do not put the registration key in the JSON body.
+If the browser signup page reports that registration is unavailable, confirm `ALLOW_PUBLIC_REGISTRATION=true` in `.env` and restart the Identity container. For gated registration, confirm that the `X-Registration-Key` value came from the same `.env` used to start Compose and was sent only to `POST /api/auth/register`. Do not put the registration key in the JSON body or the browser UI.
 
 ### The frontend loads but API calls fail
 

@@ -98,7 +98,7 @@ services:
     environment:
       <<: *dotnet-env
       ConnectionStrings__Identity: Host=postgres;Database=trade_diary;Username=identity_service;Password=${IDENTITY_DB_PASSWORD:?set IDENTITY_DB_PASSWORD}
-      Auth__AllowPublicRegistration: ${ALLOW_PUBLIC_REGISTRATION:-true}
+      Auth__AllowPublicRegistration: ${ALLOW_PUBLIC_REGISTRATION:-false}
       Auth__LocalRegistrationKey: ${LOCAL_REGISTRATION_KEY:?set LOCAL_REGISTRATION_KEY}
       Jwt__Issuer: trade-diary-identity
       Jwt__Audience: trade-diary-services

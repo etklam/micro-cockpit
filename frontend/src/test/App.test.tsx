@@ -210,11 +210,33 @@ test('public registration explains duplicate and unavailable states', async () =
   await userEvent.type(screen.getByLabelText('Email'), 'existing@example.com')
   await userEvent.type(screen.getByLabelText(/Password/), 'correct horse battery staple')
   await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
-  expect(await screen.findByText('An account with that email already exists.')).toBeInTheDocument()
+  expect(await screen.findByText('Unable to create this account. Try signing in if you may already be registered.')).toBeInTheDocument()
 
   server.use(http.post('/api/auth/register', () => new HttpResponse(null, { status: 404 })))
   await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
   expect(await screen.findByText('Registration is not available on this deployment.')).toBeInTheDocument()
+})
+
+test('login failure after successful registration offers a sign-in path', async () => {
+  server.use(
+    http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })),
+    http.post('/api/auth/register', () => HttpResponse.json({
+      id: '33333333-3333-3333-3333-333333333333',
+      email: 'created@example.com',
+      displayName: 'Created',
+      timezone: 'UTC',
+      baseCurrency: 'USD',
+    }, { status: 201 })),
+    http.post('/api/auth/login', () => new HttpResponse(null, { status: 401 })),
+  )
+  renderApp('/register')
+  await userEvent.type(await screen.findByLabelText('Name'), 'Created Trader')
+  await userEvent.type(screen.getByLabelText('Email'), 'created@example.com')
+  await userEvent.type(screen.getByLabelText(/Password/), 'correct horse battery staple')
+  await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  expect(await screen.findByText('Account created. Please sign in.')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('link', { name: 'Continue to sign in' }))
+  expect(window.location.pathname).toBe('/login')
 })
 
 test('anonymous sessions redirect to login', async () => {

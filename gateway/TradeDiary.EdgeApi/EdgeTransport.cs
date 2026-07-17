@@ -41,9 +41,10 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
         string path,
         HttpMethod method,
         TRequest body,
-        HttpContext context)
+        HttpContext context,
+        bool forwardRegistrationKey = false)
     {
-        var raw = await SendAsync(service, path, method, JsonSerializer.Serialize(body, Json), context);
+        var raw = await SendAsync(service, path, method, JsonSerializer.Serialize(body, Json), context, forwardRegistrationKey);
         return Deserialize<TResponse>(raw);
     }
 
@@ -72,7 +73,7 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
         }
     }
 
-    internal async Task<IResult> ProxyAsync(string service, string path, HttpContext context)
+    internal async Task<IResult> ProxyAsync(string service, string path, HttpContext context, bool forwardRegistrationKey = false)
     {
         string? body = null;
         if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
@@ -81,7 +82,7 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
             body = await reader.ReadToEndAsync(context.RequestAborted);
         }
 
-        var result = await SendAsync(service, path, new HttpMethod(context.Request.Method), body, context);
+        var result = await SendAsync(service, path, new HttpMethod(context.Request.Method), body, context, forwardRegistrationKey);
         if (result.Failure == DownstreamFailure.Timeout) return EdgeProblems.DownstreamTimeout(context);
         if (result.Failure == DownstreamFailure.Unavailable) return EdgeProblems.DownstreamUnavailable(context);
         if (result.StatusCode is < 200 or >= 300) return EdgeProblems.FromStatus(context, result.StatusCode);
@@ -94,9 +95,10 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
         string route,
         string service,
         string target,
-        string[] methods) =>
+        string[] methods,
+        bool forwardRegistrationKey = false) =>
         app.MapMethods(route, methods, async (HttpContext context, EdgeTransport transport) =>
-            await transport.ProxyAsync(service, Expand(target, context.Request.RouteValues) + context.Request.QueryString, context));
+            await transport.ProxyAsync(service, Expand(target, context.Request.RouteValues) + context.Request.QueryString, context, forwardRegistrationKey));
 
     internal IResult ProblemFor<T>(DownstreamResponse<T> response, HttpContext context)
     {
@@ -111,7 +113,8 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
         string path,
         HttpMethod method,
         string? body,
-        HttpContext context)
+        HttpContext context,
+        bool forwardRegistrationKey = false)
     {
         using var request = new HttpRequestMessage(method, path);
         if (body is not null)
@@ -120,7 +123,7 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
             if (context.Request.ContentType is not null)
                 request.Content.Headers.TryAddWithoutValidation("Content-Type", context.Request.ContentType);
         }
-        ProxyHeaders.Forward(request, context);
+        ProxyHeaders.Forward(request, context, forwardRegistrationKey);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
         timeout.CancelAfter(Timeout);

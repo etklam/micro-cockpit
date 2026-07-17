@@ -15,6 +15,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 builder.Services.AddAuthorization(EdgeAuthorization.Configure);
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
     ProxyHeaders.ConfigureForwardedHeaders(options, builder.Configuration));
+builder.Services.AddRateLimiter(AuthRateLimiting.Configure);
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 builder.Services.AddSingleton(TimeProvider.System);
@@ -36,6 +37,7 @@ app.UseForwardedHeaders();
 app.UseMiddleware<EdgeExceptionMiddleware>();
 app.UseMiddleware<CorrelationMiddleware>();
 app.UseStatusCodePages(EdgeProblems.WriteStatusCodeAsync);
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -79,7 +79,7 @@ The canonical ownership rules are in [`contracts/schema-ownership.json`](../cont
 | `ResearchEndpoints` | Stock research, market data, price alerts, and rotation |
 | `AdminEndpoints` | Partners, tools, content administration, operations administration |
 
-`EdgeTransport` applies a per-request downstream timeout, propagates request cancellation and correlation IDs, forwards authorization, idempotency, and gated-registration headers, and maps transport failures to safe ProblemDetails responses.
+`EdgeTransport` applies a per-request downstream timeout, propagates request cancellation and correlation IDs, forwards authorization and idempotency headers, and maps transport failures to safe ProblemDetails responses. `X-Registration-Key` is forwarded only when the Edge register route explicitly opts in for Identity registration.
 
 ## Frontend architecture
 
@@ -129,11 +129,13 @@ ASP.NET Core maps environment variables with double underscores to configuration
 | `Jwt__Issuer` | Identity | Compose sets `trade-diary-identity` |
 | `Jwt__Audience` | Identity | Compose sets `trade-diary-services` |
 | `Jwt__PrivateKeyPath` | Identity | Compose sets `/keys/signing-key.pem` |
-| `Auth__AllowPublicRegistration` | Identity | Default `false`; Compose sets `true` for local browser signup unless overridden |
+| `Auth__AllowPublicRegistration` | Identity | Code and Compose default `false`; set `true` intentionally for local browser signup |
 | `Auth__LocalRegistrationKey` | Identity | Required only when public registration is disabled and registration should remain key-gated |
 | `Internal__ServiceKey` | Journal, Reminder, Market Data, Price Alert, Operations | Required for internal machine calls |
 | `Services__<Service>` | Edge | Downstream base address; local fallbacks use ports `5100` through `5112` |
 | `Edge__DownstreamTimeoutSeconds` | Edge | Default `8`; clamped to `1..30` seconds |
+| `ForwardedHeaders__KnownProxies` / `Proxy__TrustedProxies` | Edge | Empty by default; required before trusting `X-Forwarded-For` for client IP / rate-limit partitions |
+| `ForwardedHeaders__KnownNetworks` / `Proxy__TrustedNetworks` | Edge | Empty by default; CIDR list of trusted reverse-proxy networks |
 | `Workers__Reminder__Enabled` | Reminder | Default `true` |
 | `Workers__Reminder__IntervalSeconds` | Reminder | Default `30` |
 | `Workers__PriceAlert__Enabled` | Price Alert | Default `true` |

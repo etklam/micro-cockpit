@@ -10,13 +10,11 @@ public static class ProxyHeaders
 
     public static void ConfigureForwardedHeaders(ForwardedHeadersOptions options, IConfiguration configuration)
     {
-        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
-                                    ForwardedHeaders.XForwardedProto |
-                                    ForwardedHeaders.XForwardedHost;
         options.ForwardLimit = 1;
 
-        // The framework defaults include loopback. That is unsafe when Edge is directly
-        // reachable: a client on the same host could then spoof X-Forwarded-Proto=https.
+        // Framework defaults include loopback. Empty KnownProxies/Networks does NOT mean
+        // "trust nobody": the middleware then skips the known-proxy check and accepts any
+        // client-supplied X-Forwarded-* headers. Only enable forwarding after explicit trust.
         options.KnownProxies.Clear();
         options.KnownIPNetworks.Clear();
 
@@ -41,18 +39,26 @@ public static class ProxyHeaders
 
             options.KnownIPNetworks.Add(new System.Net.IPNetwork(address, prefixLength));
         }
+
+        options.ForwardedHeaders = options.KnownProxies.Count > 0 || options.KnownIPNetworks.Count > 0
+            ? ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+            : ForwardedHeaders.None;
     }
 
     public static bool ShouldUseSecureRefreshCookie(HttpContext context, IHostEnvironment environment) =>
         environment.IsProduction() || context.Request.IsHttps;
 
-    public static void Forward(HttpRequestMessage request, HttpContext context)
+    // X-Registration-Key is never forwarded by default. Callers must opt in only for
+    // POST /api/auth/register → Identity /internal/auth/register.
+    public static void Forward(HttpRequestMessage request, HttpContext context, bool forwardRegistrationKey = false)
     {
         request.Headers.TryAddWithoutValidation("Authorization", context.Request.Headers.Authorization.ToString());
         request.Headers.TryAddWithoutValidation("X-Correlation-ID", context.Items["correlationId"]?.ToString());
         if (context.Request.Headers.TryGetValue("Idempotency-Key", out var key) && !string.IsNullOrWhiteSpace(key.ToString()))
             request.Headers.TryAddWithoutValidation("Idempotency-Key", key.ToString());
-        if (context.Request.Headers.TryGetValue("X-Registration-Key", out var registrationKey) && !string.IsNullOrWhiteSpace(registrationKey.ToString()))
+        if (forwardRegistrationKey &&
+            context.Request.Headers.TryGetValue("X-Registration-Key", out var registrationKey) &&
+            !string.IsNullOrWhiteSpace(registrationKey.ToString()))
             request.Headers.TryAddWithoutValidation("X-Registration-Key", registrationKey.ToString());
     }
 

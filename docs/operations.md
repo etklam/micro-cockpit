@@ -145,6 +145,14 @@ transport single-flight-refreshes once and retries; refresh failure ends the ses
 `POST /api/auth/logout` (Identity revokes the refresh family) and clears the cookie. Reusing an
 already-used/revoked refresh token revokes the entire family.
 
+Public registration is disabled by default in code, Compose, and Kubernetes. Enable it only with an
+explicit `ALLOW_PUBLIC_REGISTRATION=true` / `Auth__AllowPublicRegistration=true`. Edge rate-limits
+anonymous register/login/API-key/refresh by trusted client IP and returns `429` with `Retry-After`.
+Internet-facing public signup still requires TLS termination, trusted reverse-proxy configuration for
+`X-Forwarded-For`, and external monitoring; this phase does not add CAPTCHA or email verification.
+`X-Registration-Key` is accepted only for gated registration and is forwarded only to Identity's
+register endpoint.
+
 ### Stable JWT key id
 `kid` is a SHA-256 thumbprint of the RSA **public** key (SubjectPublicKeyInfo), not a random value.
 The persisted key therefore yields the same `kid` across Identity restarts, so unexpired access

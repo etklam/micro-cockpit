@@ -61,6 +61,22 @@ public sealed class RegistrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Public_registration_normalizes_currency_and_accepts_iana_timezone()
+    {
+        await using var factory = CreateFactory(allowPublicRegistration: true);
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            "/internal/auth/register",
+            RegisterBody("locale@example.test", timezone: "Asia/Taipei", baseCurrency: "usd"));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<RegisterResponse>();
+        Assert.Equal("Asia/Taipei", body?.Timezone);
+        Assert.Equal("USD", body?.BaseCurrency);
+    }
+
+    [Fact]
     public async Task Public_registration_rejects_duplicate_email()
     {
         await using var factory = CreateFactory(allowPublicRegistration: true);
@@ -74,16 +90,32 @@ public sealed class RegistrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Public_registration_validates_input()
+    public async Task Public_registration_rejects_invalid_and_oversized_input()
     {
         await using var factory = CreateFactory(allowPublicRegistration: true);
         using var client = factory.CreateClient();
 
-        using var invalidRegistration = await client.PostAsJsonAsync("/internal/auth/register", RegisterBody("not-an-email", password: "too-short"));
-        using var invalidLocale = await client.PostAsJsonAsync("/internal/auth/register", RegisterBody("bad-locale@example.test", baseCurrency: "US"));
+        using var invalidEmail = await client.PostAsJsonAsync("/internal/auth/register", RegisterBody("not-an-email"));
+        using var shortPassword = await client.PostAsJsonAsync("/internal/auth/register", RegisterBody("short@example.test", password: "too-short"));
+        using var longPassword = await client.PostAsJsonAsync("/internal/auth/register", RegisterBody("long@example.test", password: new string('p', 257)));
+        using var longEmail = await client.PostAsJsonAsync("/internal/auth/register", RegisterBody($"{new string('a', 250)}@x.co"));
+        using var longName = await client.PostAsJsonAsync("/internal/auth/register", RegisterBody("name@example.test", displayName: new string('n', 101)));
+        using var longTimezone = await client.PostAsJsonAsync("/internal/auth/register", RegisterBody("tz@example.test", timezone: new string('z', 101)));
+        using var badCurrency = await client.PostAsJsonAsync("/internal/auth/register", RegisterBody("currency@example.test", baseCurrency: "US"));
+        using var numericCurrency = await client.PostAsJsonAsync("/internal/auth/register", RegisterBody("currency2@example.test", baseCurrency: "12A"));
+        using var unknownTimezone = await client.PostAsJsonAsync("/internal/auth/register", RegisterBody("zone@example.test", timezone: "Not/ARealZone"));
+        using var blankName = await client.PostAsJsonAsync("/internal/auth/register", RegisterBody("blank@example.test", displayName: "   "));
 
-        Assert.Equal(HttpStatusCode.BadRequest, invalidRegistration.StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, invalidLocale.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidEmail.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, shortPassword.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, longPassword.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, longEmail.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, longName.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, longTimezone.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, badCurrency.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, numericCurrency.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, unknownTimezone.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, blankName.StatusCode);
     }
 
     [Fact]

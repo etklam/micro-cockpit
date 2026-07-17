@@ -11,11 +11,11 @@ Cross-user resources remain concealed with `404`; authentication failures use th
 | Edge | GET | `/health/live` | same | anonymous | — | — | — | n/a |
 | Edge | GET | `/health/ready` | same | anonymous | — | — | — | n/a |
 | Edge | GET | `/version` | same | anonymous | — | — | — | n/a |
-| Identity | POST | `/internal/auth/register` | `/api/auth/register` | anonymous | — | — | public when enabled; otherwise registration key | n/a |
-| Identity | POST | `/internal/auth/login` | `/api/auth/login` | anonymous | — | — | — | invalid credentials are not resource-disclosing |
-| Identity | POST | `/internal/auth/refresh` | `/api/auth/refresh` | anonymous with refresh token | — | — | — | token family ownership enforced |
+| Identity | POST | `/internal/auth/register` | `/api/auth/register` | anonymous | — | — | public when enabled; otherwise registration key; Edge `auth-register` rate limit | n/a |
+| Identity | POST | `/internal/auth/login` | `/api/auth/login` | anonymous | — | — | Edge `auth-login` rate limit | invalid credentials are not resource-disclosing |
+| Identity | POST | `/internal/auth/refresh` | `/api/auth/refresh` | anonymous with refresh token | — | — | Edge `auth-refresh` rate limit | token family ownership enforced |
 | Identity | POST | `/internal/auth/logout` | `/api/auth/logout` | anonymous with refresh token | — | — | — | token family ownership enforced |
-| Identity | POST | `/internal/auth/api-key/token` | `/api/auth/api-key/token` | anonymous with API key | — | issued key scopes | — | key resolves only its agent |
+| Identity | POST | `/internal/auth/api-key/token` | `/api/auth/api-key/token` | anonymous with API key | — | issued key scopes; Edge `auth-login` rate limit | — | key resolves only its agent |
 | Identity | POST | `/internal/auth/agents` | `/api/app/agents` | human user, admin | — | — | — | created agent belongs to caller |
 | Identity | DELETE | `/internal/auth/api-keys/{id}` | `/api/app/api-keys/{id}` | human user, admin | — | — | — | another creator's key is `404` |
 | Identity | GET | `/internal/auth/me` | — | human user, admin | — | — | — | another user cannot be selected |

@@ -14,6 +14,9 @@ internal static class EdgeProblems
     internal static IResult DownstreamTimeout(HttpContext context) =>
         Create(context, StatusCodes.Status504GatewayTimeout, "downstream_timeout", "Service timeout", "A required service did not respond in time.");
 
+    internal static IResult TooManyRequests(HttpContext context) =>
+        Create(context, StatusCodes.Status429TooManyRequests, "rate_limited", "Too many requests", "Too many authentication attempts. Retry later.");
+
     internal static IResult FromStatus(HttpContext context, int status) => status switch
     {
         StatusCodes.Status400BadRequest => InvalidRequest(context),
@@ -22,6 +25,7 @@ internal static class EdgeProblems
         StatusCodes.Status404NotFound => Create(context, status, "resource_not_found", "Resource not found", "The requested resource was not found."),
         StatusCodes.Status409Conflict => Create(context, status, "conflict", "Conflict", "The request conflicts with the current resource state."),
         StatusCodes.Status422UnprocessableEntity => Create(context, status, "validation_failed", "Validation failed", "The request failed validation."),
+        StatusCodes.Status429TooManyRequests => TooManyRequests(context),
         StatusCodes.Status502BadGateway => DownstreamInvalid(context),
         StatusCodes.Status504GatewayTimeout => DownstreamTimeout(context),
         _ => DownstreamUnavailable(context)
@@ -42,6 +46,7 @@ internal static class EdgeProblems
         StatusCodes.Status404NotFound or
         StatusCodes.Status409Conflict or
         StatusCodes.Status422UnprocessableEntity or
+        StatusCodes.Status429TooManyRequests or
         StatusCodes.Status502BadGateway or
         StatusCodes.Status503ServiceUnavailable or
         StatusCodes.Status504GatewayTimeout;

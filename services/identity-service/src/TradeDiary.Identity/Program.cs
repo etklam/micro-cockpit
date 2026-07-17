@@ -75,11 +75,8 @@ app.MapPost("/internal/auth/register", async (RegisterRequest input, HttpRequest
         if (suppliedKey.Length != expectedKey.Length || !CryptographicOperations.FixedTimeEquals(suppliedKey, expectedKey))
             return Results.Problem("not_found", statusCode: 404);
     }
-    var email = input.Email.Trim().ToLowerInvariant();
-    if (!email.Contains('@') || input.Password.Length < 12 || string.IsNullOrWhiteSpace(input.DisplayName))
-        return Results.Problem("invalid_registration", statusCode: 400);
-    if (input.BaseCurrency.Length != 3 || string.IsNullOrWhiteSpace(input.Timezone))
-        return Results.Problem("invalid_locale", statusCode: 400);
+    if (!TryNormalizeRegistration(input, out var email, out var displayName, out var timezone, out var baseCurrency, out var problem))
+        return Results.Problem(problem, statusCode: 400);
 
     var id = Guid.NewGuid();
     var salt = RandomNumberGenerator.GetBytes(16);
@@ -94,15 +91,15 @@ app.MapPost("/internal/auth/register", async (RegisterRequest input, HttpRequest
             VALUES ($1,$2,$3,$4,$5)
             """, connection, transaction);
         user.Parameters.AddWithValue(id); user.Parameters.AddWithValue(email);
-        user.Parameters.AddWithValue(input.DisplayName.Trim()); user.Parameters.AddWithValue(input.Timezone);
-        user.Parameters.AddWithValue(input.BaseCurrency.ToUpperInvariant());
+        user.Parameters.AddWithValue(displayName); user.Parameters.AddWithValue(timezone);
+        user.Parameters.AddWithValue(baseCurrency);
         await user.ExecuteNonQueryAsync();
         await using var credential = new NpgsqlCommand("INSERT INTO identity.user_credentials VALUES ($1,$2,$3,$4)", connection, transaction);
         credential.Parameters.AddWithValue(id); credential.Parameters.AddWithValue(salt);
         credential.Parameters.AddWithValue(hash); credential.Parameters.AddWithValue(iterations);
         await credential.ExecuteNonQueryAsync();
         await transaction.CommitAsync();
-        return Results.Created("/internal/auth/me", new RegisterResponse(id, email, input.DisplayName, input.Timezone, input.BaseCurrency.ToUpperInvariant()));
+        return Results.Created("/internal/auth/me", new RegisterResponse(id, email, displayName, timezone, baseCurrency));
     }
     catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
     {
@@ -115,12 +112,18 @@ app.MapPost("/internal/auth/register", async (RegisterRequest input, HttpRequest
 
 app.MapPost("/internal/auth/login", async (LoginRequest input, NpgsqlDataSource db, RefreshTokenFamily refreshTokens) =>
 {
+    // Bound password length before PBKDF2 so oversized bodies cannot force unbounded work.
+    if (input.Password is null || input.Password.Length is < 1 or > 256)
+        return Results.Unauthorized();
+    var email = (input.Email ?? string.Empty).Trim().ToLowerInvariant();
+    if (email.Length is < 3 or > 254)
+        return Results.Unauthorized();
     await using var command = db.CreateCommand("""
         SELECT u.id,u.email,u.display_name,u.timezone,u.base_currency,u.role,u.account_type,u.status,u.status_version,
                c.password_salt,c.password_hash,c.iterations
         FROM identity.users u JOIN identity.user_credentials c ON c.user_id=u.id WHERE u.email=$1
         """);
-    command.Parameters.AddWithValue(input.Email.Trim().ToLowerInvariant());
+    command.Parameters.AddWithValue(email);
     await using var reader = await command.ExecuteReaderAsync();
     if (!await reader.ReadAsync()) return Results.Unauthorized();
     var candidate = Rfc2898DeriveBytes.Pbkdf2(input.Password, (byte[])reader[9], reader.GetInt32(11), HashAlgorithmName.SHA256, 32);
@@ -202,6 +205,73 @@ app.MapGet("/internal/auth/me", async (ClaimsPrincipal principal, NpgsqlDataSour
 app.Run();
 
 static AuthUser ReadUser(NpgsqlDataReader reader) => new(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetInt32(8));
+
+static bool TryNormalizeRegistration(
+    RegisterRequest input,
+    out string email,
+    out string displayName,
+    out string timezone,
+    out string baseCurrency,
+    out string problem)
+{
+    email = string.Empty;
+    displayName = string.Empty;
+    timezone = string.Empty;
+    baseCurrency = string.Empty;
+    problem = "invalid_registration";
+
+    if (input.Email is null || input.Password is null || input.DisplayName is null || input.Timezone is null || input.BaseCurrency is null)
+        return false;
+
+    email = input.Email.Trim().ToLowerInvariant();
+    if (!IsValidEmail(email) || input.Password.Length is < 12 or > 256 || ContainsControlCharacters(input.Password))
+        return false;
+
+    displayName = input.DisplayName.Trim();
+    if (displayName.Length is < 1 or > 100 || ContainsControlCharacters(displayName))
+        return false;
+
+    timezone = input.Timezone.Trim();
+    if (timezone.Length is < 1 or > 100 || ContainsControlCharacters(timezone) || !TimeZoneInfo.TryFindSystemTimeZoneById(timezone, out _))
+    {
+        problem = "invalid_locale";
+        return false;
+    }
+
+    var currency = input.BaseCurrency.Trim().ToUpperInvariant();
+    if (currency.Length != 3 || !currency.All(static c => c is >= 'A' and <= 'Z'))
+    {
+        problem = "invalid_locale";
+        return false;
+    }
+
+    baseCurrency = currency;
+    return true;
+}
+
+static bool IsValidEmail(string email)
+{
+    if (email.Length is < 3 or > 254 || ContainsControlCharacters(email))
+        return false;
+    try
+    {
+        var address = new System.Net.Mail.MailAddress(email);
+        return string.Equals(address.Address, email, StringComparison.OrdinalIgnoreCase);
+    }
+    catch (FormatException)
+    {
+        return false;
+    }
+}
+
+static bool ContainsControlCharacters(string value)
+{
+    foreach (var c in value)
+    {
+        if (char.IsControl(c)) return true;
+    }
+    return false;
+}
 
 static RSA LoadSigningKey(string? path)
 {

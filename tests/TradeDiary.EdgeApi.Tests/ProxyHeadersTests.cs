@@ -8,7 +8,7 @@ using Microsoft.Extensions.Hosting;
 public sealed class ProxyHeadersTests
 {
     [Fact]
-    public void Forwards_auth_correlation_idempotency_and_registration_headers()
+    public void Forwards_auth_correlation_and_idempotency_headers()
     {
         var context = new DefaultHttpContext();
         context.Request.Headers.Authorization = "Bearer access";
@@ -22,16 +22,31 @@ public sealed class ProxyHeadersTests
         Assert.Equal("Bearer access", request.Headers.Authorization?.ToString());
         Assert.Equal("corr-1", request.Headers.GetValues("X-Correlation-ID").Single());
         Assert.Equal("retry-1", request.Headers.GetValues("Idempotency-Key").Single());
-        Assert.Equal("registration-1", request.Headers.GetValues("X-Registration-Key").Single());
+        Assert.False(request.Headers.Contains("X-Registration-Key"));
     }
 
     [Fact]
-    public void Does_not_add_registration_header_when_absent()
+    public void Forwards_registration_key_only_when_explicitly_enabled()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers["X-Registration-Key"] = "registration-1";
+        using var enabled = new HttpRequestMessage(HttpMethod.Post, "http://identity/internal/auth/register");
+        using var disabled = new HttpRequestMessage(HttpMethod.Post, "http://identity/internal/auth/login");
+
+        ProxyHeaders.Forward(enabled, context, forwardRegistrationKey: true);
+        ProxyHeaders.Forward(disabled, context);
+
+        Assert.Equal("registration-1", enabled.Headers.GetValues("X-Registration-Key").Single());
+        Assert.False(disabled.Headers.Contains("X-Registration-Key"));
+    }
+
+    [Fact]
+    public void Does_not_add_registration_header_when_absent_even_when_enabled()
     {
         var context = new DefaultHttpContext();
         using var request = new HttpRequestMessage(HttpMethod.Post, "http://service/internal/auth/register");
 
-        ProxyHeaders.Forward(request, context);
+        ProxyHeaders.Forward(request, context, forwardRegistrationKey: true);
 
         Assert.False(request.Headers.Contains("X-Registration-Key"));
     }
@@ -57,9 +72,7 @@ public sealed class ProxyHeadersTests
 
         Assert.Empty(options.KnownProxies);
         Assert.Empty(options.KnownIPNetworks);
-        Assert.Equal(
-            ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost,
-            options.ForwardedHeaders);
+        Assert.Equal(ForwardedHeaders.None, options.ForwardedHeaders);
     }
 
     [Fact]
@@ -76,6 +89,9 @@ public sealed class ProxyHeadersTests
 
         Assert.Equal([System.Net.IPAddress.Parse("10.0.0.10")], options.KnownProxies);
         Assert.Single(options.KnownIPNetworks);
+        Assert.Equal(
+            ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost,
+            options.ForwardedHeaders);
     }
 
     [Fact]
