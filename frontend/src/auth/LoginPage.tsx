@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthProvider'
 import { Brand, Button, Field, TextInput } from '../ui'
 
@@ -45,7 +45,7 @@ export function LoginPage() {
         </Field>
         {error ? <p className="login__error" role="alert">{error}</p> : null}
         <Button variant="primary" block type="submit" loading={busy}>{busy ? null : 'Sign in'}</Button>
-        <p className="login__foot">Diary first. Numbers in service of memory.</p>
+        <p className="login__foot">No account yet? <Link to="/register" state={location.state}>Create one</Link>.</p>
       </form>
     </main>
   )

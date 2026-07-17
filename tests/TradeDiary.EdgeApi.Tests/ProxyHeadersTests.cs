@@ -8,11 +8,12 @@ using Microsoft.Extensions.Hosting;
 public sealed class ProxyHeadersTests
 {
     [Fact]
-    public void Forwards_auth_correlation_and_idempotency_headers()
+    public void Forwards_auth_correlation_idempotency_and_registration_headers()
     {
         var context = new DefaultHttpContext();
         context.Request.Headers.Authorization = "Bearer access";
         context.Request.Headers["Idempotency-Key"] = "retry-1";
+        context.Request.Headers["X-Registration-Key"] = "registration-1";
         context.Items["correlationId"] = "corr-1";
         using var request = new HttpRequestMessage(HttpMethod.Post, "http://service/internal/diaries");
 
@@ -21,6 +22,18 @@ public sealed class ProxyHeadersTests
         Assert.Equal("Bearer access", request.Headers.Authorization?.ToString());
         Assert.Equal("corr-1", request.Headers.GetValues("X-Correlation-ID").Single());
         Assert.Equal("retry-1", request.Headers.GetValues("Idempotency-Key").Single());
+        Assert.Equal("registration-1", request.Headers.GetValues("X-Registration-Key").Single());
+    }
+
+    [Fact]
+    public void Does_not_add_registration_header_when_absent()
+    {
+        var context = new DefaultHttpContext();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "http://service/internal/auth/register");
+
+        ProxyHeaders.Forward(request, context);
+
+        Assert.False(request.Headers.Contains("X-Registration-Key"));
     }
 
     [Fact]

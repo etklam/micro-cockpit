@@ -11,7 +11,7 @@ Cross-user resources remain concealed with `404`; authentication failures use th
 | Edge | GET | `/health/live` | same | anonymous | — | — | — | n/a |
 | Edge | GET | `/health/ready` | same | anonymous | — | — | — | n/a |
 | Edge | GET | `/version` | same | anonymous | — | — | — | n/a |
-| Identity | POST | `/internal/auth/register` | `/api/auth/register` | anonymous | — | — | registration key when configured | n/a |
+| Identity | POST | `/internal/auth/register` | `/api/auth/register` | anonymous | — | — | public when enabled; otherwise registration key | n/a |
 | Identity | POST | `/internal/auth/login` | `/api/auth/login` | anonymous | — | — | — | invalid credentials are not resource-disclosing |
 | Identity | POST | `/internal/auth/refresh` | `/api/auth/refresh` | anonymous with refresh token | — | — | — | token family ownership enforced |
 | Identity | POST | `/internal/auth/logout` | `/api/auth/logout` | anonymous with refresh token | — | — | — | token family ownership enforced |

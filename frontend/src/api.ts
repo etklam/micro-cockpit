@@ -30,6 +30,9 @@ applyToken(null)
 export function configureSession(ended: () => void) { onSessionEnded = ended }
 export const hasAccessToken = () => accessToken !== null
 export async function restoreSession(): Promise<boolean> { return (await refreshAccessToken()) !== null }
+export async function register(input: G.RegisterRequest): Promise<G.RegisterResponse> {
+  return G.postApiAuthRegister(input)
+}
 export async function login(email: string, password: string) {
   const tokens = await G.postApiAuthLogin({ email, password })
   applyToken(tokens.accessToken)

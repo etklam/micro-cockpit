@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react'
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthProvider'
 import { LoginPage } from './auth/LoginPage'
+import { RegisterPage } from './auth/RegisterPage'
 import { Brand, Button, ErrorBox, IconButton, useConfirm } from './ui'
 import type { ConfirmOpts } from './ui'
 import { Icon } from './icons'
@@ -41,6 +42,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<Shell />}>
           <Route index element={<Navigate to="/today" replace />} />

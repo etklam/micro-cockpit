@@ -466,6 +466,8 @@
 .login__signal span:nth-child(3) { background: color-mix(in oklch, var(--warn) 34%, var(--surface-2)); }
 .login__error { color: var(--loss); font-size: var(--fs-sm); }
 .login__foot { text-align: center; color: var(--faint); font-size: var(--fs-xs); }
+.login__foot a { color: var(--primary); font-weight: 650; }
+.login__foot a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 
 /* =============================  TODAY  ============================ */
 .reminder-banner {

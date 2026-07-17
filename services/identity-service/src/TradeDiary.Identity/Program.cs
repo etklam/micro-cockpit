@@ -65,11 +65,16 @@ app.MapGet("/.well-known/jwks.json", () =>
 
 app.MapPost("/internal/auth/register", async (RegisterRequest input, HttpRequest request, NpgsqlDataSource db, IConfiguration config) =>
 {
+    var allowPublicRegistration = config.GetValue("Auth:AllowPublicRegistration", false);
     var registrationKey = config["Auth:LocalRegistrationKey"];
-    if (string.IsNullOrEmpty(registrationKey)) return Results.Problem("not_found", statusCode: 404);
-    if (!CryptographicOperations.FixedTimeEquals(
-        Encoding.UTF8.GetBytes(request.Headers["X-Registration-Key"].FirstOrDefault() ?? ""),
-        Encoding.UTF8.GetBytes(registrationKey))) return Results.Problem("not_found", statusCode: 404);
+    if (!allowPublicRegistration)
+    {
+        if (string.IsNullOrEmpty(registrationKey)) return Results.Problem("not_found", statusCode: 404);
+        var suppliedKey = Encoding.UTF8.GetBytes(request.Headers["X-Registration-Key"].FirstOrDefault() ?? "");
+        var expectedKey = Encoding.UTF8.GetBytes(registrationKey);
+        if (suppliedKey.Length != expectedKey.Length || !CryptographicOperations.FixedTimeEquals(suppliedKey, expectedKey))
+            return Results.Problem("not_found", statusCode: 404);
+    }
     var email = input.Email.Trim().ToLowerInvariant();
     if (!email.Contains('@') || input.Password.Length < 12 || string.IsNullOrWhiteSpace(input.DisplayName))
         return Results.Problem("invalid_registration", statusCode: 400);

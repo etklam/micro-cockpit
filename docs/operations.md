@@ -136,9 +136,10 @@ authentication secret.
 
 ### Authentication and session flow
 The access token (15 min, RS256) is held in browser memory only. The refresh token never reaches
-JavaScript: on login/register Edge extracts it from Identity's response, stores it in an
+JavaScript: on login Edge extracts it from Identity's response, stores it in an
 `HttpOnly`/`SameSite=Lax`/`Secure`(HTTPS) cookie scoped to `/api/auth`, and returns only
-`{ accessToken, expiresAt }`. Reload restores the session by calling `POST /api/auth/refresh`
+`{ accessToken, expiresAt }`. Browser signup first calls register, then uses the normal login path
+for the session cookie. Reload restores the session by calling `POST /api/auth/refresh`
 (Edge reads the cookie, forwards it to Identity, rotates the cookie). On a `401` the frontend
 transport single-flight-refreshes once and retries; refresh failure ends the session. Logout calls
 `POST /api/auth/logout` (Identity revokes the refresh family) and clears the cookie. Reusing an

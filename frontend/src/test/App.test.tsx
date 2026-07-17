@@ -157,6 +157,66 @@ test('browser navigation uses route links', async () => {
   expect(await screen.findByRole('heading', { name: 'Diary' })).toBeInTheDocument()
 })
 
+test('anonymous users can open the register page from login', async () => {
+  server.use(http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })))
+  renderApp('/login')
+  await userEvent.click(await screen.findByRole('link', { name: 'Create one' }))
+  expect(window.location.pathname).toBe('/register')
+  expect(await screen.findByRole('heading', { name: 'Create your cockpit.' })).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('link', { name: 'Sign in' }))
+  expect(window.location.pathname).toBe('/login')
+})
+
+type RegistrationPayload = { email: string; password: string; displayName: string; timezone: string; baseCurrency: string }
+type LoginPayload = { email: string; password: string }
+
+test('public registration creates an account and signs in', async () => {
+  const observed: { registered?: RegistrationPayload; loggedIn?: LoginPayload } = {}
+  server.use(
+    http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })),
+    http.get('/api/app/bootstrap', () => HttpResponse.json(bootstrap)),
+    http.get('/api/app/dashboard', () => HttpResponse.json({
+      localDate: '2026-07-16', diary: { writtenToday: false, count: 0 }, performance: null,
+      pendingAlerts: null, discipline: null, recentDiaries: [], capabilities: { alerts: 'unavailable', discipline: 'empty' },
+    })),
+    http.post('/api/auth/register', async ({ request }) => {
+      const payload = await request.json() as RegistrationPayload
+      observed.registered = payload
+      return HttpResponse.json({ id: '22222222-2222-2222-2222-222222222222', email: payload.email, displayName: payload.displayName, timezone: payload.timezone, baseCurrency: payload.baseCurrency }, { status: 201 })
+    }),
+    http.post('/api/auth/login', async ({ request }) => {
+      observed.loggedIn = await request.json() as LoginPayload
+      return HttpResponse.json({ accessToken: 'memory-only-token', expiresAt: '2026-07-16T12:00:00Z' })
+    }))
+  renderApp('/register')
+  await userEvent.type(await screen.findByLabelText('Name'), 'New Trader')
+  await userEvent.type(screen.getByLabelText('Email'), 'new@example.com')
+  await userEvent.type(screen.getByLabelText(/Password/), 'correct horse battery staple')
+  await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  await screen.findByText('Recent reflections')
+  expect(window.location.pathname).toBe('/today')
+  const registered = observed.registered
+  if (!registered) throw new Error('registration request was not sent')
+  expect(registered).toMatchObject({ email: 'new@example.com', password: 'correct horse battery staple', displayName: 'New Trader', baseCurrency: 'USD' })
+  expect(registered.timezone).toBeTruthy()
+  expect(observed.loggedIn).toEqual({ email: 'new@example.com', password: 'correct horse battery staple' })
+})
+
+test('public registration explains duplicate and unavailable states', async () => {
+  server.use(http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })))
+  server.use(http.post('/api/auth/register', () => new HttpResponse(null, { status: 409 })))
+  renderApp('/register')
+  await userEvent.type(await screen.findByLabelText('Name'), 'Existing Trader')
+  await userEvent.type(screen.getByLabelText('Email'), 'existing@example.com')
+  await userEvent.type(screen.getByLabelText(/Password/), 'correct horse battery staple')
+  await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  expect(await screen.findByText('An account with that email already exists.')).toBeInTheDocument()
+
+  server.use(http.post('/api/auth/register', () => new HttpResponse(null, { status: 404 })))
+  await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  expect(await screen.findByText('Registration is not available on this deployment.')).toBeInTheDocument()
+})
+
 test('anonymous sessions redirect to login', async () => {
   server.use(http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })))
   renderApp('/today')

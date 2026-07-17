@@ -52,6 +52,8 @@ public static class ProxyHeaders
         request.Headers.TryAddWithoutValidation("X-Correlation-ID", context.Items["correlationId"]?.ToString());
         if (context.Request.Headers.TryGetValue("Idempotency-Key", out var key) && !string.IsNullOrWhiteSpace(key.ToString()))
             request.Headers.TryAddWithoutValidation("Idempotency-Key", key.ToString());
+        if (context.Request.Headers.TryGetValue("X-Registration-Key", out var registrationKey) && !string.IsNullOrWhiteSpace(registrationKey.ToString()))
+            request.Headers.TryAddWithoutValidation("X-Registration-Key", registrationKey.ToString());
     }
 
     public static void Propagate(HttpContext context, HttpResponseMessage response)

@@ -5,7 +5,7 @@ You will start the complete production-like stack, create the first user, sign i
 ## What you need
 
 - Docker with Docker Compose v2.
-- `curl` and `jq` for the registration request.
+- `curl` and `jq` only if you choose the gated registration fallback.
 - At least 16 GB of free memory is recommended when building the full stack locally.
 - A clone of this repository on the `main` branch.
 
@@ -19,7 +19,7 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Edit `.env` and replace every `change-me-*` value with an independently generated local value. The file contains the PostgreSQL administrator and migrator passwords, one password per stateful service, the local registration key, and the internal service key.
+Edit `.env` and replace every `change-me-*` value with an independently generated local value. The file contains the PostgreSQL administrator and migrator passwords, one password per stateful service, the registration key used when public signup is disabled, and the internal service key. Compose keeps `ALLOW_PUBLIC_REGISTRATION=true` by default for local development.
 
 Confirm that Compose can resolve the configuration:
 
@@ -55,7 +55,9 @@ Open <http://localhost:8080>. The login screen is the first visible application 
 
 ## Step 3: Register the first user
 
-Registration is deployment-gated. Load the local registration key without printing it, choose a local password, and submit the request:
+Compose enables public signup for local development. Open <http://localhost:8080/register>, enter your name, email, and a password of at least 12 characters. The browser creates the account and signs in automatically.
+
+For a gated deployment, set `ALLOW_PUBLIC_REGISTRATION=false`, load the local registration key without printing it, choose a local password, and submit the request:
 
 ```sh
 set -a
@@ -77,9 +79,7 @@ curl -fsS \
 unset TEST_PASSWORD LOCAL_REGISTRATION_KEY INTERNAL_SERVICE_KEY
 ```
 
-A successful first registration returns `201 Created`. A repeated registration for the same email may return `409 Conflict`.
-
-Sign in at <http://localhost:8080/login> with `owner@example.com` and the password you entered.
+A successful registration returns `201 Created`. A repeated registration for the same email may return `409 Conflict`. If you used the gated curl flow, sign in at <http://localhost:8080/login> with `owner@example.com` and the password you entered.
 
 ## Step 4: Exercise the diary loop
 
@@ -145,9 +145,9 @@ docker compose logs db-role-bootstrap db-migrate db-role-finalize
 
 Application startup waits for all three jobs. Do not delete an existing database merely to bypass a migration or baseline error. Follow [Database migrations](database-migrations.md).
 
-### Registration returns 401 or 403
+### Registration is unavailable
 
-Confirm that the `X-Registration-Key` value came from the same `.env` used to start Compose. Do not put the registration key in the JSON body.
+If the browser signup page reports that registration is unavailable, confirm `ALLOW_PUBLIC_REGISTRATION=true` in `.env` and restart the Identity container. For gated registration, confirm that the `X-Registration-Key` value came from the same `.env` used to start Compose. Do not put the registration key in the JSON body.
 
 ### The frontend loads but API calls fail
 

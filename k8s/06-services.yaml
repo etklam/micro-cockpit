@@ -29,6 +29,8 @@ spec:
                 secretKeyRef:
                   name: service-connection-strings
                   key: "IDENTITY_CONNECTION_STRING"
+            - name: Auth__AllowPublicRegistration
+              value: "false"
             - name: Auth__LocalRegistrationKey
               valueFrom:
                 secretKeyRef:

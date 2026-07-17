@@ -79,7 +79,7 @@ The canonical ownership rules are in [`contracts/schema-ownership.json`](../cont
 | `ResearchEndpoints` | Stock research, market data, price alerts, and rotation |
 | `AdminEndpoints` | Partners, tools, content administration, operations administration |
 
-`EdgeTransport` applies a per-request downstream timeout, propagates request cancellation and correlation IDs, forwards authorization and idempotency headers, and maps transport failures to safe ProblemDetails responses.
+`EdgeTransport` applies a per-request downstream timeout, propagates request cancellation and correlation IDs, forwards authorization, idempotency, and gated-registration headers, and maps transport failures to safe ProblemDetails responses.
 
 ## Frontend architecture
 
@@ -100,6 +100,7 @@ The access token exists only in module memory in `frontend/src/api.ts`. `AuthPro
 | Route | Screen |
 |---|---|
 | `/login` | Sign in |
+| `/register` | Public sign-up when enabled |
 | `/today` | Dashboard/today view |
 | `/diary` | Diary list and recent review patterns |
 | `/diary/:diaryId` | Diary, transactions, and optional structured review |
@@ -128,7 +129,8 @@ ASP.NET Core maps environment variables with double underscores to configuration
 | `Jwt__Issuer` | Identity | Compose sets `trade-diary-identity` |
 | `Jwt__Audience` | Identity | Compose sets `trade-diary-services` |
 | `Jwt__PrivateKeyPath` | Identity | Compose sets `/keys/signing-key.pem` |
-| `Auth__LocalRegistrationKey` | Identity | Required registration gate |
+| `Auth__AllowPublicRegistration` | Identity | Default `false`; Compose sets `true` for local browser signup unless overridden |
+| `Auth__LocalRegistrationKey` | Identity | Required only when public registration is disabled and registration should remain key-gated |
 | `Internal__ServiceKey` | Journal, Reminder, Market Data, Price Alert, Operations | Required for internal machine calls |
 | `Services__<Service>` | Edge | Downstream base address; local fallbacks use ports `5100` through `5112` |
 | `Edge__DownstreamTimeoutSeconds` | Edge | Default `8`; clamped to `1..30` seconds |
