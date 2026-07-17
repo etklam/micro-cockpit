@@ -19,6 +19,7 @@ Cross-user resources remain concealed with `404`; authentication failures use th
 | Identity | POST | `/internal/auth/agents` | `/api/app/agents` | human user, admin | — | — | — | created agent belongs to caller |
 | Identity | DELETE | `/internal/auth/api-keys/{id}` | `/api/app/api-keys/{id}` | human user, admin | — | — | — | another creator's key is `404` |
 | Identity | GET | `/internal/auth/me` | — | human user, admin | — | — | — | another user cannot be selected |
+| Identity | GET, PUT | `/internal/auth/settings` | `/api/app/settings` | human user, admin | — | — | — | caller row only; agents concealed/denied |
 | Identity | GET | `/internal/auth/sso/providers` | — | anonymous | — | — | — | n/a |
 | Edge aggregation | GET | downstream read set | `/api/app/dashboard` | human user, admin | — | — | — | every downstream query uses caller ownership |
 | Edge aggregation | GET | downstream read set | `/api/app/calendar` | human user, admin | — | — | — | every downstream query uses caller ownership |

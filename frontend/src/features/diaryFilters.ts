@@ -47,6 +47,47 @@ export function diaryFiltersActive(filters: DiaryFilters): boolean {
   return Boolean(filters.q || filters.from || filters.to || filters.review !== 'all' || filters.symbol || filters.tag)
 }
 
+/** Encode diary list search for durable detail returnTo (search only, no path). */
+export function encodeDiaryReturnTo(search: string): string {
+  const raw = search.startsWith('?') ? search.slice(1) : search
+  const bytes = new TextEncoder().encode(raw)
+  let bin = ''
+  for (const b of bytes) bin += String.fromCharCode(b)
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/** Accept only internal diary list search; invalid → null (caller falls back to /diary). */
+export function decodeDiaryReturnTo(value: string | null | undefined): string | null {
+  if (!value) return null
+  try {
+    const padded = value.replace(/-/g, '+').replace(/_/g, '/')
+    const pad = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4))
+    const bin = atob(padded + pad)
+    const bytes = Uint8Array.from(bin, c => c.charCodeAt(0))
+    const decoded = new TextDecoder().decode(bytes)
+    if (decoded.includes('://') || decoded.startsWith('//') || decoded.includes('\0')) return null
+    // Only diary list query params — never a foreign path.
+    if (decoded.startsWith('/') && !decoded.startsWith('/diary')) return null
+    const search = decoded.startsWith('/diary')
+      ? decoded.slice(decoded.indexOf('?') + 1 || decoded.length)
+      : decoded.startsWith('?') ? decoded.slice(1) : decoded
+    if (search.includes('/') && !search.startsWith('q=') && !search.includes('=')) return null
+    return search
+  } catch {
+    return null
+  }
+}
+
+export function diaryDetailPath(id: string, listSearch: string): string {
+  const encoded = encodeDiaryReturnTo(listSearch)
+  return encoded ? `/diary/${id}?returnTo=${encoded}` : `/diary/${id}`
+}
+
+export function listPathFromReturnTo(returnTo: string | null | undefined): { pathname: string; search: string } {
+  const decoded = decodeDiaryReturnTo(returnTo)
+  return { pathname: '/diary', search: decoded ? `?${decoded}` : '' }
+}
+
 export function normalizeTags(input: string[]): { tags: string[]; error: string } {
   const seen = new Set<string>()
   const tags: string[] = []
@@ -67,7 +108,12 @@ export function normalizeTags(input: string[]): { tags: string[]; error: string 
   return { tags, error: '' }
 }
 
+/** Real calendar date only; syntax-valid but impossible dates (2026-02-31) → ''. */
 function validDate(value: string | null): string {
   if (!value) return ''
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ''
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return ''
+  const [y, m, d] = value.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return ''
+  return value
 }

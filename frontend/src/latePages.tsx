@@ -20,6 +20,7 @@ export function MorePage() {
   const links: { page: Page; title: string; hint: string }[] = [
     { page: 'review', title: 'Monthly review', hint: 'Review process and outcome side by side.' },
     { page: 'alerts', title: 'Diary alerts', hint: 'Return to reflections at the right time.' },
+    { page: 'settings', title: 'Settings', hint: 'Timezone, currency, appearance, and display name.' },
     { page: 'watchlist', title: 'Watchlist', hint: 'Research symbols and keep a decision trail.' },
     { page: 'price-alerts', title: 'Price alerts', hint: 'Track levels that deserve attention.' },
     { page: 'rotation', title: 'Market rotation', hint: 'See relative group momentum.' },

@@ -194,17 +194,124 @@ app.MapDelete("/internal/auth/api-keys/{id:guid}", async (Guid id, ClaimsPrincip
 app.MapGet("/internal/auth/me", async (ClaimsPrincipal principal, NpgsqlDataSource db) =>
 {
     if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var userId)) return Results.Unauthorized();
-    await using var command = db.CreateCommand("SELECT id,email,display_name,timezone,base_currency,role,account_type,status,status_version FROM identity.users WHERE id=$1 AND status='active'");
+    await using var command = db.CreateCommand("""
+        SELECT id,email,display_name,timezone,base_currency,role,account_type,status,status_version,appearance
+        FROM identity.users WHERE id=$1 AND status='active'
+        """);
     command.Parameters.AddWithValue(userId);
     await using var reader = await command.ExecuteReaderAsync();
-    return await reader.ReadAsync() ? Results.Ok(ReadUser(reader)) : Results.Problem("not_found", statusCode: 404);
+    return await reader.ReadAsync() ? Results.Ok(ReadUserWithAppearance(reader)) : Results.Problem("not_found", statusCode: 404);
 })
 .RequireAuthorization()
 .Produces<AuthUser>(200).ProducesProblem(401).ProducesProblem(404);
 
+app.MapGet("/internal/auth/settings", async (ClaimsPrincipal principal, NpgsqlDataSource db) =>
+{
+    if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var userId)) return Results.Unauthorized();
+    await using var command = db.CreateCommand("""
+        SELECT email, display_name, timezone, base_currency, appearance, updated_at
+        FROM identity.users WHERE id=$1 AND status='active'
+        """);
+    command.Parameters.AddWithValue(userId);
+    await using var reader = await command.ExecuteReaderAsync();
+    if (!await reader.ReadAsync()) return Results.Problem("not_found", statusCode: 404);
+    return Results.Ok(ReadSettings(reader));
+})
+.RequireAuthorization()
+.Produces<UserSettingsResponse>(200).ProducesProblem(401).ProducesProblem(404);
+
+app.MapPut("/internal/auth/settings", async (UserSettingsWrite input, ClaimsPrincipal principal, NpgsqlDataSource db) =>
+{
+    if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var userId)) return Results.Unauthorized();
+    if (!TryNormalizeSettings(input, out var displayName, out var timezone, out var baseCurrency, out var appearance, out var problem))
+        return Results.Problem(problem, statusCode: 400);
+
+    await using var command = db.CreateCommand("""
+        UPDATE identity.users
+        SET display_name=$2, timezone=$3, base_currency=$4, appearance=$5, updated_at=now()
+        WHERE id=$1 AND status='active' AND account_type <> 'agent'
+        RETURNING email, display_name, timezone, base_currency, appearance, updated_at
+        """);
+    command.Parameters.AddWithValue(userId);
+    command.Parameters.AddWithValue(displayName);
+    command.Parameters.AddWithValue(timezone);
+    command.Parameters.AddWithValue(baseCurrency);
+    command.Parameters.AddWithValue(appearance);
+    await using var reader = await command.ExecuteReaderAsync();
+    if (!await reader.ReadAsync()) return Results.Problem("not_found", statusCode: 404);
+    return Results.Ok(ReadSettings(reader));
+})
+.RequireAuthorization()
+.Produces<UserSettingsResponse>(200).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
+
 app.Run();
 
-static AuthUser ReadUser(NpgsqlDataReader reader) => new(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetInt32(8));
+// Login/API-key readers omit appearance (column 9 is credentials/scopes there). Default is fine for JWT.
+static AuthUser ReadUser(NpgsqlDataReader reader) => new(
+    reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
+    reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetInt32(8));
+
+static AuthUser ReadUserWithAppearance(NpgsqlDataReader reader) => new(
+    reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
+    reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetInt32(8), reader.GetString(9));
+
+static UserSettingsResponse ReadSettings(NpgsqlDataReader reader) => new(
+    reader.GetString(0),
+    reader.GetString(1),
+    reader.GetString(2),
+    reader.GetString(3).Trim(),
+    reader.GetString(4),
+    DateTime.SpecifyKind(reader.GetDateTime(5), DateTimeKind.Utc));
+
+static bool TryNormalizeSettings(
+    UserSettingsWrite input,
+    out string displayName,
+    out string timezone,
+    out string baseCurrency,
+    out string appearance,
+    out string problem)
+{
+    displayName = string.Empty;
+    timezone = string.Empty;
+    baseCurrency = string.Empty;
+    appearance = string.Empty;
+    problem = "invalid_settings";
+
+    if (input.DisplayName is null || input.Timezone is null || input.BaseCurrency is null || input.Appearance is null)
+        return false;
+
+    displayName = input.DisplayName.Trim();
+    if (displayName.Length is < 1 or > 100 || ContainsControlCharacters(displayName))
+    {
+        problem = "invalid_display_name";
+        return false;
+    }
+
+    var timezoneRaw = input.Timezone.Trim();
+    if (timezoneRaw.Length is < 1 or > 100 || ContainsControlCharacters(timezoneRaw)
+        || !TimeZoneInfo.TryFindSystemTimeZoneById(timezoneRaw, out var tz))
+    {
+        problem = "invalid_timezone";
+        return false;
+    }
+    timezone = tz.Id;
+
+    var currency = input.BaseCurrency.Trim().ToUpperInvariant();
+    if (currency.Length != 3 || !currency.All(static c => c is >= 'A' and <= 'Z'))
+    {
+        problem = "invalid_currency";
+        return false;
+    }
+    baseCurrency = currency;
+
+    appearance = input.Appearance.Trim().ToLowerInvariant();
+    if (appearance is not ("system" or "light" or "dark"))
+    {
+        problem = "invalid_appearance";
+        return false;
+    }
+    return true;
+}
 
 static bool TryNormalizeRegistration(
     RegisterRequest input,
@@ -287,12 +394,14 @@ record LoginRequest(string Email, string Password);
 record RefreshRequest(string RefreshToken);
 record AgentRequest(string Name, string DisplayName, string Timezone, string BaseCurrency, List<string> Scopes, DateTime? ExpiresAt);
 record ApiKeyTokenRequest(string ApiKey);
-record AuthUser(Guid Id, string Email, string DisplayName, string Timezone, string BaseCurrency, string Role, string AccountType, string Status, int StatusVersion);
+record AuthUser(Guid Id, string Email, string DisplayName, string Timezone, string BaseCurrency, string Role, string AccountType, string Status, int StatusVersion, string Appearance = "system");
 record AuthTokens(string AccessToken, DateTime ExpiresAt, string RefreshToken);
 record RegisterResponse(Guid Id, string Email, string DisplayName, string Timezone, string BaseCurrency);
 record AgentResponse(Guid UserId, Guid KeyId, string ApiKey, List<string> Scopes);
 record ApiKeyTokenResponse(string AccessToken, DateTime ExpiresAt);
 record SsoProvidersResponse(string[] EnabledProviders);
+record UserSettingsResponse(string Email, string DisplayName, string Timezone, string BaseCurrency, string Appearance, DateTime UpdatedAt);
+record UserSettingsWrite(string DisplayName, string Timezone, string BaseCurrency, string Appearance);
 
 // ponytail: shared OpenAPI security wiring — bearerAuth for user routes, serviceKey for internal admin/worker/events.
 // Duplicated per service intentionally: no shared kernel is allowed across services.

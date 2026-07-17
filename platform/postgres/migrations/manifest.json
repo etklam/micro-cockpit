@@ -90,6 +90,11 @@
       "id": "0018",
       "filename": "0018_diary_tags_and_list_indexes.sql",
       "sha256": "2b73d3d458d42a194c83bf2e5edf6e123b98c54f2a9c35f2f016efc0d96c0613"
+    },
+    {
+      "id": "0019",
+      "filename": "0019_identity_user_preferences.sql",
+      "sha256": "62d38c8b85cf6c9d9f1ad03ee146ce4ef4a9b77c2062a34e62e63e8642e635bb"
     }
   ]
 }

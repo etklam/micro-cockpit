@@ -46,6 +46,7 @@ app.UseMiddleware<AuthBodyLimitMiddleware>();
 HealthEndpoints.Map(app);
 AuthenticationEndpoints.Map(app);
 BootstrapEndpoints.Map(app);
+SettingsEndpoints.Map(app);
 DashboardEndpoints.Map(app);
 CalendarEndpoints.Map(app);
 JournalEndpoints.Map(app);

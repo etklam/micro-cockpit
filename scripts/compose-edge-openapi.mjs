@@ -175,13 +175,14 @@ const stockPageSchema = {
 }
 const bootstrapSchema = {
   type: 'object',
-  required: ['currentUser', 'timezone', 'baseCurrency', 'role', 'accountType', 'currentLocalDate', 'availableProductAreas'],
+  required: ['currentUser', 'timezone', 'baseCurrency', 'appearance', 'role', 'accountType', 'currentLocalDate', 'availableProductAreas'],
   properties: {
     currentUser: {
       type: 'object', required: ['id', 'email', 'displayName'],
       properties: { id: { type: 'string', format: 'uuid' }, email: { type: 'string' }, displayName: { type: 'string' } },
     },
-    timezone: { type: 'string' }, baseCurrency: { type: 'string' }, role: { type: 'string' }, accountType: { type: 'string' },
+    timezone: { type: 'string' }, baseCurrency: { type: 'string' }, appearance: { type: 'string' },
+    role: { type: 'string' }, accountType: { type: 'string' },
     currentLocalDate: { type: 'string', format: 'date' },
     availableProductAreas: { type: 'array', items: { type: 'string' } },
   },
@@ -191,6 +192,9 @@ collected.set('AppBootstrapResponse', bootstrapSchema)
 collected.set('DashboardResponse', dashboardSchema)
 collected.set('CalendarResponse', calendarSchema)
 collected.set('StockPageResponse', stockPageSchema)
+// Settings: Edge forwards Identity's UserSettingsResponse/Write 1:1.
+collectFromObj({ $ref: '#/components/schemas/UserSettingsResponse' }, docFor('identity'))
+collectFromObj({ $ref: '#/components/schemas/UserSettingsWrite' }, docFor('identity'))
 collected.set('EdgeProblemDetails', {
   type: 'object', required: ['code', 'title', 'status', 'detail', 'correlationId'],
   properties: { code: { type: 'string' }, title: { type: 'string' }, status: { type: 'integer' }, detail: { type: 'string' }, correlationId: { type: 'string' } },
@@ -223,6 +227,39 @@ Object.assign(paths,
   agg('/api/app/calendar', 'CalendarResponse', [intParam('year'), intParam('month')]),
   agg('/api/app/stocks/{symbol}/page', 'StockPageResponse', [strPathParam('symbol')]),
 )
+// Settings endpoints (typed forwarders, not MapProxy) — declared explicitly.
+Object.assign(paths, {
+  '/api/app/settings': {
+    get: {
+      operationId: opId('get', '/api/app/settings'),
+      summary: 'Account settings',
+      security: [{ bearerAuth: [] }],
+      responses: {
+        200: { description: 'Success', content: { 'application/json': { schema: { $ref: '#/components/schemas/UserSettingsResponse' } } } },
+        401: { $ref: '#/components/responses/Problem' },
+        404: { $ref: '#/components/responses/Problem' },
+        502: { $ref: '#/components/responses/Problem' },
+        503: { $ref: '#/components/responses/Problem' },
+        504: { $ref: '#/components/responses/Problem' },
+      },
+    },
+    put: {
+      operationId: opId('put', '/api/app/settings'),
+      summary: 'Update account settings',
+      security: [{ bearerAuth: [] }],
+      requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/UserSettingsWrite' } } } },
+      responses: {
+        200: { description: 'Success', content: { 'application/json': { schema: { $ref: '#/components/schemas/UserSettingsResponse' } } } },
+        400: { $ref: '#/components/responses/Problem' },
+        401: { $ref: '#/components/responses/Problem' },
+        404: { $ref: '#/components/responses/Problem' },
+        502: { $ref: '#/components/responses/Problem' },
+        503: { $ref: '#/components/responses/Problem' },
+        504: { $ref: '#/components/responses/Problem' },
+      },
+    },
+  },
+})
 
 // Auth endpoints: Edge owns the browser-facing session shape. The refresh token lives only in the
 // HttpOnly cookie Edge sets, so login/refresh return SessionTokens (no refresh token) and

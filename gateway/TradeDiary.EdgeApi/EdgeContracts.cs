@@ -16,10 +16,25 @@ public sealed record AppBootstrapResponse(
     CurrentUserResponse CurrentUser,
     string Timezone,
     string BaseCurrency,
+    string Appearance,
     string Role,
     string AccountType,
     DateOnly CurrentLocalDate,
     IReadOnlyList<string> AvailableProductAreas);
+
+public sealed record UserSettingsResponse(
+    string Email,
+    string DisplayName,
+    string Timezone,
+    string BaseCurrency,
+    string Appearance,
+    DateTime UpdatedAt);
+
+public sealed record UserSettingsWrite(
+    string DisplayName,
+    string Timezone,
+    string BaseCurrency,
+    string Appearance);
 
 public sealed record DashboardResponse(
     DateOnly LocalDate,
@@ -215,7 +230,16 @@ internal sealed record IdentityUserResponse(
     string Role,
     string AccountType,
     string Status,
-    int StatusVersion);
+    int StatusVersion,
+    string Appearance = "system");
+
+internal sealed record IdentitySettingsResponse(
+    string Email,
+    string DisplayName,
+    string Timezone,
+    string BaseCurrency,
+    string Appearance,
+    DateTime UpdatedAt);
 
 internal sealed record IdentityTokensResponse(string AccessToken, DateTime ExpiresAt, string RefreshToken);
 internal sealed record RefreshRequest(string RefreshToken);

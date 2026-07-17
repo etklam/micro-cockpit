@@ -101,7 +101,7 @@ public sealed class MigrationEngineTests : IAsyncLifetime
         await Reset();
         var engine = Engine(Migrations);
         Assert.Equal(0, await engine.RunAsync("migrate"));
-        Assert.Equal(17L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
+        Assert.Equal(19L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
         var applied = await Scalar<DateTime>("SELECT max(applied_at) FROM platform_migrations.schema_history");
         Assert.Equal(0, await engine.RunAsync("migrate"));
         Assert.Equal(applied, await Scalar<DateTime>("SELECT max(applied_at) FROM platform_migrations.schema_history"));
@@ -169,8 +169,10 @@ public sealed class MigrationEngineTests : IAsyncLifetime
     {
         await Reset();
         var through0016 = CopyMigrations();
-        var future = Path.Combine(through0016, "0017_price_alert_evaluation_price.sql");
-        if (File.Exists(future)) File.Delete(future);
+        foreach (var name in Directory.GetFiles(through0016, "*.sql")
+                     .Select(Path.GetFileName)
+                     .Where(name => name is not null && string.CompareOrdinal(name, "0017") >= 0))
+            File.Delete(Path.Combine(through0016, name!));
         await RefreshManifest(through0016);
         Assert.Equal(0, await Engine(through0016).RunAsync("migrate"));
         var alertId = Guid.NewGuid(); var triggerId = Guid.NewGuid(); var userId = Guid.NewGuid();
@@ -203,19 +205,19 @@ public sealed class MigrationEngineTests : IAsyncLifetime
     {
         await Reset();
         var fixture = CopyMigrations();
-        await File.WriteAllTextAsync(Path.Combine(fixture, "0018_failure.sql"), "-- migration-id: 0018\n-- owner: journal-service\n-- description: Failure fixture\n\nCREATE TABLE journal.rollback_probe(id integer);\nSELECT 1 / 0;\n");
+        await File.WriteAllTextAsync(Path.Combine(fixture, "0020_failure.sql"), "-- migration-id: 0020\n-- owner: journal-service\n-- description: Failure fixture\n\nCREATE TABLE journal.rollback_probe(id integer);\nSELECT 1 / 0;\n");
         await RefreshManifest(fixture);
         await Assert.ThrowsAnyAsync<Exception>(() => Engine(fixture).RunAsync("migrate"));
         Assert.False(await Scalar<bool>("SELECT to_regclass('journal.rollback_probe') IS NOT NULL"));
-        Assert.Equal(0L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history WHERE migration_id='0018'"));
-        File.Delete(Path.Combine(fixture, "0018_failure.sql"));
+        Assert.Equal(0L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history WHERE migration_id='0020'"));
+        File.Delete(Path.Combine(fixture, "0020_failure.sql"));
         await File.AppendAllTextAsync(Path.Combine(fixture, "0001_initial_journal_performance.sql"), "\n-- changed\n");
         await RefreshManifest(fixture);
         await Assert.ThrowsAsync<MigrationException>(() => Engine(fixture).RunAsync("migrate"));
         File.Delete(Path.Combine(fixture, "0001_initial_journal_performance.sql"));
         await RefreshManifest(fixture);
         await Assert.ThrowsAsync<MigrationException>(() => Engine(fixture).RunAsync("migrate"));
-        Assert.Equal(17L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
+        Assert.Equal(19L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
     }
 
     [Fact]
@@ -233,7 +235,7 @@ public sealed class MigrationEngineTests : IAsyncLifetime
         await Reset();
         var results = await Task.WhenAll(Engine(Migrations).RunAsync("migrate"), Engine(Migrations).RunAsync("migrate"));
         Assert.Equal(new[] { 0, 0 }, results);
-        Assert.Equal(17L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
+        Assert.Equal(19L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
     }
 
     [Fact]

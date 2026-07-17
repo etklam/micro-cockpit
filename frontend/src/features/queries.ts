@@ -1,5 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import * as session from '../api'
 import * as api from './api'
+import { isAppearance, reconcileAppearance } from './appearance'
 
 export type DiaryListKeyFilters = {
   q: string
@@ -12,6 +14,7 @@ export type DiaryListKeyFilters = {
 
 export const queryKeys = {
   bootstrap: ['bootstrap'] as const,
+  settings: ['settings'] as const,
   dashboard: ['dashboard'] as const,
   diaries: ['diaries'] as const,
   diariesList: (filters: DiaryListKeyFilters) => ['diaries', 'list', filters.q, filters.from, filters.to, filters.review, filters.symbol, filters.tag] as const,
@@ -45,6 +48,7 @@ export const queryKeys = {
 }
 
 export const useBootstrapQuery = () => useQuery({ queryKey: queryKeys.bootstrap, queryFn: api.getBootstrap, staleTime: 60_000 })
+export const useSettingsQuery = () => useQuery({ queryKey: queryKeys.settings, queryFn: api.getSettings })
 export const useDashboardQuery = () => useQuery({ queryKey: queryKeys.dashboard, queryFn: api.getDashboard })
 export const useDiariesInfiniteQuery = (filters: DiaryListKeyFilters) => useInfiniteQuery({
   queryKey: queryKeys.diariesList(filters),
@@ -61,7 +65,12 @@ export const useDiariesInfiniteQuery = (filters: DiaryListKeyFilters) => useInfi
   }),
   getNextPageParam: (last) => last.nextCursor ?? undefined,
 })
-// Compact list for pickers (alerts). Not a full archive dump.
+/** Searchable diary picker (alerts). Server-side page; not an archive dump. */
+export const useDiaryPickerQuery = (q: string) => useQuery({
+  queryKey: ['diaries', 'picker', q] as const,
+  queryFn: () => api.getDiaries({ query: q || undefined, limit: 20 }),
+})
+// Compact list for pickers that still need a simple list. Prefer useDiaryPickerQuery for large accounts.
 export const useDiariesQuery = () => useQuery({
   queryKey: queryKeys.diariesList({ q: '', from: '', to: '', review: 'all', symbol: '', tag: '' }),
   queryFn: () => api.getDiaries({ limit: 100 }),
@@ -132,21 +141,33 @@ export function useDeleteDiaryMutation() {
 export function useCreateTransactionMutation(diaryId: string) {
   const client = useQueryClient()
   return useMutation({ mutationFn: ({ body, key }: { body: Parameters<typeof api.createTransaction>[1]; key: string }) => api.createTransaction(diaryId, body, key), onSuccess: async () => {
-    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.transactions(diaryId) }), invalidateCalendar(client)])
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.transactions(diaryId) }),
+      client.invalidateQueries({ queryKey: queryKeys.diaries }),
+      invalidateCalendar(client),
+    ])
   } })
 }
 
 export function useUpdateTransactionMutation(diaryId: string) {
   const client = useQueryClient()
   return useMutation({ mutationFn: ({ id, body }: { id: string; body: Parameters<typeof api.updateTransaction>[2] }) => api.updateTransaction(diaryId, id, body), onSuccess: async () => {
-    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.transactions(diaryId) }), invalidateCalendar(client)])
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.transactions(diaryId) }),
+      client.invalidateQueries({ queryKey: queryKeys.diaries }),
+      invalidateCalendar(client),
+    ])
   } })
 }
 
 export function useDeleteTransactionMutation(diaryId: string) {
   const client = useQueryClient()
   return useMutation({ mutationFn: (id: string) => api.deleteTransaction(diaryId, id), onSuccess: async () => {
-    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.transactions(diaryId) }), invalidateCalendar(client)])
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.transactions(diaryId) }),
+      client.invalidateQueries({ queryKey: queryKeys.diaries }),
+      invalidateCalendar(client),
+    ])
   } })
 }
 
@@ -202,6 +223,7 @@ export function useSaveDiaryReviewMutation(diaryId: string) {
       client.invalidateQueries({ queryKey: queryKeys.diaryReview.summaries }),
       client.invalidateQueries({ queryKey: queryKeys.diaryReview.itemsPrefix }),
       client.invalidateQueries({ queryKey: queryKeys.diary(diaryId) }),
+      client.invalidateQueries({ queryKey: queryKeys.diaries }),
     ])
   } })
 }
@@ -214,6 +236,43 @@ export function useDeleteDiaryReviewMutation(diaryId: string) {
       client.invalidateQueries({ queryKey: queryKeys.diaryReview.summaries }),
       client.invalidateQueries({ queryKey: queryKeys.diaryReview.itemsPrefix }),
       client.invalidateQueries({ queryKey: queryKeys.diary(diaryId) }),
+      client.invalidateQueries({ queryKey: queryKeys.diaries }),
     ])
   } })
+}
+
+export type SaveSettingsResult =
+  | { status: 'ok'; settings: api.UserSettings }
+  | { status: 'saved_session_stale'; settings: api.UserSettings; message: string }
+
+export function useSaveSettingsMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: api.UserSettingsWrite): Promise<SaveSettingsResult> => {
+      const settings = await api.putSettings(body)
+      const refreshed = await session.refreshSession()
+      if (!refreshed) {
+        // Settings persisted in Identity; access token claims may be stale. Clear the
+        // in-memory token without a second refresh-rotation attempt.
+        session.clearAccessToken()
+        return {
+          status: 'saved_session_stale',
+          settings,
+          message: 'Settings were saved, but the session could not be refreshed. Sign in again to apply timezone and currency.',
+        }
+      }
+      if (isAppearance(settings.appearance)) reconcileAppearance(settings.appearance)
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.settings }),
+        client.invalidateQueries({ queryKey: queryKeys.bootstrap }),
+        client.invalidateQueries({ queryKey: queryKeys.dashboard }),
+        client.invalidateQueries({ queryKey: calendarPrefix }),
+        client.invalidateQueries({ queryKey: queryKeys.diaries }),
+        client.invalidateQueries({ queryKey: queryKeys.diaryReview.summaries }),
+        client.invalidateQueries({ queryKey: queryKeys.alerts }),
+      ])
+      await client.refetchQueries({ queryKey: queryKeys.bootstrap })
+      return { status: 'ok', settings }
+    },
+  })
 }

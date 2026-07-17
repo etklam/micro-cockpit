@@ -4,15 +4,16 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { Alert, Discipline } from './features/api'
 import { useIdempotencyKey } from './features/api'
 import {
-  useAlertsQuery, useCalendarQuery, useCreateAlertMutation, useCreateDisciplineMutation,
-  useDashboardQuery, useDeleteAlertMutation, useDeleteDisciplineMutation, useDiariesQuery,
+  useAlertsQuery, useBootstrapQuery, useCalendarQuery, useCreateAlertMutation, useCreateDisciplineMutation,
+  useDashboardQuery, useDeleteAlertMutation, useDeleteDisciplineMutation, useDiaryPickerQuery, useDiaryQuery,
   useDismissAlertMutation, useQuickNoteMutation, useSavePerformanceMutation,
   useDisciplinesQuery,
 } from './features/queries'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
 import { Icon } from './icons'
 import { PageSkeleton, SectionError, useCockpit } from './shell'
-import { cx, formatDate, formatLongDate, formatTime, monthLabel, pct, repeatLabel, signed, signedCompact, todayISO } from './format'
+import { cx, formatDate, formatLongDate, formatTime, monthLabel, pct, repeatLabel, signed, signedCompact } from './format'
+import { formatTimezoneLabel } from './features/accountTime'
 
 export { DiaryDetailPage, DiaryPage } from './screens/diary'
 
@@ -158,14 +159,16 @@ export function TodayPage() {
 export function CalendarPage() {
   const navigate = useNavigate()
   const params = useParams()
-  const now = new Date()
-  const year = Number(params.year) || now.getFullYear()
-  const month = Number(params.month) || now.getMonth() + 1
+  const bootstrap = useBootstrapQuery()
+  const accountToday = bootstrap.data?.currentLocalDate
+  const year = Number(params.year) || (accountToday ? Number(accountToday.slice(0, 4)) : new Date().getFullYear())
+  const month = Number(params.month) || (accountToday ? Number(accountToday.slice(5, 7)) : new Date().getMonth() + 1)
   const cursor = { year, month }
   const [search, setSearch] = useSearchParams()
   const { data, isLoading: loading, isError: error, refetch: reload } = useCalendarQuery(year, month)
   const requestedDay = search.get('day')
-  const selectedFromUrl = validCalendarDay(requestedDay, year, month) ? requestedDay! : todayISO()
+  const defaultDay = accountToday && validCalendarDay(accountToday, year, month) ? accountToday : `${year}-${String(month).padStart(2, '0')}-01`
+  const selectedFromUrl = validCalendarDay(requestedDay, year, month) ? requestedDay! : defaultDay
   const [selected, setSelected] = useState(selectedFromUrl)
   const [amount, setAmount] = useState('')
   const [capital, setCapital] = useState('')
@@ -358,28 +361,59 @@ export function DisciplinePage() {
 /* ============================== ALERTS ============================= */
 export function AlertsPage() {
   const { confirm } = useCockpit()
+  const bootstrap = useBootstrapQuery()
   const alertsQuery = useAlertsQuery()
-  const diariesQuery = useDiariesQuery()
   const alerts = alertsQuery.data?.items ?? []
+  const [pickerQuery, setPickerQuery] = useState('')
+  const [debouncedQ, setDebouncedQ] = useState('')
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedQ(pickerQuery.trim()), 250)
+    return () => window.clearTimeout(handle)
+  }, [pickerQuery])
+  const diariesQuery = useDiaryPickerQuery(debouncedQ)
   const diaries = useMemo(() => diariesQuery.data?.items ?? [], [diariesQuery.data?.items])
-  const loading = alertsQuery.isLoading || diariesQuery.isLoading
-  const error = alertsQuery.isError || diariesQuery.isError
-  const reload = () => { void alertsQuery.refetch(); void diariesQuery.refetch() }
+  const loading = alertsQuery.isLoading || bootstrap.isLoading
+  const error = alertsQuery.isError || diariesQuery.isError || bootstrap.isError
+  const reload = () => { void alertsQuery.refetch(); void diariesQuery.refetch(); void bootstrap.refetch() }
   const [diaryId, setDiaryId] = useState('')
-  const [date, setDate] = useState(todayISO())
+  const [selectedTitle, setSelectedTitle] = useState('')
+  const [date, setDate] = useState('')
   const [time, setTime] = useState('09:00')
   const [repeat, setRepeat] = useState('none')
   const [formError, setFormError] = useState('')
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const timezone = bootstrap.data?.timezone ?? ''
+  const accountToday = bootstrap.data?.currentLocalDate ?? ''
   const createAlert = useCreateAlertMutation()
   const dismissAlert = useDismissAlertMutation()
   const deleteAlert = useDeleteAlertMutation()
+  const selectedDiary = useDiaryQuery(diaryId)
 
-  useEffect(() => { if (!diaryId && diaries.length) setDiaryId(diaries[0].id) }, [diaryId, diaries])
+  useEffect(() => {
+    if (accountToday && !date) setDate(accountToday)
+  }, [accountToday, date])
+  useEffect(() => {
+    if (!diaryId && diaries.length) {
+      setDiaryId(diaries[0].id)
+      setSelectedTitle(diaries[0].title)
+    }
+  }, [diaryId, diaries])
+  useEffect(() => {
+    if (selectedDiary.data) setSelectedTitle(selectedDiary.data.title)
+  }, [selectedDiary.data])
+
+  // Keep titles for alert cards that fall outside the current picker page.
+  const titleCache = useMemo(() => {
+    const map = new Map<string, string>()
+    if (selectedTitle && diaryId) map.set(diaryId, selectedTitle)
+    for (const d of diaries) map.set(d.id, d.title)
+    return map
+  }, [diaries, diaryId, selectedTitle])
 
   async function add(e: FormEvent) {
     e.preventDefault()
     setFormError('')
+    if (!timezone) { setFormError('Account timezone is still loading.'); return }
+    if (!diaryId) { setFormError('Choose a diary.'); return }
     try {
       await createAlert.mutateAsync({ diaryId, startLocalDate: date, localTime: time, timezone, repeatMode: repeat })
     } catch {
@@ -394,7 +428,7 @@ export function AlertsPage() {
     await deleteAlert.mutateAsync(a.id)
   }
 
-  const titleFor = (id: string) => diaries.find((d) => d.id === id)?.title ?? 'Diary reminder'
+  const titleFor = (id: string) => titleCache.get(id) ?? (selectedDiary.data?.id === id ? selectedDiary.data.title : null) ?? 'Diary reminder'
 
   return (
     <>
@@ -403,10 +437,22 @@ export function AlertsPage() {
       <Card flush as="section" className="alert-form">
         <form className="alert-form__body" onSubmit={add}>
           <div className="form-row">
+            <Field label="Find diary" className="field--grow" hint="Search by title or content. Results are paged.">
+              <TextInput value={pickerQuery} onChange={(e) => setPickerQuery(e.target.value)} placeholder="Search diaries" />
+            </Field>
+          </div>
+          <div className="form-row">
             <Field label="Diary" className="field--grow">
-              <SelectBox required value={diaryId} onChange={(e) => setDiaryId(e.target.value)} disabled={!diaries.length}>
+              <SelectBox required value={diaryId} onChange={(e) => {
+                setDiaryId(e.target.value)
+                const match = diaries.find(d => d.id === e.target.value)
+                if (match) setSelectedTitle(match.title)
+              }} disabled={!diaries.length && !diaryId}>
+                {diaryId && !diaries.some(d => d.id === diaryId) ? (
+                  <option value={diaryId}>{selectedTitle || 'Selected diary'}</option>
+                ) : null}
                 <option value="" disabled>Choose a diary</option>
-                {diaries.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+                {diaries.map((d) => <option key={d.id} value={d.id}>{d.title} · {d.localDate}</option>)}
               </SelectBox>
             </Field>
             <Field label="Date">
@@ -425,12 +471,13 @@ export function AlertsPage() {
               </SelectBox>
             </Field>
           </div>
+          {timezone ? <p className="form-hint">New reminders use account timezone: {formatTimezoneLabel(timezone)}</p> : null}
           {formError ? <p className="form-error" role="alert">{formError}</p> : null}
           <div className="form-actions">
-            <Button variant="primary" type="submit" icon="bell" loading={createAlert.isPending} disabled={!diaries.length}>
+            <Button variant="primary" type="submit" icon="bell" loading={createAlert.isPending} disabled={!diaryId || !timezone}>
               Create alert
             </Button>
-            {!diaries.length && !loading ? <span className="form-hint">Create a diary entry first.</span> : null}
+            {!diaries.length && !loading && !diaryId ? <span className="form-hint">Create a diary entry first, or refine the search.</span> : null}
           </div>
         </form>
       </Card>
@@ -448,9 +495,9 @@ export function AlertsPage() {
               <Card as="article" className="alert">
                 <div className="alert__main">
                   <Badge tone={a.status === 'active' ? 'warn' : 'muted'}>{a.status}</Badge>
-                  <h3 className="alert__title">{titleFor(a.diaryId)}</h3>
+                  <h3 className="alert__title"><AlertDiaryTitle diaryId={a.diaryId} fallback={titleFor(a.diaryId)} /></h3>
                   <p className="alert__meta">
-                    {a.nextLocalDate ?? a.startLocalDate} · {formatTime(a.localTime)} · {repeatLabel(a.repeatMode)}
+                    {a.nextLocalDate ?? a.startLocalDate} · {formatTime(a.localTime)} · {repeatLabel(a.repeatMode)} · {a.timezone}
                   </p>
                 </div>
                 <div className="alert__actions">
@@ -464,4 +511,9 @@ export function AlertsPage() {
       )}
     </>
   )
+}
+
+function AlertDiaryTitle({ diaryId, fallback }: { diaryId: string; fallback: string }) {
+  const diary = useDiaryQuery(diaryId)
+  return <>{diary.data?.title ?? fallback}</>
 }

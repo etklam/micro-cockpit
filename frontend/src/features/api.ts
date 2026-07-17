@@ -30,6 +30,11 @@ export type DiaryReviewFilterStatus = NonNullable<G.DiaryReviewFilterStatus>
 export type DiaryReviewAssessmentFilter = NonNullable<G.DiaryReviewAssessmentFilter>
 
 export const getBootstrap = () => G.getApiAppBootstrap()
+export type Bootstrap = Awaited<ReturnType<typeof G.getApiAppBootstrap>>
+export type UserSettings = G.UserSettingsResponse
+export type UserSettingsWrite = G.UserSettingsWrite
+export const getSettings = () => G.getApiAppSettings()
+export const putSettings = (body: UserSettingsWrite) => G.putApiAppSettings(body)
 export const getDashboard = () => G.getApiAppDashboard()
 export const saveQuickNote = (localDate: string, content: string, key?: string) =>
   G.postApiAppQuickNote({ localDate, content, targetDiaryId: null }, idempotencyHeader(key))

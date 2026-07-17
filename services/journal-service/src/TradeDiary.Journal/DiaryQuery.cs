@@ -51,7 +51,8 @@ static class DiaryQuery
         }
 
         string? normalizedTag = null;
-        if (tag is not null)
+        // Blank/whitespace tag is absent (same as query/symbol). Non-blank invalid stays 400.
+        if (!string.IsNullOrWhiteSpace(tag))
         {
             if (!DiaryTags.TryNormalizeOne(tag, out normalizedTag, out var tagError)) return tagError;
         }

@@ -3,7 +3,7 @@ import { ErrorBox } from './ui'
 import type { ConfirmOpts } from './ui'
 
 export type Page =
-  | 'today' | 'diary' | 'calendar' | 'discipline' | 'alerts' | 'more' | 'review'
+  | 'today' | 'diary' | 'calendar' | 'discipline' | 'alerts' | 'more' | 'review' | 'settings'
   | 'watchlist' | 'price-alerts' | 'rotation' | 'partners' | 'articles' | 'tools'
 
 type Cockpit = { go: (page: Page) => void; confirm: (options: ConfirmOpts) => Promise<boolean> }

@@ -36,7 +36,7 @@ test('diary mutation invalidates diaries, dashboard, and calendar queries', asyn
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['calendar'] })
 })
 
-test('review save invalidates its detail, summaries, evidence items, and diary detail', async () => {
+test('review save invalidates list variants, detail, summaries, evidence items, and diary detail', async () => {
   const invalidation = vi.spyOn(client, 'invalidateQueries')
   const { result } = renderHook(() => useSaveDiaryReviewMutation('diary-1'), { wrapper })
   await act(() => result.current.mutateAsync({ thesis: null, plannedAction: null, actualAction: null, emotion: null, disciplineScore: null, executionScore: null, processAssessment: null, mistakeTags: [], lesson: null, nextAction: null }))
@@ -44,17 +44,19 @@ test('review save invalidates its detail, summaries, evidence items, and diary d
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diary-review', 'summary'] })
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diary-review', 'items'] })
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diary', 'diary-1'] })
-  expect(invalidation).toHaveBeenCalledTimes(4)
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diaries'] })
+  expect(invalidation).toHaveBeenCalledTimes(5)
 })
 
-test('review delete invalidates evidence item queries', async () => {
+test('review delete invalidates evidence item queries and diary lists', async () => {
   const invalidation = vi.spyOn(client, 'invalidateQueries')
   const { result } = renderHook(() => useDeleteDiaryReviewMutation('diary-1'), { wrapper })
   await act(() => result.current.mutateAsync())
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diary-review', 'items'] })
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diaries'] })
 })
 
-test('transaction create invalidates diary transactions and calendar queries', async () => {
+test('transaction create invalidates diary list variants, transactions, and calendar', async () => {
   const invalidation = vi.spyOn(client, 'invalidateQueries')
   const { result } = renderHook(() => useCreateTransactionMutation('diary-1'), { wrapper })
   await act(() => result.current.mutateAsync({
@@ -62,10 +64,11 @@ test('transaction create invalidates diary transactions and calendar queries', a
     key: 'idempotency-key',
   }))
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['transactions', 'diary-1'] })
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diaries'] })
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['calendar'] })
 })
 
-test('transaction update invalidates diary transactions and calendar queries', async () => {
+test('transaction update invalidates diary list variants, transactions, and calendar', async () => {
   const invalidation = vi.spyOn(client, 'invalidateQueries')
   const { result } = renderHook(() => useUpdateTransactionMutation('diary-1'), { wrapper })
   await act(() => result.current.mutateAsync({
@@ -73,13 +76,15 @@ test('transaction update invalidates diary transactions and calendar queries', a
     body: { symbol: 'AAPL', side: 'sell', quantity: 2, price: 101, currency: 'USD', tradedAt: '2026-07-16T08:00:00.000Z', notes: 'Updated' },
   }))
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['transactions', 'diary-1'] })
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diaries'] })
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['calendar'] })
 })
 
-test('transaction delete invalidates diary transactions and calendar queries', async () => {
+test('transaction delete invalidates diary list variants, transactions, and calendar', async () => {
   const invalidation = vi.spyOn(client, 'invalidateQueries')
   const { result } = renderHook(() => useDeleteTransactionMutation('diary-1'), { wrapper })
   await act(() => result.current.mutateAsync('tx-1'))
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['transactions', 'diary-1'] })
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diaries'] })
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['calendar'] })
 })

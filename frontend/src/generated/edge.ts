@@ -4,7 +4,7 @@ export type AgentRequest = { "name": string; "displayName": string; "timezone": 
 export type AgentResponse = { "userId": string; "keyId": string; "apiKey": string; "scopes": Array<string> }
 export type ApiKeyTokenRequest = { "apiKey": string }
 export type ApiKeyTokenResponse = { "accessToken": string; "expiresAt": string }
-export type AppBootstrapResponse = { "currentUser": { "id": string; "email": string; "displayName": string }; "timezone": string; "baseCurrency": string; "role": string; "accountType": string; "currentLocalDate": string; "availableProductAreas": Array<string> }
+export type AppBootstrapResponse = { "currentUser": { "id": string; "email": string; "displayName": string }; "timezone": string; "baseCurrency": string; "appearance": string; "role": string; "accountType": string; "currentLocalDate": string; "availableProductAreas": Array<string> }
 export type AuditResponse = { "id": string; "actorUserId": null | string; "action": string; "resourceType": string; "resourceId": null | string; "details": JsonElement; "occurredAt": string }
 export type AuthorizationResponse = { "allowed": boolean }
 export type BarsResponse = { "contractVersion": number | string; "symbol": string; "items": Array<PublishedBarResponse> }
@@ -101,6 +101,8 @@ export type UniverseCreatedResponse = { "id": string; "code": string; "name": st
 export type UniverseResponse = { "id": string; "code": string; "name": string; "rankScope": string; "createdAt": string; "updatedAt": string }
 export type UniverseSymbolWrite = { "symbol": string; "label": string; "sector": null | string; "sortOrder": null | number | string }
 export type UniverseWrite = { "code": string; "name": string; "rankScope": null | string }
+export type UserSettingsResponse = { "email": string; "displayName": string; "timezone": string; "baseCurrency": string; "appearance": string; "updatedAt": string }
+export type UserSettingsWrite = { "displayName": string; "timezone": string; "baseCurrency": string; "appearance": string }
 export type WatchlistItemCreatedResponse = { "stockId": string }
 export type WatchlistResponse = { "stock": StockResponse; "currentNote": null | string; "noteUpdatedAt": null | string; "timelineCount": number | string }
 
@@ -218,6 +220,8 @@ export const getApiAppBootstrap = (extra?: RequestInit) => request<AppBootstrapR
 export const getApiAppDashboard = (extra?: RequestInit) => request<DashboardResponse>("/api/app/dashboard", { method: "GET", ...extra })
 export const getApiAppCalendar = (query: { "year": number; "month": number }, extra?: RequestInit) => request<CalendarResponse>("/api/app/calendar" + withQuery(query), { method: "GET", ...extra })
 export const getApiAppStocksSymbolPage = (symbol: string, extra?: RequestInit) => request<StockPageResponse>(`/api/app/stocks/${encodeURIComponent(String(symbol))}/page`, { method: "GET", ...extra })
+export const getApiAppSettings = (extra?: RequestInit) => request<UserSettingsResponse>("/api/app/settings", { method: "GET", ...extra })
+export const putApiAppSettings = (body: UserSettingsWrite, extra?: RequestInit) => request<UserSettingsResponse>("/api/app/settings", { method: "PUT", body: JSON.stringify(body), ...extra })
 export const postApiAuthRegister = (body: RegisterRequest, extra?: RequestInit) => request<RegisterResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAuthLogin = (body: LoginRequest, extra?: RequestInit) => request<SessionTokens>("/api/auth/login", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAuthRefresh = (extra?: RequestInit) => request<SessionTokens>("/api/auth/refresh", { method: "POST", ...extra })

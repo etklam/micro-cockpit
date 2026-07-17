@@ -51,16 +51,43 @@ public sealed class CockpitCompositionTests
     [Fact]
     public async Task Bootstrap_returns_safe_typed_user_context()
     {
-        using var factory = CreateFactory((service, _) => service == "identity"
-            ? Json(HttpStatusCode.OK, "{\"id\":\"33333333-3333-3333-3333-333333333333\",\"email\":\"owner@example.com\",\"displayName\":\"Owner\",\"timezone\":\"Asia/Taipei\",\"baseCurrency\":\"USD\",\"role\":\"user\",\"accountType\":\"human\",\"status\":\"active\",\"statusVersion\":1}")
+        using var factory = CreateFactory((service, path) => service == "identity"
+            ? path.Contains("/settings", StringComparison.Ordinal)
+                ? Json(HttpStatusCode.OK, "{\"email\":\"owner@example.com\",\"displayName\":\"Owner\",\"timezone\":\"Asia/Taipei\",\"baseCurrency\":\"USD\",\"appearance\":\"dark\",\"updatedAt\":\"2026-07-18T00:00:00Z\"}")
+                : Json(HttpStatusCode.OK, "{\"id\":\"33333333-3333-3333-3333-333333333333\",\"email\":\"owner@example.com\",\"displayName\":\"Owner\",\"timezone\":\"Asia/Taipei\",\"baseCurrency\":\"USD\",\"role\":\"user\",\"accountType\":\"human\",\"status\":\"active\",\"statusVersion\":1,\"appearance\":\"dark\"}")
             : Json(HttpStatusCode.OK, "{}"));
         using var response = await factory.CreateClient().GetAsync("/api/app/bootstrap");
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("owner@example.com", document.RootElement.GetProperty("currentUser").GetProperty("email").GetString());
+        Assert.Equal("dark", document.RootElement.GetProperty("appearance").GetString());
         Assert.False(document.RootElement.TryGetProperty("accessToken", out _));
         Assert.False(document.RootElement.TryGetProperty("serviceUrl", out _));
+    }
+
+    [Fact]
+    public async Task Settings_get_and_put_forward_to_identity()
+    {
+        var paths = new List<string>();
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service == "identity") paths.Add(path.Split('?')[0]);
+            if (service == "identity" && path.StartsWith("/internal/auth/settings", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, "{\"email\":\"owner@example.com\",\"displayName\":\"Owner\",\"timezone\":\"UTC\",\"baseCurrency\":\"USD\",\"appearance\":\"light\",\"updatedAt\":\"2026-07-18T00:00:00Z\"}");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+
+        using var client = factory.CreateClient();
+        using var get = await client.GetAsync("/api/app/settings");
+        Assert.Equal(HttpStatusCode.OK, get.StatusCode);
+        using var put = await client.PutAsync("/api/app/settings", new StringContent(
+            "{\"displayName\":\"Owner\",\"timezone\":\"UTC\",\"baseCurrency\":\"USD\",\"appearance\":\"light\"}",
+            Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.OK, put.StatusCode);
+        using var body = JsonDocument.Parse(await put.Content.ReadAsStringAsync());
+        Assert.Equal("light", body.RootElement.GetProperty("appearance").GetString());
+        Assert.Contains("/internal/auth/settings", paths);
     }
 
     [Theory]

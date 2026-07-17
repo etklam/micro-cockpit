@@ -70,6 +70,9 @@ public sealed class DiaryWorkspaceApiTests
 
         // Tag exact
         Assert.Equal("Alpha FOMO", Assert.Single((await client.GetFromJsonAsync<DiaryPage>("/internal/diaries?tag=FOMO", Json))!.Items).Title);
+        // Blank tag is absent (not invalid)
+        Assert.Equal(3, (await client.GetFromJsonAsync<DiaryPage>("/internal/diaries?tag=", Json))!.Items.Count);
+        Assert.Equal(3, (await client.GetFromJsonAsync<DiaryPage>("/internal/diaries?tag=%20", Json))!.Items.Count);
 
         // Combined AND
         Assert.Equal("Alpha FOMO", Assert.Single((await client.GetFromJsonAsync<DiaryPage>("/internal/diaries?query=fomo&symbol=AAPL&tag=breakout&reviewStatus=reviewed", Json))!.Items).Title);

@@ -7,6 +7,7 @@ import { expect, test } from 'vitest'
 import App from '../App'
 import { AuthProvider } from '../auth/AuthProvider'
 import type { TransactionResponse, TransactionWrite } from '../generated/edge'
+import { utcToAccountDateTimeLocal } from '../features/accountTime'
 import { server } from './setup'
 
 const diaryId = 'diary-1'
@@ -28,16 +29,11 @@ const bootstrap = {
   currentUser: { id: '11111111-1111-1111-1111-111111111111', email: 'owner@example.com', displayName: 'Owner' },
   timezone: 'Asia/Taipei',
   baseCurrency: 'USD',
+  appearance: 'system',
   role: 'user',
   accountType: 'human',
   currentLocalDate: '2026-07-16',
   availableProductAreas: ['today', 'diary', 'calendar'],
-}
-
-function localDateTimeLocal(value: string) {
-  const d = new Date(value)
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
-  return d.toISOString().slice(0, 16)
 }
 
 function authenticatedHandlers(options?: {
@@ -133,7 +129,7 @@ test('edit populates the transaction form from the selected trade', async () => 
   expect(screen.getByLabelText('Quantity')).toHaveValue(2)
   expect(screen.getByLabelText('Price')).toHaveValue(190.5)
   expect(screen.getByLabelText('Currency')).toHaveValue('USD')
-  expect(screen.getByLabelText('Traded at')).toHaveValue(localDateTimeLocal(trade.tradedAt))
+  expect(screen.getByLabelText('Traded at')).toHaveValue(utcToAccountDateTimeLocal(trade.tradedAt, 'Asia/Taipei'))
   expect(screen.getByLabelText('Notes')).toHaveValue('Within plan')
   expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()

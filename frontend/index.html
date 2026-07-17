@@ -5,9 +5,21 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#14121c" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="description" content="A diary-first trade journal. Capture decisions, log trades, track daily P/L, and keep your discipline." />
     <title>Micro Cockpit</title>
+    <script>
+      // First-paint theme mirror (server preference wins after bootstrap).
+      (function () {
+        try {
+          var pref = localStorage.getItem('td_appearance') || 'system'
+          var light = pref === 'light' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches)
+          var scheme = light ? 'light' : 'dark'
+          document.documentElement.setAttribute('data-theme', scheme)
+          document.documentElement.style.colorScheme = scheme
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

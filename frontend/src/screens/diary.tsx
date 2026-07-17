@@ -7,9 +7,10 @@ import {
   transactionUpdateErrorMessage, useIdempotencyKey,
 } from '../features/api'
 import {
-  diaryFiltersActive, diaryFiltersToSearch, emptyDiaryFilters, normalizeTags, parseDiaryFilters,
-  type DiaryFilters,
+  diaryDetailPath, diaryFiltersActive, diaryFiltersToSearch, emptyDiaryFilters, listPathFromReturnTo,
+  normalizeTags, parseDiaryFilters, type DiaryFilters,
 } from '../features/diaryFilters'
+import { accountDateTimeLocalToUtc, formatTimezoneLabel, nowAccountDateTimeLocal, utcToAccountDateTimeLocal } from '../features/accountTime'
 import { MarkdownView, plainExcerpt } from '../features/markdown'
 import {
   useBootstrapQuery, useCreateTransactionMutation, useDeleteDiaryMutation, useDeleteTransactionMutation,
@@ -19,7 +20,7 @@ import {
 } from '../features/queries'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from '../ui'
 import { PageSkeleton, SectionError, useCockpit } from '../shell'
-import { quantity, todayISO } from '../format'
+import { quantity } from '../format'
 
 export function DiaryPage() {
   const { confirm } = useCockpit()
@@ -27,14 +28,27 @@ export function DiaryPage() {
   const [search, setSearch] = useSearchParams()
   const filters = useMemo(() => parseDiaryFilters(search), [search])
   const [keywordDraft, setKeywordDraft] = useState(filters.q)
+  const keywordTimer = useRef<number | null>(null)
   useEffect(() => { setKeywordDraft(filters.q) }, [filters.q])
+  // Debounce keyword against the latest URL filters so a pending timer cannot clobber newer date/symbol/tag/review.
   useEffect(() => {
-    const handle = window.setTimeout(() => {
-      if (keywordDraft === filters.q) return
-      writeFilters({ ...filters, q: keywordDraft.trim() })
+    if (keywordTimer.current != null) window.clearTimeout(keywordTimer.current)
+    keywordTimer.current = window.setTimeout(() => {
+      keywordTimer.current = null
+      setSearch(prev => {
+        const current = parseDiaryFilters(prev)
+        const q = keywordDraft.trim()
+        if (q === current.q) return prev
+        return diaryFiltersToSearch({ ...current, q })
+      }, { replace: true })
     }, 300)
-    return () => window.clearTimeout(handle)
-  }, [keywordDraft]) // eslint-disable-line react-hooks/exhaustive-deps -- debounce keyword only
+    return () => {
+      if (keywordTimer.current != null) {
+        window.clearTimeout(keywordTimer.current)
+        keywordTimer.current = null
+      }
+    }
+  }, [keywordDraft, setSearch])
 
   const list = useDiariesInfiniteQuery(filters)
   const items = useMemo(() => {
@@ -50,9 +64,11 @@ export function DiaryPage() {
     return rows
   }, [list.data])
 
+  const bootstrap = useBootstrapQuery()
+  const accountToday = bootstrap.data?.currentLocalDate
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [date, setDate] = useState(todayISO())
+  const [date, setDate] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [tagDraft, setTagDraft] = useState('')
   const [mode, setMode] = useState<'write' | 'preview'>('write')
@@ -62,18 +78,29 @@ export function DiaryPage() {
   const idem = useIdempotencyKey()
   const saveDiary = useSaveDiaryMutation()
   const deleteDiary = useDeleteDiaryMutation()
-  const bootstrap = useBootstrapQuery()
+  useEffect(() => {
+    if (accountToday && !editing && !date) setDate(accountToday)
+  }, [accountToday, editing, date])
   const reviewWindow = useMemo(() => {
-    const to = bootstrap.data?.currentLocalDate ?? ''
+    const to = accountToday ?? ''
     if (!to) return { from: '', to: '' }
     const fromDate = new Date(`${to}T00:00:00Z`); fromDate.setUTCDate(fromDate.getUTCDate() - 29)
     return { from: fromDate.toISOString().slice(0, 10), to }
-  }, [bootstrap.data?.currentLocalDate])
+  }, [accountToday])
   const reviewSummary = useDiaryReviewSummaryQuery(reviewWindow.from, reviewWindow.to)
   const activeFilters = diaryFiltersActive(filters)
 
-  function writeFilters(next: DiaryFilters) {
-    setSearch(diaryFiltersToSearch(next), { replace: false })
+  function writeFilters(next: DiaryFilters, opts?: { replace?: boolean }) {
+    setSearch(diaryFiltersToSearch(next), { replace: opts?.replace ?? false })
+  }
+
+  function clearFilters() {
+    if (keywordTimer.current != null) {
+      window.clearTimeout(keywordTimer.current)
+      keywordTimer.current = null
+    }
+    setKeywordDraft('')
+    writeFilters(emptyDiaryFilters, { replace: true })
   }
 
   function startEdit(d: Diary) {
@@ -82,7 +109,7 @@ export function DiaryPage() {
     document.getElementById('diary-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
   function reset() {
-    setEditing(null); setTitle(''); setContent(''); setDate(todayISO()); setTags([]); setTagDraft('')
+    setEditing(null); setTitle(''); setContent(''); setDate(accountToday ?? ''); setTags([]); setTagDraft('')
     setMode('write'); setFormError(''); idem.reset()
   }
 
@@ -209,12 +236,12 @@ export function DiaryPage() {
               <option value="unreviewed">Unreviewed</option>
             </SelectBox>
           </Field>
-          <Field label="Symbol"><TextInput value={filters.symbol} onChange={(e) => writeFilters({ ...filters, symbol: e.target.value.toUpperCase() })} placeholder="AAPL" /></Field>
-          <Field label="Tag"><TextInput value={filters.tag} onChange={(e) => writeFilters({ ...filters, tag: e.target.value.toLowerCase() })} placeholder="fomo" /></Field>
+          <Field label="Symbol"><TextInput value={filters.symbol} onChange={(e) => writeFilters({ ...filters, symbol: e.target.value.toUpperCase() }, { replace: true })} placeholder="AAPL" /></Field>
+          <Field label="Tag"><TextInput value={filters.tag} onChange={(e) => writeFilters({ ...filters, tag: e.target.value.toLowerCase() }, { replace: true })} placeholder="fomo" /></Field>
         </div>
         <div className="diary-filters__summary">
           <span className="is-muted">{items.length} loaded{activeFilters ? ' · filters active' : ''}</span>
-          {activeFilters ? <Button size="sm" variant="ghost" onClick={() => { setKeywordDraft(''); writeFilters(emptyDiaryFilters) }}>Clear filters</Button> : null}
+          {activeFilters ? <Button size="sm" variant="ghost" onClick={clearFilters}>Clear filters</Button> : null}
         </div>
         {activeFilters ? (
           <div className="tag-chips" aria-label="Active filters">
@@ -249,7 +276,7 @@ export function DiaryPage() {
                   <div className="entry__head">
                     <span className="entry__date">{d.localDate}</span>
                     <div className="entry__actions">
-                      <IconButton icon="layers" label="Trades" size={16} onClick={() => navigate(`/diary/${d.id}`, { state: { diarySearch: search.toString() } })} />
+                      <IconButton icon="layers" label="Trades" size={16} onClick={() => navigate(diaryDetailPath(d.id, search.toString()))} />
                       <IconButton icon="edit" label="Edit entry" size={16} onClick={() => startEdit(d)} />
                       <IconButton icon="trash" label="Delete entry" size={16} className="icon-btn--danger" onClick={() => { void remove(d) }} />
                     </div>
@@ -283,9 +310,9 @@ export function DiaryPage() {
 export function DiaryDetailPage() {
   const { diaryId = '' } = useParams()
   const navigate = useNavigate()
-  const location = useLocation()
-  const listSearch = (location.state as { diarySearch?: string } | null)?.diarySearch
-  const backToList = () => navigate({ pathname: '/diary', search: listSearch ? `?${listSearch}` : '' })
+  const [detailSearch] = useSearchParams()
+  const listTarget = listPathFromReturnTo(detailSearch.get('returnTo'))
+  const backToList = () => navigate(listTarget)
   const { confirm } = useCockpit()
   const diary = useDiaryQuery(diaryId)
   const removeDiary = useDeleteDiaryMutation()
@@ -297,7 +324,7 @@ export function DiaryDetailPage() {
     setDeleteError('')
     try {
       await removeDiary.mutateAsync(diaryId)
-      navigate({ pathname: '/diary', search: listSearch ? `?${listSearch}` : '' }, { replace: true })
+      navigate(listTarget, { replace: true })
     } catch (error) {
       setDeleteError(diaryDeleteErrorMessage(error))
     }
@@ -378,15 +405,11 @@ function DiaryListSkeleton() {
 }
 
 /* -------------------------- Transactions --------------------------- */
-const localDateTimeLocal = (value: string | Date = new Date()) => {
-  const d = value instanceof Date ? new Date(value.getTime()) : new Date(value)
-  if (Number.isNaN(d.getTime())) return ''
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
-  return d.toISOString().slice(0, 16)
-}
-
 function TransactionPanel({ diaryId }: { diaryId: string }) {
   const { confirm } = useCockpit()
+  const bootstrap = useBootstrapQuery()
+  const timeZone = bootstrap.data?.timezone ?? ''
+  const baseCurrency = bootstrap.data?.baseCurrency ?? 'USD'
   const { data, isLoading: loading, isError: error, refetch: reload } = useTransactionsQuery(diaryId)
   const items = data?.items ?? []
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -394,8 +417,8 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
   const [side, setSide] = useState('buy')
   const [qty, setQty] = useState('')
   const [price, setPrice] = useState('')
-  const [currency, setCurrency] = useState('USD')
-  const [tradedAt, setTradedAt] = useState(localDateTimeLocal)
+  const [currency, setCurrency] = useState(baseCurrency)
+  const [tradedAt, setTradedAt] = useState('')
   const [notes, setNotes] = useState('')
   const [formError, setFormError] = useState('')
   const idem = useIdempotencyKey()
@@ -404,14 +427,22 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
   const deleteTransaction = useDeleteTransactionMutation(diaryId)
   const saving = createTransaction.isPending || updateTransaction.isPending
 
+  useEffect(() => {
+    if (!timeZone || editingId) return
+    if (!tradedAt) setTradedAt(nowAccountDateTimeLocal(timeZone))
+    if (!editingId) setCurrency(current => current || baseCurrency)
+  }, [timeZone, baseCurrency, editingId, tradedAt])
+
   function resetEdit() {
-    setEditingId(null); setSymbol(''); setSide('buy'); setQty(''); setPrice(''); setCurrency('USD')
-    setTradedAt(localDateTimeLocal()); setNotes(''); setFormError(''); idem.reset()
+    setEditingId(null); setSymbol(''); setSide('buy'); setQty(''); setPrice(''); setCurrency(baseCurrency)
+    setTradedAt(timeZone ? nowAccountDateTimeLocal(timeZone) : ''); setNotes(''); setFormError(''); idem.reset()
   }
 
   function startEdit(t: Transaction) {
     setEditingId(t.id); setSymbol(t.symbol); setSide(t.side); setQty(String(t.quantity)); setPrice(String(t.price))
-    setCurrency(t.currency); setTradedAt(localDateTimeLocal(t.tradedAt)); setNotes(t.notes ?? ''); setFormError(''); idem.reset()
+    setCurrency(t.currency)
+    setTradedAt(timeZone ? utcToAccountDateTimeLocal(t.tradedAt, timeZone) : '')
+    setNotes(t.notes ?? ''); setFormError(''); idem.reset()
   }
 
   async function submit(e: FormEvent) {
@@ -423,7 +454,6 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
     const normalizedCurrency = currency.trim().toUpperCase()
     const quantityValue = Number(qty)
     const priceValue = Number(price)
-    const tradeTime = new Date(tradedAt)
     setSymbol(normalizedSymbol)
     setCurrency(normalizedCurrency)
 
@@ -433,16 +463,23 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
       setFormError('Quantity and price must be greater than zero.'); return
     }
     if (!/^[A-Z]{3}$/.test(normalizedCurrency)) { setFormError('Enter a three-letter currency code.'); return }
-    if (!tradedAt || Number.isNaN(tradeTime.getTime())) { setFormError('Enter a valid traded date and time.'); return }
+    if (!timeZone) { setFormError('Account timezone is still loading.'); return }
+    const converted = accountDateTimeLocalToUtc(tradedAt, timeZone)
+    if (!converted.ok) {
+      setFormError(converted.error === 'nonexistent'
+        ? 'That local time does not exist (DST gap). Pick another minute.'
+        : 'Enter a valid traded date and time in the account timezone.')
+      return
+    }
 
-    const body = { symbol: normalizedSymbol, side, quantity: quantityValue, price: priceValue, currency: normalizedCurrency, tradedAt: tradeTime.toISOString(), notes }
+    const body = { symbol: normalizedSymbol, side, quantity: quantityValue, price: priceValue, currency: normalizedCurrency, tradedAt: converted.iso, notes }
     try {
       if (editingId) {
         await updateTransaction.mutateAsync({ id: editingId, body })
         resetEdit()
       } else {
         await createTransaction.mutateAsync({ body, key: idem.key() })
-        setSymbol(''); setQty(''); setPrice(''); setNotes(''); idem.reset()
+        setSymbol(''); setQty(''); setPrice(''); setNotes(''); setTradedAt(nowAccountDateTimeLocal(timeZone)); idem.reset()
       }
     } catch (mutationError: unknown) {
       setFormError(editingId ? transactionUpdateErrorMessage(mutationError) : 'Could not add the trade.')
@@ -460,6 +497,8 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
     }
   }
 
+  if (!timeZone) return <p className="is-muted">Loading account timezone…</p>
+
   return (
     <div className="trades">
       <form className="trades__form" onSubmit={submit}>
@@ -471,7 +510,10 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
         <TextInput aria-label="Quantity" type="number" min="0" step="any" inputMode="decimal" placeholder="Qty" required disabled={saving} value={qty} onChange={(e) => setQty(e.target.value)} className="num" />
         <TextInput aria-label="Price" type="number" min="0" step="any" inputMode="decimal" placeholder="Price" required disabled={saving} value={price} onChange={(e) => setPrice(e.target.value)} className="num" />
         <TextInput aria-label="Currency" placeholder="CCY" required maxLength={3} disabled={saving} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} className="input--ccy" />
-        <TextInput aria-label="Traded at" type="datetime-local" required disabled={saving} value={tradedAt} onChange={(e) => setTradedAt(e.target.value)} className="input--when" />
+        <div className="trades__when">
+          <TextInput aria-label="Traded at" type="datetime-local" required disabled={saving} value={tradedAt} onChange={(e) => setTradedAt(e.target.value)} className="input--when" />
+          <span className="form-hint" title={timeZone}>{formatTimezoneLabel(timeZone)}</span>
+        </div>
         <TextInput aria-label="Notes" placeholder="Notes (optional)" disabled={saving} value={notes} onChange={(e) => setNotes(e.target.value)} />
         {editingId ? <Button variant="ghost" disabled={saving} onClick={resetEdit}>Cancel</Button> : null}
         <Button variant="primary" type="submit" icon={editingId ? 'check' : 'plus'} loading={saving} className="trades__add">{editingId ? 'Save changes' : 'Add'}</Button>

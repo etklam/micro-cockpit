@@ -3363,6 +3363,93 @@
         }
       }
     },
+    "/api/app/settings": {
+      "get": {
+        "operationId": "get_api_app_settings",
+        "summary": "Account settings",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSettingsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "502": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "504": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      },
+      "put": {
+        "operationId": "put_api_app_settings",
+        "summary": "Update account settings",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserSettingsWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "502": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "504": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
     "/api/auth/register": {
       "post": {
         "operationId": "post_api_auth_register",
@@ -3587,6 +3674,7 @@
           "currentUser",
           "timezone",
           "baseCurrency",
+          "appearance",
           "role",
           "accountType",
           "currentLocalDate",
@@ -3617,6 +3705,9 @@
             "type": "string"
           },
           "baseCurrency": {
+            "type": "string"
+          },
+          "appearance": {
             "type": "string"
           },
           "role": {
@@ -6717,6 +6808,61 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "UserSettingsResponse": {
+        "required": [
+          "email",
+          "displayName",
+          "timezone",
+          "baseCurrency",
+          "appearance",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "baseCurrency": {
+            "type": "string"
+          },
+          "appearance": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UserSettingsWrite": {
+        "required": [
+          "displayName",
+          "timezone",
+          "baseCurrency",
+          "appearance"
+        ],
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "baseCurrency": {
+            "type": "string"
+          },
+          "appearance": {
+            "type": "string"
           }
         }
       },

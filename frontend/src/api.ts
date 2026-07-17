@@ -41,3 +41,19 @@ export async function logout() {
   try { await G.postApiAuthLogout() } catch { /* Local session clearing is authoritative. */ }
   endSession()
 }
+
+/** Rotate refresh cookie and replace in-memory access token. Does not expose the refresh token. */
+export async function refreshSession(): Promise<boolean> {
+  const token = await refreshAccessToken()
+  return token !== null
+}
+
+/** Drop the in-memory access token without invoking the session-ended listener. */
+export function clearAccessToken() {
+  applyToken(null)
+}
+
+/** Clear local access token and notify listeners (cookie cleared only via logout/refresh failure). */
+export function terminateSession() {
+  endSession()
+}

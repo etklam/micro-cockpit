@@ -17,6 +17,7 @@ internal static class BootstrapEndpoints
                 new CurrentUserResponse(value.Id, value.Email, value.DisplayName),
                 value.Timezone,
                 value.BaseCurrency,
+                value.Appearance,
                 value.Role,
                 value.AccountType,
                 CockpitComposition.ResolveLocalDate(value.Timezone, time.GetUtcNow()),
