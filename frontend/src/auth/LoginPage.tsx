@@ -23,5 +23,30 @@ export function LoginPage() {
     } catch { setError('That email and password didn’t match.') } finally { setBusy(false) }
   }
 
-  return <main className="login"><div className="login__glow" aria-hidden="true" /><form className="login__card" onSubmit={submit}><Brand /><div className="login__head"><h1>Your decisions, remembered.</h1><p>Sign in to your trade journal.</p></div><Field label="Email"><TextInput type="email" autoComplete="username" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" /></Field><Field label="Password"><TextInput type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} placeholder="••••••••" /></Field>{error ? <p className="login__error" role="alert">{error}</p> : null}<Button variant="primary" block type="submit" loading={busy}>{busy ? null : 'Sign in'}</Button><p className="login__foot">A diary-first trade journal.</p></form></main>
+  return (
+    <main className="login">
+      <div className="login__glow" aria-hidden="true" />
+      <form className="login__card" onSubmit={submit}>
+        <Brand />
+        <div className="login__head">
+          <h1>Your decisions, remembered.</h1>
+          <p>Sign in to the quiet cockpit for reflection, P/L, and discipline.</p>
+        </div>
+        <div className="login__signal" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        <Field label="Email">
+          <TextInput type="email" autoComplete="username" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" />
+        </Field>
+        <Field label="Password">
+          <TextInput type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} placeholder="••••••••" />
+        </Field>
+        {error ? <p className="login__error" role="alert">{error}</p> : null}
+        <Button variant="primary" block type="submit" loading={busy}>{busy ? null : 'Sign in'}</Button>
+        <p className="login__foot">Diary first. Numbers in service of memory.</p>
+      </form>
+    </main>
+  )
 }

@@ -75,20 +75,23 @@ function RequireAuth() {
   return <Outlet />
 }
 
+type BootstrapData = NonNullable<ReturnType<typeof useBootstrapQuery>['data']>
+
 function Shell() {
   const navigate = useNavigate()
   const { logout } = useAuth()
   const { confirm, confirmNode } = useConfirm()
   const bootstrap = useBootstrapQuery()
   if (bootstrap.isLoading) return null
-  if (bootstrap.isError) return <SectionError onRetry={() => { void bootstrap.refetch() }} />
+  if (bootstrap.isError || !bootstrap.data) return <SectionError onRetry={() => { void bootstrap.refetch() }} />
   const go = (page: Page) => { navigate(PATHS[page]); scrollTo({ top: 0, behavior: 'smooth' }) }
   return (
     <CockpitContext.Provider value={{ go, confirm }}>
+      <a className="skip-link" href="#content">Skip to content</a>
       <div className="shell">
-        <Sidebar onSignOut={logout} />
+        <Sidebar cockpit={bootstrap.data} onSignOut={logout} />
         <div className="main">
-          <MobileTop onSignOut={logout} />
+          <MobileTop cockpit={bootstrap.data} onSignOut={logout} />
           <main className="content" id="content"><Outlet /></main>
         </div>
         <MobileNav />
@@ -98,16 +101,46 @@ function Shell() {
   )
 }
 
-function Sidebar({ onSignOut }: { onSignOut: () => void }) {
+function Sidebar({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: () => void }) {
   const location = useLocation()
-  return <aside className="sidebar" aria-label="Primary"><Brand /><nav className="nav" aria-label="Sections">{NAV.map(item => <NavItem key={item.id} item={item} />)}</nav><details className="more-nav" open={MORE.some(item => location.pathname.startsWith(PATHS[item.id]))}><summary>More</summary>{MORE.map(item => <NavLink key={item.id} className={({ isActive }) => cx('nav__item', isActive && 'is-active')} to={PATHS[item.id]}>{item.label}</NavLink>)}</details><div className="sidebar__foot"><Button variant="ghost" icon="logout" onClick={onSignOut} className="signout-btn">Sign out</Button></div></aside>
+  const moreOpen = MORE.some(item => location.pathname.startsWith(PATHS[item.id]))
+  return (
+    <aside className="sidebar" aria-label="Primary">
+      <Brand />
+      <div className="sidebar__body">
+        <div className="sidebar__label">Reflect</div>
+        <nav className="nav" aria-label="Primary sections">
+          {NAV.map(item => <NavItem key={item.id} item={item} />)}
+        </nav>
+        <details className="more-nav" open={moreOpen}>
+          <summary>Decision support</summary>
+          <div className="more-nav__list">
+            {MORE.map(item => (
+              <NavLink key={item.id} className={({ isActive }) => cx('nav__item', isActive && 'is-active')} to={PATHS[item.id]}>
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+        </details>
+      </div>
+      <div className="sidebar__foot">
+        <div className="sidebar__identity" aria-label="Signed in user">
+          <strong>{cockpit.currentUser.displayName || cockpit.currentUser.email}</strong>
+          <span>{cockpit.baseCurrency} · {cockpit.timezone}</span>
+        </div>
+        <Button variant="ghost" icon="logout" onClick={onSignOut} className="signout-btn">Sign out</Button>
+      </div>
+    </aside>
+  )
 }
 
 function NavItem({ item }: { item: (typeof NAV)[number] }) {
   return <NavLink to={PATHS[item.id]} className={({ isActive }) => cx('nav__item', isActive && 'is-active')}><Icon name={item.icon} size={18} /><span>{item.label}</span></NavLink>
 }
 
-function MobileTop({ onSignOut }: { onSignOut: () => void }) { return <header className="mobile-top"><Brand compact /><IconButton icon="logout" label="Sign out" onClick={onSignOut} /></header> }
+function MobileTop({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: () => void }) {
+  return <header className="mobile-top"><Brand compact /><span className="mobile-top__meta">{cockpit.currentLocalDate}</span><IconButton icon="logout" label="Sign out" onClick={onSignOut} /></header>
+}
 function MobileNav() {
   const mobile = NAV.slice(0, 4)
   const location = useLocation()

@@ -1,1283 +1,459 @@
-# DESIGN.md — Diary-first Trade Journal UI/UX Guide
+# DESIGN.md — Micro Cockpit Design System
 
-## 1. Product Direction
+> Calm. Precise. Restrained.  
+> A quiet instrument panel for post-session reflection — graphite and ink with a single signal lamp.
 
-This product is a **Diary-first Trade Journal** for early-stage investors.
-
-It is not a generic market terminal, not a portfolio accounting system, and not a Bloomberg-style dashboard.
-
-The product helps the user build a decision loop:
-
-```text
-Observe market
-→ Write Diary
-→ Record optional Transaction
-→ Record Daily P/L
-→ Review later
-→ Improve Discipline
-```
-
-Primary product areas:
-
-```text
-Diary
-Quick Note
-Transaction
-Daily P/L Calendar
-Discipline
-Diary Alert
-Watchlist
-Stock Note
-Stock Timeline Record
-Price Alert
-Partner
-AI Agent Partner
-Post
-Tools
-Market Rotation Monitor
-```
-
-Design target:
-
-```text
-Calm dark notebook
-Disciplined investing workflow
-Low-noise financial dashboard
-Mobile-friendly daily capture
-```
-
-Avoid:
-
-```text
-Crypto casino feeling
-Professional trader terminal overload
-Landing page hero sections inside the app
-Excessive neon green/red
-Generic admin dashboard layout
-```
+This document is the source of truth for visual and interaction design. Product boundaries live in [PRODUCT.md](./PRODUCT.md). Implementation tokens live in `frontend/src/index.css`.
 
 ---
 
-## 2. Core Product Principles
+## 1. Intent
 
-## 2.1 Diary Is the Center
+Micro Cockpit is a **diary-first trade journal**. The UI exists so a solo trader, after the market closes, can:
 
-The UI should make it obvious that Diary is the core.
+1. Capture what they noticed (quick note / diary)
+2. Attach the trades and the day’s P/L
+3. Meet one personal discipline principle
+4. Review later without shame or theater
 
-Dashboard should answer:
+It is **not** a brokerage, portfolio ledger, or terminal. Numbers serve reflection; reflection is never decoration for the numbers.
 
-```text
-Did I write today?
-What did I observe?
-Did I trade?
-What was today's P/L?
-What do I need to review?
-What discipline should I remember?
-```
+### Brand personality
 
-Market Rotation Monitor and Watchlist are supporting tools.  
-They should feed the user's thinking, but the final memory should live in Diary.
+| Word | Means in the UI |
+| --- | --- |
+| **Calm** | Low light, soft elevation, no flashing state |
+| **Precise** | Tabular numbers, hairline structure, consistent spacing |
+| **Restrained** | One accent, sparse chrome, copy that never congratulates or scolds |
 
-## 2.2 Mobile Is for Habit Formation
+### Anti-references
 
-Mobile is not a mini desktop.
+Do not drift toward:
 
-Mobile primary actions:
-
-```text
-Quick Note
-Create Diary
-Record Transaction
-Input Daily P/L
-Check Diary Alerts
-Review Discipline
-```
-
-Mobile should optimize:
-
-```text
-Capture
-Check
-Reflect
-Review
-```
-
-Not:
-
-```text
-Large tables
-Heavy chart analysis
-Dense sector matrices
-```
-
-## 2.3 Dark Mode First
-
-Dark mode is the primary experience.
-
-Reasons:
-
-```text
-- Long reading/writing sessions
-- Better chart/card contrast
-- More comfortable for post-market review
-- Fits investment journaling mood
-```
-
-Light mode may exist, but dark mode should be the polished default.
-
-## 2.4 New Investor Friendly
-
-Target user has 0–3 years investing experience.
-
-Design implication:
-
-```text
-- Use explanation text where useful
-- Avoid unexplained signal overload
-- Use progressive disclosure
-- Do not show every metric at once
-- Prefer "what changed" and "what needs action" over raw data dump
-```
-
-## 2.5 Do Not Gamify P/L
-
-Daily P/L is useful, but should not turn the app into a casino.
-
-Rules:
-
-```text
-- Use calm colors
-- Avoid confetti
-- Avoid streak addiction mechanics
-- Avoid ranking days like a game
-- Emphasize process review, not only outcome
-```
+- Consumer trading apps — confetti, neon gain/loss, streak pressure
+- Navy-and-gold “premium fintech” costume
+- 2026 warm-cream AI defaults
+- Generic SaaS dashboards — flat blue sidebars, identical card grids, eyebrow-on-everything, hero-metric tiles
+- Decorative motion that makes the trader wait
 
 ---
 
-## 3. Information Architecture
+## 2. Design principles
 
-## 3.1 Desktop Primary Navigation
+1. **Reflection and numbers, equal weight.** Prose gets a real reading measure (serif, ~65–70ch). Numbers get tabular precision and signed direction.
+2. **Quiet by default.** Surfaces are deep and calm. One violet signal lamp does all accent work. Negative space is a material.
+3. **Instrument, not stage.** Density only where the task needs it. Familiar affordances. Consistent vocabulary screen to screen.
+4. **Honesty over performance.** Copy never gamifies. “You showed up today” is the ceiling of praise.
+5. **Reward opening it.** The daily discipline principle and the quick-note capture sit at the top of the day. Starting to write is the lowest-friction act on screen.
 
-```text
-Dashboard
-Diary
-Calendar
-Quick Note
-Watchlist
-Discipline
-Diary Alerts
-Price Alerts
-Partners
-Articles
-Tools
-Admin
-```
+---
 
-## 3.2 Tools Navigation
+## 3. Information architecture
+
+### Desktop primary nav
 
 ```text
-Market Rotation Monitor
-Position Sizing
-Risk / Reward
-FIRE
-Relative Value
-Seasonality
+Today · Diary · Calendar · Discipline · Alerts
+More ▸ Monthly review · Watchlist · Price alerts · Market rotation · Partners · Articles · Tools
 ```
 
-## 3.3 Mobile Bottom Navigation
+### Mobile bottom nav
 
 ```text
-Dashboard
-Diary
-Quick Note
-Calendar
-More
+Today · Diary · Calendar · Discipline · More
 ```
 
-`More` contains:
-
-```text
-Watchlist
-Discipline
-Diary Alerts
-Price Alerts
-Partners
-Articles
-Tools
-Settings
-Admin
-```
-
-## 3.4 Route Structure
+### Core routes
 
 ```text
 /today
-/diary
-/diary/:diaryId
+/diary  /diary/:diaryId
 /calendar/:year/:month
 /discipline
 /alerts
 /more
-/watchlist
-/price-alerts
-/rotation
-/partners
-/articles
-/articles/:slug
-/tools
+/review  /review/:year/:month
+/watchlist  /price-alerts  /rotation
+/partners  /articles  /articles/:slug  /tools
+/login
 ```
 
-Quick Note is an action in the diary-first workflow rather than a separate route. Unknown routes show the not-found state.
+Quick Note is an **action on Today**, not a separate route.
 
 ---
 
-## 4. Layout System
+## 4. Layout system
 
-## 4.1 Desktop App Shell
-
-```text
-┌──────────────┬──────────────────────────────────────────────┬──────────────────────┐
-│ Sidebar      │ Top Bar                                      │ Right Context Panel  │
-│              ├──────────────────────────────────────────────┤                      │
-│ Navigation   │ Main Workspace                               │ Alerts / Discipline  │
-│              │                                              │ Diary Context        │
-│ Today status │ Diary / Calendar / Watchlist / Tools         │ Stock Context        │
-└──────────────┴──────────────────────────────────────────────┴──────────────────────┘
-```
-
-Recommended widths:
+### Desktop shell
 
 ```text
-Sidebar: 240px
-Right context panel: 320px - 380px
-Main content: flexible
+┌────────────┬────────────────────────────────────────┐
+│  Rail      │  Main workspace                        │
+│  240px     │  max-width 1080px, centered            │
+│            │                                        │
+│  Brand     │  Page header                           │
+│  Primary   │  Content stack                         │
+│  More      │                                        │
+│  Sign out  │                                        │
+└────────────┴────────────────────────────────────────┘
 ```
 
-## 4.2 Mobile App Shell
+| Region | Width / rule |
+| --- | --- |
+| Sidebar rail | `240px` sticky, full viewport height |
+| Content max | `1080px` |
+| Page pad X | `clamp(16px, 4vw, 48px)` |
+| Content gap | `24px` vertical rhythm |
+
+The rail is graphite chrome — darker than the workspace, separated by a hairline, never a saturated brand slab.
+
+### Mobile shell
 
 ```text
 ┌──────────────────────────┐
-│ Compact Header           │
+│ Compact header (sticky)  │
 ├──────────────────────────┤
-│ Page Content             │
+│ Page content             │
 ├──────────────────────────┤
-│ Sticky Primary Action    │
-├──────────────────────────┤
-│ Bottom Navigation        │
+│ Bottom nav (safe-area)   │
 └──────────────────────────┘
 ```
 
-Mobile rules:
+- No permanent sidebar below `920px`
+- Prefer card lists over dense tables
+- Primary capture actions stay one tap away
+- Respect `env(safe-area-inset-*)`
 
-```text
-- No permanent sidebar
-- No dense desktop tables
-- Use card lists
-- Use bottom sheets for forms and filters
-- Primary action is obvious
-- Quick Note is one tap away
-```
+### Composition patterns
 
-## 4.3 Right Context Panel
+| Pattern | When |
+| --- | --- |
+| **Writing desk** | Today, Diary editor — prose-first, large textarea, ambient instruments secondary |
+| **Instrument strip** | Compact metrics in a horizontal or auto-fit grid (P/L, counts, status) |
+| **Timeline** | Diary list, recent reflections |
+| **Month grid** | Calendar (desktop); list-first on narrow viewports |
+| **Research split** | Watchlist / stock context — list + detail columns |
 
-Context panel changes by page.
-
-Dashboard:
-
-```text
-Today's Discipline
-Pending Diary Alerts
-Recent Quick Notes
-```
-
-Diary editor:
-
-```text
-Linked stocks
-Transactions
-Daily P/L for the date
-Diary Alert settings
-Related past diaries
-```
-
-Calendar:
-
-```text
-Selected day summary
-Diary entries
-Transactions
-Daily P/L edit
-Diary Alerts
-```
-
-Stock page:
-
-```text
-Current Stock Note
-Price Alerts
-Related Diary entries
-Timeline Records
-```
-
-Market Rotation Monitor:
-
-```text
-Market State explanation
-Sector Breadth explanation
-Rank Scope filter
-Data freshness
-```
+Avoid stacking three equal “metric tiles” as the visual identity of a page. Prefer one primary surface + quieter instruments.
 
 ---
 
-## 5. Theme System
+## 5. Color system
 
-## 5.1 Dark Mode Tokens
+Dark-only in v1. All tokens are **OKLCH**. Source of truth: `frontend/src/index.css`.
 
-v0.1 ships **dark-only** (committed dark). Calm near-black, not pure black — a
-whisper of the brand violet. The accent is violet (hue 279), replacing the
-earlier generic blue per the "quiet cockpit" direction.
+### Surfaces (graphite + whisper of brand hue 279)
 
-**Source of truth: `frontend/src/index.css`** (OKLCH). Contrast verified WCAG AA
-(ink→bg 16.5:1, muted→bg 7.35:1, primary-button label 6.17:1).
+| Token | Role |
+| --- | --- |
+| `--bg` | App canvas |
+| `--bg-elevated` | Deepest well / rail underlay |
+| `--sidebar` | Navigation rail |
+| `--surface` | Cards, panels, raised work areas |
+| `--surface-2` | Inputs, inset wells, nested chrome |
+| `--overlay` | Hover / raised interaction |
 
-```css
-/* surfaces — hue 279, near-black with a whisper of violet */
---bg:           oklch(0.150 0.008 279);   /* app background */
---surface:      oklch(0.195 0.010 279);   /* cards, panels */
---surface-2:    oklch(0.165 0.009 279);   /* inputs, inset wells */
---overlay:      oklch(0.230 0.011 279);   /* hover / raised */
+### Text
 
-/* text */
---ink:          oklch(0.94 0.004 279);    /* body */
---muted:        oklch(0.70 0.012 279);    /* secondary, labels */
---faint:        oklch(0.50 0.014 279);    /* large / decorative only */
+| Token | Role |
+| --- | --- |
+| `--ink` | Primary body and titles |
+| `--muted` | Secondary labels, meta |
+| `--faint` | Tertiary, large decorative only |
 
-/* brand — violet */
---primary-btn:  oklch(0.50 0.17 279);     /* filled primary button */
---primary:      oklch(0.62 0.16 279);     /* accents, links, focus, active nav */
+### Brand — the signal lamp
 
-/* P/L — restrained, never neon; direction always paired with a +/- sign */
---gain:         oklch(0.72 0.14 155);
---loss:         oklch(0.66 0.17 25);
---warn:         oklch(0.78 0.14 85);      /* active alerts */
+Violet (hue **279**) is the **only** chromatic accent for chrome.
 
-/* lines adapt via color-mix(in oklch, var(--ink) N%, transparent) */
-```
+| Token | Role |
+| --- | --- |
+| `--primary` | Links, focus, active nav, indicators |
+| `--primary-btn` | Filled primary actions |
+| `--primary-soft` | Soft fills (active nav wash, selected day) |
+| `--primary-line` | Focus borders, selected outlines |
+| `--on-primary` | Label on filled primary |
 
-## 5.2 Light Mode Tokens
+Surfaces stay nearly neutral graphite. Violet appears on **signal**, not wallpaper.
 
-Not implemented in v0.1 (dark-only). Kept as a provisional future reference; if
-implemented later, re-derive from the same violet brand seed on a true off-white.
+### Semantic (restrained; never neon)
 
-```css
---bg-app: #F6F3EC;
---bg-surface: #FBF8F1;
---bg-surface-elevated: #FFFFFF;
---bg-card: #FFFDF8;
---bg-card-hover: #F8F4EA;
+| Token | Role |
+| --- | --- |
+| `--gain` / `--gain-soft` | Positive P/L |
+| `--loss` / `--loss-soft` | Negative P/L, destructive |
+| `--warn` / `--warn-soft` | Active reminders |
 
---border-subtle: #E5DED2;
---border-strong: #CDBFAE;
+**Direction is never color alone.** Always pair with a sign (`+` / `−`), arrow, or label (see `signed()` / `pct()` in `format.ts`).
 
---text-primary: #1F2933;
---text-secondary: #52606D;
---text-muted: #7B8794;
-
---accent-primary: #2563EB;
-
---profit: #16803C;
---profit-soft: rgba(22, 128, 60, 0.10);
-
---loss: #C2410C;
---loss-soft: rgba(194, 65, 12, 0.10);
-
---warning: #B7791F;
---neutral: #64748B;
-```
-
-## 5.3 P/L Color Rules
-
-Daily P/L should be visible but not emotionally aggressive.
+### Lines
 
 ```text
-Profit day:
-- subtle green background
-- green text for amount
-- arrow up icon optional
-
-Loss day:
-- subtle red background
-- red text for amount
-- arrow down icon optional
-
-Flat day:
-- neutral slate background
-- muted text
-
-No data:
-- default card background
-- no color
+--border         ~9% ink over transparent
+--border-strong  ~16% ink
+--hairline       ~5.5% ink
 ```
 
-Do not use:
+Prefer hairlines and soft elevation over heavy frames.
 
-```text
-Pure bright green background
-Pure bright red background
-Flashing colors
-Streak badges
-Confetti
-```
+### Contrast floor
+
+WCAG 2.2 AA minimum:
+
+- Body ink → bg ≥ 4.5:1 (shipped ~16:1)
+- Muted → bg ≥ 4.5:1 for essential text (≥ 7:1 shipped)
+- Primary button label → button ≥ 4.5:1
+- Focus ring clearly visible on all interactive surfaces
 
 ---
 
 ## 6. Typography
 
-Recommended font stack:
+### Families
 
-```css
-font-family:
-  Inter,
-  ui-sans-serif,
-  system-ui,
-  -apple-system,
-  BlinkMacSystemFont,
-  "Segoe UI",
-  sans-serif;
-```
+| Role | Stack |
+| --- | --- |
+| UI / chrome | **Inter Variable** → system UI sans |
+| Prose / diary / discipline quotes | **Newsreader Variable** → Georgia → serif |
 
-Use tabular numbers:
+### Scale
 
-```css
-font-variant-numeric: tabular-nums;
-```
+| Token | Size | Use |
+| --- | --- | --- |
+| `--fs-xs` | 12px | Captions, meta, badges |
+| `--fs-sm` | 13px | Field labels, secondary |
+| `--fs-base` | 15px | Body UI |
+| `--fs-md` | 16px | Emphasized body / prose |
+| `--fs-lg` | 18px | Section titles, quotes |
+| `--fs-xl` | 21px | Card / entry titles |
+| `--fs-2xl` | 26px | Page titles |
+| `--fs-3xl` | 36px | Hero numbers (rare) |
 
-Apply to:
+### Rules
 
-```text
-Prices
-P/L
-Percentages
-Ranks
-Scores
-Calendar day values
-```
-
-Type scale:
-
-```text
-Page title: 24px / 32px / 700
-Section title: 16px / 24px / 650
-Card title: 13px / 20px / 700
-Body: 14px / 22px / 400
-Small: 12px / 18px / 400
-Data large: 32px / 40px / 600
-Data medium: 20px / 28px / 600
-Data small: 13px / 18px / 600
-```
+- Page titles: weight 600, tight tracking, `text-wrap: balance`
+- Instrument labels: small, medium weight, muted — **not** shouty uppercase everywhere; reserve wide tracking for true chrome labels (e.g. “More”)
+- Diary body: `.prose` — Newsreader, relaxed leading, max ~70ch
+- All money, ranks, percents, calendar cells: `.num` → `font-variant-numeric: tabular-nums`
+- Inter feature settings: `cv02 cv03 cv04 cv11 ss01` for cleaner UI glyphs
 
 ---
 
-## 7. Core Components
+## 7. Spacing, radius, elevation
 
-Required components:
+### Spacing (4px grid)
 
 ```text
-AppShell
-Sidebar
-TopBar
-RightContextPanel
-MobileBottomNav
-CommandPalette
-
-DashboardSummary
-TodayDiaryCard
-QuickNoteCard
-DailyPnlCard
-MonthlyPnlCard
-CalendarMonthGrid
-CalendarDayCell
-MobileCalendarList
-SelectedDayPanel
-
-DiaryTimeline
-DiaryEditor
-TransactionEditor
-DailyPerformanceEditor
-DisciplineCard
-RandomDisciplineCard
-
-DiaryAlertList
-PriceAlertList
-WatchlistTable
-WatchlistCard
-StockHeader
-StockNotePanel
-StockTimelinePanel
-
-MarketStateCard
-SectorBreadthCard
-MarketRotationTable
-RotationSignalPill
-RankDeltaBadge
-
-StatusPill
-PriorityBadge
-ProfitLossBadge
-Sparkline
-EmptyState
-LoadingSkeleton
-ErrorState
+4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 56 · 72
 ```
+
+Prefer multiples of 4. Page vertical rhythm uses `--sp-6` (24px) between major blocks.
+
+### Radius
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--r-xs` | 6px | Tight chips |
+| `--r-sm` | 8px | Small controls |
+| `--r-md` | 10px | Buttons, inputs, nav items |
+| `--r-lg` | 14px | Cards |
+| `--r-xl` | 18px | Dialogs, login |
+| `--r-pill` | 999px | Badges, focus marks |
+
+### Elevation (dark: soft, wide, low)
+
+| Token | Use |
+| --- | --- |
+| `--shadow-sm` | Subtle rest |
+| `--shadow-md` | Raised panels |
+| `--shadow-lg` | Modal / login |
+| `--ring` | Focus-visible only |
+
+Cards primarily use **surface + hairline border**, not heavy drop shadows. Shadow is for true overlays.
 
 ---
 
-## 8. Dashboard Design
+## 8. Motion
 
-Dashboard is not a data dump. It is a daily action summary.
-
-Desktop sections:
-
-```text
-Top row:
-- Today Diary
-- Daily P/L
-- Pending Diary Alerts
-
-Middle row:
-- Quick Note
-- Random Discipline
-- Watchlist Changes
-
-Lower row:
-- Market Rotation Summary
-- Price Alerts
-- Recent Diary Entries
-```
-
-Mobile order:
-
-```text
-1. Quick Note
-2. Today Diary status
-3. Daily P/L input/status
-4. Pending Diary Alerts
-5. Today's Discipline
-6. Watchlist Changes
-7. Market Rotation Summary
-```
-
-Dashboard should answer:
-
-```text
-What should I record today?
-What happened today?
-Did I make or lose money?
-What do I need to review?
-What discipline should I remember?
-Is the market condition changing?
-```
-
----
-
-## 9. Diary Design
-
-## 9.1 Diary List
-
-Diary list should use timeline grouping.
-
-Display:
-
-```text
-Date
-Title
-Short excerpt
-Linked stocks
-Transaction count
-Daily P/L badge
-Diary Alert status
-Tags
-```
-
-## 9.2 Diary Editor
-
-Desktop:
-
-```text
-Main editor + right metadata panel
-```
-
-Right metadata panel includes:
-
-```text
-User local date
-Linked stocks
-Transactions
-Daily P/L for the date
-Diary Alert settings
-Tags
-```
-
-Mobile:
-
-```text
-Single column editor
-Bottom sheet for metadata
-Sticky Save button
-```
-
-## 9.3 Diary Fields
-
-```text
-Title
-Diary date
-Content
-Market observation
-Thesis
-Risk
-Execution
-Conclusion
-Mood
-Tags
-Linked stocks
-Transactions
-Diary Alert
-```
-
-Do not make every field mandatory.  
-Diary must remain low-friction.
-
----
-
-## 10. Quick Note Design
-
-Quick Note is a fast input path into Diary.
-
-Templates:
-
-```text
-Free Writing
-Trading Diary
-Post-market Reflection
-Market Observation
-```
-
-Mobile Quick Note:
-
-```text
-Large text input
-Template chips
-Optional stock link
-Optional transaction quick add
-Save as a new Diary
-Optional: choose an existing Diary and append
-```
+| Token | Value | Use |
+| --- | --- | --- |
+| `--dur-fast` | 140ms | Hover, color |
+| `--dur` | 200ms | Standard UI |
+| `--dur-slow` | 320ms | Modal enter |
+| `--ease-out` | `cubic-bezier(0.22, 1, 0.36, 1)` | Entrances |
+| `--ease-standard` | `cubic-bezier(0.4, 0, 0.2, 1)` | Utility |
 
 Rules:
 
-```text
-- Quick Note should not feel like a full form.
-- With no selected Diary, it creates a new Diary for the selected local date.
-- With an explicitly selected Diary, it appends to that Diary's content only.
-- It never guesses among multiple same-day Diaries.
-- It should be usable in under 30 seconds.
-```
+- Transition **color / background / border / opacity / shadow** — not layout thrash
+- No orchestrated page-load choreography
+- Skeleton shimmer is the only continuous motion in resting UI
+- `prefers-reduced-motion: reduce` collapses all motion to near-instant / static
 
 ---
 
-## 11. Daily P/L Calendar Design
+## 9. Component vocabulary
 
-## 11.1 Product Purpose
+Shared primitives live in `frontend/src/ui.tsx` + `App.css`. No component library dependency.
 
-Daily P/L Calendar connects outcome with decision process.
+### Core
 
-It should help the user review:
+| Component | Notes |
+| --- | --- |
+| `Button` | `primary` · `subtle` · `ghost` · `danger` · sizes `sm`/`md` · loading spinner |
+| `IconButton` | 36×36 hit target, `aria-label` required |
+| `Card` | Surface + hairline; `flush` for nested layouts |
+| `Field` | Label + control + hint/error |
+| `TextInput` / `TextArea` / `SelectBox` | Shared `.input` chrome |
+| `Badge` | `muted` · `primary` · `gain` · `loss` · `warn` |
+| `Stat` | Compact instrument metric |
+| `PageHeader` | Title + optional subtitle + actions |
+| `EmptyBox` / `ErrorBox` | Honest empty and failure states |
+| `Skeleton` / `SkeletonText` | Loading placeholders |
+| `Brand` / `Gauge` | Wordmark + gauge mark |
+| `useConfirm` | Accessible alertdialog |
 
-```text
-Which days did I make or lose money?
-What did I write on those days?
-Did I trade?
-Was the P/L caused by process or noise?
-```
+### Shell
 
-This feature must not become full portfolio accounting.
+| Piece | Notes |
+| --- | --- |
+| Sidebar rail | Brand, primary nav, More group, sign out |
+| Mobile top | Compact brand + sign out |
+| Mobile bottom nav | Five slots; More aggregates secondary |
+| Content column | Max-width, page pad, vertical stack |
 
-## 11.2 Desktop Month Calendar
+### Interaction states
 
-Each day cell shows:
+Every interactive control supports:
 
-```text
-Day number
-Daily P/L amount
-Daily P/L %
-Diary count dot
-Transaction count icon
-Diary Alert / Review marker
-```
+- rest · hover · active/press · focus-visible · disabled · loading (where async)
 
-Example cell:
-
-```text
-05
-+$320
-+0.42%
-2 diaries · 1 tx
-```
-
-Day cell states:
-
-```text
-Profit day
-Loss day
-Flat day
-No P/L data
-Today
-Selected day
-Weekend
-Future day
-```
-
-## 11.3 Desktop Calendar Layout
-
-```text
-┌──────────────────────────────────────────────┐
-│ July 2026        Total P/L +$1,240  +2.8%    │
-├──────┬──────┬──────┬──────┬──────┬──────┬──────┤
-│ Mon  │ Tue  │ Wed  │ Thu  │ Fri  │ Sat  │ Sun  │
-├──────┼──────┼──────┼──────┼──────┼──────┼──────┤
-│ Day cells with P/L, diary count, tx count        │
-└──────────────────────────────────────────────┘
-```
-
-Side panel for selected day:
-
-```text
-Selected date
-Daily P/L editor
-Diary entries
-Transactions
-Diary Alerts
-Discipline note
-```
-
-## 11.4 Mobile Calendar
-
-Mobile should not force a full dense month grid.
-
-Recommended mobile layout:
-
-```text
-Month summary card
-Week strip
-Daily P/L list
-Selected day bottom sheet
-```
-
-Mobile month summary:
-
-```text
-July 2026
-Total P/L: +$1,240
-Win days: 9
-Loss days: 5
-Best day: +$520
-Worst day: -$310
-```
-
-Daily list:
-
-```text
-Jul 05   +$320   +0.42%   2 diary · 1 tx
-Jul 04   -$80    -0.10%   1 diary
-```
-
-## 11.5 Daily P/L Input
-
-Manual input first.
-
-Fields:
-
-```text
-P/L amount
-P/L percent, read-only and derived when capital base is present
-Currency
-Capital base optional
-Note optional
-Source read-only or hidden
-```
-
-Rules:
-
-```text
-- Manual Daily P/L is the first version.
-- P/L amount uses the user's base currency.
-- The server derives P/L percent; the user does not enter an independent conflicting value.
-- Do not calculate portfolio mark-to-market.
-- Do not require holdings.
-- Do not require cost basis.
-- Do not require brokerage import.
-```
-
-## 11.6 Monthly Summary
-
-Monthly summary card:
-
-```text
-Total P/L
-Total P/L %
-Win days
-Loss days
-Flat days
-Best day
-Worst day
-Average winning day
-Average losing day
-Diary completion days
-```
-
-Use this as reflection support, not leaderboard.
+Focus-visible uses `--ring` (violet soft outline). Never remove focus without a visible replacement.
 
 ---
 
-## 12. Transaction Design
+## 10. Page patterns
 
-Transaction is inside Diary.
+### Login
 
-Transaction editor fields:
+Centered card on deep canvas. Soft radial signal glow — atmospheric, not decorative overload. Copy: plain, adult. No marketing hero.
 
-```text
-Symbol
-Asset type: stock / etf
-Side: buy / sell
-Quantity
-Price
-Currency
-Transaction time
-Notes
-```
+### Today — writing desk
 
-Rules:
+Primary question: *What should I capture before it fades?*
 
-```text
-- Transaction must belong to Diary.
-- Transaction is not an order.
-- Transaction is not portfolio accounting.
-- Transaction should be quick to add from Diary editor.
-```
+Order:
 
-UI should show:
+1. Greeting + long date (quiet)
+2. Pending reminder banner (only if count > 0)
+3. **Quick note** — full-width prose surface (primary)
+4. **Instrument strip** — diary status · daily P/L · today’s discipline (secondary)
+5. Recent reflections list
 
-```text
-This transaction belongs to: Diary date/title
-```
+Discipline quote uses serif italic. P/L always signed. Diary status prefers “You showed up today.” over scores.
 
----
+### Diary
 
-## 13. Discipline Design
+- Editor card above the list (low friction to write)
+- Timeline of entries: date meta, title, prose body
+- Trades live on the detail surface, not as portfolio accounting
+- Structured decision review is progressive disclosure (`details`)
 
-Discipline is a trading lesson list.
+### Calendar
 
-UI sections:
+- Month grid on desktop; horizontal scroll acceptable on narrow
+- Day cell: number · compact signed P/L · diary presence dot
+- Selected day opens P/L editor below/aside — reflection support, not a game board
+- Profit/loss tints are soft washes; never pure neon fills
 
-```text
-Random Discipline
-All Disciplines
-Recently added
-```
+### Discipline
 
-Random card example:
+Serif principle lines. Add form is inline and quiet. Random/today principle is a gift, not a streak counter.
 
-```text
-Today's Discipline
-Do not change your thesis because of one red candle.
-```
+### Alerts / tools / research
 
-`Today's Discipline` is stable for the signed-in user's local date. The separate Discipline-center random action may return a different item on each request.
+List density without terminal noise. Filters as plain fields. Tables use sticky headers, tabular numbers, restrained MA/status chips.
 
-Rules:
+### Monthly review
 
-```text
-- No daily checklist
-- No completion streak
-- No DisciplineCheck
-- Random extraction is a primary interaction
-```
+Two-column process + outcome on desktop; stack on mobile. Charts are thin instrument bars, not celebration graphics.
 
 ---
 
-## 14. Diary Alert and Price Alert Design
+## 11. Iconography
 
-## 14.1 Diary Alert
+Hand-rolled 24×24 set in `icons.tsx`:
 
-Diary Alert reminds the user to return to a specific Diary.
+- Stroke 1.6, round caps/joins, `currentColor`
+- No external icon pack
+- Gauge mark is the brand glyph (login, rail, favicon)
 
-Display:
-
-```text
-Diary title
-Reminder date/time
-Repeat mode: None / Week / Month
-Status
-```
-
-Repeat mode helper text:
-
-```text
-Week: remind on weekdays until Friday
-Month: remind on weekdays until month end
-```
-
-## 14.2 Price Alert
-
-Price Alert is stock-price driven.
-
-Display:
-
-```text
-Stock symbol
-Condition
-Threshold
-Last price
-Status
-```
-
-Rules:
-
-```text
-- Do not mix Diary Alerts and Price Alerts in one undifferentiated list.
-- Use separate pages or tabs with clear naming.
-```
+Keep new icons in the same optical weight. Prefer recognition over decoration.
 
 ---
 
-## 15. Watchlist / Stock Design
+## 12. Content voice
 
-## 15.1 Watchlist
+| Do | Don’t |
+| --- | --- |
+| “What did you notice today?” | “Crush your goals 🚀” |
+| “You showed up today.” | “🔥 12-day streak!” |
+| “No entry yet today.” | “You haven’t journaled — you’re falling behind.” |
+| “Couldn’t reach the cockpit.” | Generic “Error 500” without recovery |
+| “Save note” | “Submit” on reflective capture |
 
-Watchlist is stocks only.
-
-List display:
-
-```text
-Symbol
-Name
-Current view summary
-Price movement
-Price Alert badge
-Last Stock Note update
-Timeline count
-```
-
-## 15.2 Stock Page
-
-Stock page sections:
-
-```text
-Stock header
-Current Stock Note
-Stock Timeline Records
-Related Diary entries
-Price Alerts
-```
-
-Do not show ETF Market Rotation Monitor inside Stock page.
-
-## 15.3 Stock Note
-
-Stock Note is mutable current view.
-
-UI should make it feel like the current thesis header.
-
-## 15.4 Stock Timeline Record
-
-Timeline Record is immutable evidence.
-
-UI should show:
-
-```text
-Event time
-Source type
-Title
-Content
-Linked Diary / AI Agent source if available
-```
-
-Existing Timeline Records cannot be edited or deleted. A correction is a new append-only Timeline Record linked to the original record, never an update of existing evidence.
+Empty states explain what will appear and how to begin — never blame.
 
 ---
 
-## 16. Market Rotation Monitor Design
+## 13. Accessibility
 
-Market Rotation Monitor lives under Tools.
-
-Route:
-
-```text
-/tools/market-rotation-monitor
-```
-
-It can feed Dashboard summary, but it is not the product center.
-
-Sections:
-
-```text
-Market State
-Sector Breadth
-Breadth Confirmation
-Sector Rotation Matrix
-Indexes Comparison
-Core ETF Scope
-2W Trend
-Batch/Data Freshness
-```
-
-Rules:
-
-```text
-- Use canonical labels from backend.
-- Explain rank scope.
-- Do not mix stocks into ETF rotation.
-- Do not show missing data as neutral.
-- Current Market Summary must be deterministic and match displayed data.
-```
-
-Mobile design:
-
-```text
-Market State card
-Sector Breadth card
-Top improving sectors
-Top weakening sectors
-Expandable ETF cards
-```
+- WCAG 2.2 AA floor
+- Interactive targets ≥ 24×24 CSS px (mobile nav ≥ 48px tall)
+- Full keyboard paths; no hover-only actions
+- Confirm dialogs trap focus, Esc cancels, labelled by title
+- `prefers-reduced-motion` honored
+- P/L direction not color-alone
+- Money labeled with currency when known
+- Semantic landmarks: `aside` nav, `main#content`, labelled nav regions
 
 ---
 
-## 17. Partner / AI Agent Partner Design
+## 14. Implementation map
 
-Partner is peer sharing.
+| Concern | Location |
+| --- | --- |
+| Tokens + base | `frontend/src/index.css` |
+| Components + layout + pages | `frontend/src/App.css` |
+| Primitives | `frontend/src/ui.tsx` |
+| Icons / brand mark | `frontend/src/icons.tsx`, `ui.tsx` `Gauge` |
+| Shell + routes | `frontend/src/App.tsx` |
+| Page surfaces | `pages.tsx`, `latePages.tsx`, `MonthlyReviewPage.tsx` |
+| Formatting helpers | `frontend/src/format.ts` |
+| Fonts | Inter Variable + Newsreader Variable (`main.tsx`) |
 
-UI sections:
+### Engineering constraints
 
-```text
-Partners
-Sharing settings
-Shared Diaries
-Shared Stock Notes
-Partner Compare
-```
-
-Rules:
-
-```text
-- Avoid "followers" language.
-- Avoid social network feel.
-- AI Agent Partner should appear as a partner identity, not a separate bot sidebar.
-```
-
-AI Agent Partner display:
-
-```text
-Name
-Account type: AI Agent Partner
-Shared stock notes
-Shared timeline records
-Last update
-```
+- Plain CSS classes — no CSS-in-JS, no Tailwind, no component library
+- Dark-only `color-scheme: dark`
+- Frontend talks only to Edge API
+- Preserve existing class names used by tests and page markup unless intentionally migrated together
 
 ---
 
-## 18. Post / Articles Design
+## 15. Quality bar checklist
 
-Post is public educational content.
+Before shipping UI changes:
 
-Rules:
-
-```text
-- Post is not Diary.
-- Public article pages should not expose author email.
-- Admin editor is separate from Diary editor.
-```
-
-Routes:
-
-```text
-/articles
-/articles/:slug
-/admin/posts
-/admin/posts/:id
-```
+- [ ] Feels calm in low light for 30+ minutes of reading/writing
+- [ ] One accent only; surfaces stay graphite
+- [ ] Diary prose is actually pleasant to read
+- [ ] Numbers are tabular and signed
+- [ ] Empty / error / loading states are honest and recoverable
+- [ ] Keyboard + focus-visible work end to end
+- [ ] Mobile safe areas and bottom nav don’t obscure primary actions
+- [ ] No confetti, streaks-as-pressure, or casino color
+- [ ] Diff does not reintroduce generic SaaS “metric tile wallpaper”
 
 ---
 
-## 19. Accessibility
-
-Minimum requirements:
-
-```text
-- WCAG AA contrast
-- Price movement not color-only
-- P/L movement not color-only
-- Visible focus states
-- Keyboard-accessible command palette
-- Touch target minimum 44px
-- Calendar cells usable with keyboard
-- Screen reader labels for profit/loss
-```
-
-Calendar screen reader examples:
-
-```text
-July 5, profit 320 dollars, 2 diaries, 1 transaction
-July 6, loss 80 dollars, no transaction
-```
-
----
-
-## 20. Responsive Breakpoints
-
-```text
-Mobile: < 768px
-Tablet: 768px - 1023px
-Desktop: 1024px - 1439px
-Wide: >= 1440px
-```
-
-Behavior:
-
-```text
-Mobile:
-- bottom nav
-- card lists
-- no dense month grid by default
-- use bottom sheet
-
-Tablet:
-- collapsible sidebar
-- calendar can use compact grid
-
-Desktop:
-- full sidebar
-- full calendar grid
-- optional right context panel
-
-Wide:
-- persistent right panel
-- richer dashboard grid
-```
-
----
-
-## 21. Motion and Interaction
-
-Allowed:
-
-```text
-Bottom sheet slide
-Panel slide
-Tab transition
-Card hover
-Skeleton loading
-Calendar day selection
-```
-
-Avoid:
-
-```text
-Animated P/L celebration
-Flashing red/green
-Heavy animated gradients
-Chart animation on every refresh
-Distracting glow pulse
-```
-
----
-
-## 22. Empty / Loading / Error States
-
-Every major page must support:
-
-```text
-Loading skeleton
-Empty state
-Error state
-Retry action
-```
-
-Calendar empty state:
-
-```text
-No P/L recorded this month.
-Start by entering today's Daily P/L or writing a Diary.
-[Input Daily P/L] [Create Diary]
-```
-
-Diary empty state:
-
-```text
-No diary entries yet.
-Start with a Quick Note to record today's market observation.
-[Quick Note]
-```
-
-Watchlist empty state:
-
-```text
-Your Watchlist is empty.
-Add stocks you want to follow and maintain a current Stock Note.
-[Add Stock]
-```
-
-Market Rotation error state:
-
-```text
-Market Rotation data is unavailable.
-Last successful update: 2026-07-05 09:30
-[Retry]
-```
-
----
-
-## 23. Design Acceptance Checklist
-
-```text
-[ ] Diary is visually and navigationally central
-[ ] Quick Note is one tap away on mobile
-[ ] Daily P/L Calendar exists
-[ ] Calendar does not imply full portfolio accounting
-[ ] Daily P/L can be manually entered
-[ ] Calendar links P/L with Diary and Transactions
-[ ] Mobile Calendar uses summary/list, not cramped desktop grid
-[ ] Transaction is displayed inside Diary context
-[ ] Discipline has random extraction
-[ ] No DisciplineCheck UI exists
-[ ] Diary Alerts and Price Alerts are visually distinct
-[ ] Watchlist is stock-focused
-[ ] Stock Note is current mutable view
-[ ] Stock Timeline Record feels immutable
-[ ] ETF research appears only under Tools / Market Rotation Monitor
-[ ] Market Rotation Monitor does not dominate the product
-[ ] Dark mode is fully polished
-[ ] P/L colors are calm, not casino-like
-[ ] Price/P&L movement does not rely only on color
-[ ] All screens have loading / empty / error states
-[ ] Mobile bottom nav works
-[ ] Right context panel is contextual
-[ ] Typography uses tabular numbers
-[ ] No landing-page hero section inside app
-```
-
----
-
-## 24. Final Design Summary
-
-The UI should feel like:
-
-```text
-A calm dark trade journal that connects daily market observation, trading actions, P/L outcomes, and later review.
-```
-
-The product should not make the user trade more.  
-It should help the user think better, record better, and review better.
+*This system should make the tool disappear into the trader’s evening ritual — precise when counting, quiet when writing.*
