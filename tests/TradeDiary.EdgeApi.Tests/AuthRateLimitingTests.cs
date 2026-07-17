@@ -208,4 +208,41 @@ public sealed class AuthRateLimitingTests
             return base.SendAsync(request, cancellationToken);
         }
     }
+
+    // Regression: ISSUE-001 — Edge forwarded JSON bodies as text/plain, so Identity returned 401 on login/register.
+    // Found by /qa on 2026-07-18
+    // Report: .gstack/qa-reports/qa-report-localhost-8080-2026-07-18.md
+    [Fact]
+    public async Task Downstream_json_bodies_use_application_json_content_type()
+    {
+        var contentTypes = new List<string?>();
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            foreach (var service in Services)
+            {
+                services.AddHttpClient(service).ConfigurePrimaryHttpMessageHandler(() =>
+                    new ContentTypeCapturingHandler(contentTypes));
+            }
+        }));
+        using var client = factory.CreateClient();
+
+        using var login = await client.PostAsJsonAsync("/api/auth/login", new { email = "a@b.co", password = "secret" });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+
+        using var register = await client.PostAsJsonAsync("/api/auth/register", RegisterBody("typed@example.test"));
+        Assert.Equal(HttpStatusCode.Created, register.StatusCode);
+
+        Assert.NotEmpty(contentTypes);
+        Assert.All(contentTypes, ct => Assert.Equal("application/json", ct));
+    }
+
+    private sealed class ContentTypeCapturingHandler(List<string?> contentTypes) : IdentityOkHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Content is not null)
+                contentTypes.Add(request.Content.Headers.ContentType?.MediaType);
+            return base.SendAsync(request, cancellationToken);
+        }
+    }
 }

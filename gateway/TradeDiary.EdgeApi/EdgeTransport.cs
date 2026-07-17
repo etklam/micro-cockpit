@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Routing;
@@ -119,9 +121,10 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
         using var request = new HttpRequestMessage(method, path);
         if (body is not null)
         {
-            request.Content = new StringContent(body);
-            if (context.Request.ContentType is not null)
-                request.Content.Headers.TryAddWithoutValidation("Content-Type", context.Request.ContentType);
+            // StringContent defaults to text/plain; identity minimal APIs reject that with 401 on login/register.
+            // Prefer the inbound JSON content type when present, otherwise send application/json.
+            var mediaType = MediaTypeForBody(context.Request.ContentType);
+            request.Content = new StringContent(body, Encoding.UTF8, mediaType);
         }
         ProxyHeaders.Forward(request, context, forwardRegistrationKey);
 
@@ -156,6 +159,16 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
         foreach (var (key, value) in values)
             path = path.Replace($"{{{key}}}", Uri.EscapeDataString(value?.ToString() ?? string.Empty), StringComparison.Ordinal);
         return path;
+    }
+
+    private static string MediaTypeForBody(string? contentType)
+    {
+        if (!string.IsNullOrWhiteSpace(contentType) &&
+            MediaTypeHeaderValue.TryParse(contentType, out var parsed) &&
+            !string.IsNullOrWhiteSpace(parsed.MediaType) &&
+            parsed.MediaType.Contains("json", StringComparison.OrdinalIgnoreCase))
+            return parsed.MediaType;
+        return "application/json";
     }
 
     private sealed record RawDownstreamResponse(
