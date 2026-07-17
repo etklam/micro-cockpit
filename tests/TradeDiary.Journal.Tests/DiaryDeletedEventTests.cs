@@ -1,3 +1,5 @@
+using TradeDiary.Events;
+
 public sealed class DiaryDeletedEventTests
 {
     [Fact]
@@ -13,6 +15,7 @@ public sealed class DiaryDeletedEventTests
         Assert.Equal("DiaryDeleted.v1", result.EventType);
         Assert.Equal(1, result.Version);
         Assert.Equal(new DiaryDeletedV1(diaryId, userId), result.Payload);
+        Assert.True(DiaryDeletedV1Envelope.IsValid(result));
     }
 
     [Fact]

@@ -9,8 +9,8 @@ import {
   useBootstrapQuery, useReactivatePriceAlertMutation, useRotationQuery, useRotationUniversesQuery, useSaveResearchNoteMutation, useWatchlistQuery,
 } from './features/queries'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
-import { PageSkeleton, SectionError, useCockpit } from './App'
-import type { Page } from './App'
+import { PageSkeleton, SectionError, useCockpit } from './shell'
+import type { Page } from './shell'
 
 const ListState = ({ loading, error, empty, retry, children }: { loading: boolean; error?: string; empty: boolean; retry: () => void; children: ReactNode }) =>
   loading ? <PageSkeleton rows={2} /> : error ? <SectionError onRetry={retry} /> : empty ? <EmptyBox title="Nothing here yet" hint="Add the first item when it becomes useful." /> : <>{children}</>

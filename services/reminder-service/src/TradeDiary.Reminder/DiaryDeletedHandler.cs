@@ -1,34 +1,15 @@
 using System.Text.Json;
 using Npgsql;
-
-public sealed record DiaryDeletedV1(Guid DiaryId, Guid UserId);
-
-public sealed record DiaryDeletedV1Envelope(
-    Guid EventId,
-    string EventType,
-    int Version,
-    DiaryDeletedV1? Payload);
+using TradeDiary.Events;
 
 public static class DiaryDeletedHandler
 {
-    public const string EventType = "DiaryDeleted.v1";
-    public const int EventVersion = 1;
-
-    public static bool IsValid(DiaryDeletedV1Envelope? input) =>
-        input is not null &&
-        input.EventId != Guid.Empty &&
-        input.EventType == EventType &&
-        input.Version == EventVersion &&
-        input.Payload is { } payload &&
-        payload.DiaryId != Guid.Empty &&
-        payload.UserId != Guid.Empty;
-
     public static async Task ProcessAsync(
         NpgsqlDataSource db,
         DiaryDeletedV1Envelope input,
         CancellationToken cancellationToken = default)
     {
-        if (!IsValid(input)) throw new ArgumentException("Invalid DiaryDeleted.v1 event.", nameof(input));
+        if (!DiaryDeletedV1Envelope.IsValid(input)) throw new ArgumentException("Invalid DiaryDeleted.v1 event.", nameof(input));
 
         await using var connection = await db.OpenConnectionAsync(cancellationToken);
         await using var tx = await connection.BeginTransactionAsync(cancellationToken);

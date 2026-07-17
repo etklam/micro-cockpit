@@ -1,3 +1,5 @@
+using TradeDiary.Events;
+
 public sealed class DiaryDeletedHandlerTests
 {
     [Fact]
@@ -5,11 +7,11 @@ public sealed class DiaryDeletedHandlerTests
     {
         var input = new DiaryDeletedV1Envelope(
             Guid.NewGuid(),
-            DiaryDeletedHandler.EventType,
-            DiaryDeletedHandler.EventVersion,
+            DiaryDeletedV1Envelope.Type,
+            DiaryDeletedV1Envelope.EventVersion,
             new DiaryDeletedV1(Guid.NewGuid(), Guid.NewGuid()));
 
-        Assert.True(DiaryDeletedHandler.IsValid(input));
+        Assert.True(DiaryDeletedV1Envelope.IsValid(input));
     }
 
     [Fact]
@@ -17,10 +19,10 @@ public sealed class DiaryDeletedHandlerTests
     {
         var input = new DiaryDeletedV1Envelope(
             Guid.NewGuid(),
-            DiaryDeletedHandler.EventType,
-            DiaryDeletedHandler.EventVersion + 1,
+            DiaryDeletedV1Envelope.Type,
+            DiaryDeletedV1Envelope.EventVersion + 1,
             new DiaryDeletedV1(Guid.Empty, Guid.NewGuid()));
 
-        Assert.False(DiaryDeletedHandler.IsValid(input));
+        Assert.False(DiaryDeletedV1Envelope.IsValid(input));
     }
 }

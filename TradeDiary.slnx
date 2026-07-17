@@ -4,6 +4,9 @@
   <Folder Name="/platform/postgres/migrator/">
     <Project Path="platform/postgres/migrator/TradeDiary.DatabaseMigrator/TradeDiary.DatabaseMigrator.csproj" />
   </Folder>
+  <Folder Name="/contracts/">
+    <Project Path="contracts/TradeDiary.Events/TradeDiary.Events.csproj" />
+  </Folder>
   <Folder Name="/gateway/">
     <Project Path="gateway/TradeDiary.EdgeApi/TradeDiary.EdgeApi.csproj" />
   </Folder>

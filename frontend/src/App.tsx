@@ -1,10 +1,8 @@
-import { createContext, useContext } from 'react'
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthProvider'
 import { LoginPage } from './auth/LoginPage'
 import { RegisterPage } from './auth/RegisterPage'
 import { Brand, Button, ErrorBox, IconButton, useConfirm } from './ui'
-import type { ConfirmOpts } from './ui'
 import { Icon } from './icons'
 import { cx } from './format'
 import './App.css'
@@ -12,8 +10,7 @@ import { AlertsPage, CalendarPage, DiaryDetailPage, DiaryPage, DisciplinePage, T
 import { ArticleDetailPage, ArticlesPage, MorePage, PartnersPage, PriceAlertsPage, RotationPage, ToolsPage, WatchlistPage } from './latePages'
 import { useBootstrapQuery } from './features/queries'
 import { MonthlyReviewPage, MonthlyReviewRedirect } from './MonthlyReviewPage'
-
-export type Page = 'today' | 'diary' | 'calendar' | 'discipline' | 'alerts' | 'more' | 'review' | 'watchlist' | 'price-alerts' | 'rotation' | 'partners' | 'articles' | 'tools'
+import { CockpitProvider, SectionError, type Page } from './shell'
 
 const PATHS: Record<Page, string> = {
   today: '/today', diary: '/diary', calendar: currentCalendarPath(), discipline: '/discipline', alerts: '/alerts',
@@ -33,10 +30,6 @@ const MORE: { id: Page; label: string }[] = [
   { id: 'rotation', label: 'Market rotation' }, { id: 'partners', label: 'Partners' },
   { id: 'articles', label: 'Articles' }, { id: 'tools', label: 'Tools' },
 ]
-
-type Cockpit = { go: (page: Page) => void; confirm: (options: ConfirmOpts) => Promise<boolean> }
-const CockpitContext = createContext<Cockpit>(null!)
-export const useCockpit = () => useContext(CockpitContext)
 
 export default function App() {
   return (
@@ -88,7 +81,7 @@ function Shell() {
   if (bootstrap.isError || !bootstrap.data) return <SectionError onRetry={() => { void bootstrap.refetch() }} />
   const go = (page: Page) => { navigate(PATHS[page]); scrollTo({ top: 0, behavior: 'smooth' }) }
   return (
-    <CockpitContext.Provider value={{ go, confirm }}>
+    <CockpitProvider value={{ go, confirm }}>
       <a className="skip-link" href="#content">Skip to content</a>
       <div className="shell">
         <Sidebar cockpit={bootstrap.data} onSignOut={logout} />
@@ -99,7 +92,7 @@ function Shell() {
         <MobileNav />
         {confirmNode}
       </div>
-    </CockpitContext.Provider>
+    </CockpitProvider>
   )
 }
 
@@ -155,9 +148,4 @@ function NotFoundPage() { return <ErrorBox message="Page not found." /> }
 function currentCalendarPath() {
   const now = new Date()
   return `/calendar/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`
-}
-
-export function SectionError({ onRetry }: { onRetry: () => void }) { return <ErrorBox message="Couldn’t reach the cockpit." onRetry={onRetry} /> }
-export function PageSkeleton({ rows = 3 }: { rows?: number }) {
-  return <div className="page-skel"><div className="skel" style={{ height: 34, width: 220 }} /><div className="card-grid">{Array.from({ length: 3 }, (_, index) => <div className="card" key={index}><div className="skel" style={{ height: 12, width: 90 }} /><div className="skel" style={{ height: 30, width: 120, marginTop: 16 }} /></div>)}</div>{Array.from({ length: rows }, (_, index) => <div className="skel" key={index} style={{ height: 56, marginTop: 12 }} />)}</div>
 }

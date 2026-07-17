@@ -7,6 +7,7 @@ using Microsoft.OpenApi;
 using Npgsql;
 using System.Security.Cryptography;
 using System.Text;
+using TradeDiary.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Reminder") ?? throw new InvalidOperationException("Connection string 'Reminder' is required.")));
@@ -45,7 +46,7 @@ app.MapGet("/version", () => Results.Ok(new { service = "reminder-service", vers
 
 app.MapPost("/internal/events/diary-deleted", async (DiaryDeletedV1Envelope? input, NpgsqlDataSource db) =>
 {
-    if (!DiaryDeletedHandler.IsValid(input))
+    if (!DiaryDeletedV1Envelope.IsValid(input))
         return Results.Problem("invalid_event", statusCode: 400);
     await DiaryDeletedHandler.ProcessAsync(db, input!);
     return Results.NoContent();
