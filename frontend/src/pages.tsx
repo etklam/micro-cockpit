@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { Alert, Diary, DiaryReviewWrite, Discipline, Transaction } from './features/api'
-import { useIdempotencyKey } from './features/api'
+import { transactionUpdateErrorMessage, useIdempotencyKey } from './features/api'
 import {
   useAlertsQuery, useCalendarQuery, useCreateAlertMutation, useCreateDisciplineMutation,
   useCreateTransactionMutation, useDashboardQuery, useDeleteAlertMutation, useDeleteDiaryMutation,
@@ -10,7 +10,7 @@ import {
   useDismissAlertMutation, useQuickNoteMutation, useSaveDiaryMutation, useSavePerformanceMutation,
   useBootstrapQuery, useDisciplinesQuery,
   useDeleteDiaryReviewMutation, useDiaryReviewQuery, useDiaryReviewSummaryQuery, useSaveDiaryReviewMutation,
-  useTransactionsQuery,
+  useTransactionsQuery, useUpdateTransactionMutation,
 } from './features/queries'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
 import { Icon } from './icons'
@@ -350,8 +350,9 @@ function DiaryListSkeleton() {
 }
 
 /* -------------------------- Transactions --------------------------- */
-const localDateTimeLocal = () => {
-  const d = new Date()
+const localDateTimeLocal = (value: string | Date = new Date()) => {
+  const d = value instanceof Date ? new Date(value.getTime()) : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
   return d.toISOString().slice(0, 16)
 }
@@ -360,6 +361,7 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
   const { confirm } = useCockpit()
   const { data, isLoading: loading, isError: error, refetch: reload } = useTransactionsQuery(diaryId)
   const items = data?.items ?? []
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [symbol, setSymbol] = useState('')
   const [side, setSide] = useState('buy')
   const [qty, setQty] = useState('')
@@ -370,20 +372,52 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
   const [formError, setFormError] = useState('')
   const idem = useIdempotencyKey()
   const createTransaction = useCreateTransactionMutation(diaryId)
+  const updateTransaction = useUpdateTransactionMutation(diaryId)
   const deleteTransaction = useDeleteTransactionMutation(diaryId)
+  const saving = createTransaction.isPending || updateTransaction.isPending
 
-  async function add(e: FormEvent) {
+  function resetEdit() {
+    setEditingId(null); setSymbol(''); setSide('buy'); setQty(''); setPrice(''); setCurrency('USD')
+    setTradedAt(localDateTimeLocal()); setNotes(''); setFormError(''); idem.reset()
+  }
+
+  function startEdit(t: Transaction) {
+    setEditingId(t.id); setSymbol(t.symbol); setSide(t.side); setQty(String(t.quantity)); setPrice(String(t.price))
+    setCurrency(t.currency); setTradedAt(localDateTimeLocal(t.tradedAt)); setNotes(t.notes ?? ''); setFormError(''); idem.reset()
+  }
+
+  async function submit(e: FormEvent) {
     e.preventDefault()
+    if (saving) return
     setFormError('')
+
+    const normalizedSymbol = symbol.trim().toUpperCase()
+    const normalizedCurrency = currency.trim().toUpperCase()
+    const quantityValue = Number(qty)
+    const priceValue = Number(price)
+    const tradeTime = new Date(tradedAt)
+    setSymbol(normalizedSymbol)
+    setCurrency(normalizedCurrency)
+
+    if (!normalizedSymbol) { setFormError('Enter a symbol.'); return }
+    if (side !== 'buy' && side !== 'sell') { setFormError('Choose Buy or Sell.'); return }
+    if (!Number.isFinite(quantityValue) || !Number.isFinite(priceValue) || quantityValue <= 0 || priceValue <= 0) {
+      setFormError('Quantity and price must be greater than zero.'); return
+    }
+    if (!/^[A-Z]{3}$/.test(normalizedCurrency)) { setFormError('Enter a three-letter currency code.'); return }
+    if (!tradedAt || Number.isNaN(tradeTime.getTime())) { setFormError('Enter a valid traded date and time.'); return }
+
+    const body = { symbol: normalizedSymbol, side, quantity: quantityValue, price: priceValue, currency: normalizedCurrency, tradedAt: tradeTime.toISOString(), notes }
     try {
-      await createTransaction.mutateAsync({ body: {
-        symbol, side, quantity: Number(qty), price: Number(price), currency,
-        tradedAt: new Date(tradedAt).toISOString(), notes,
-      }, key: idem.key() })
-      setSymbol(''); setQty(''); setPrice(''); setNotes('')
-      idem.reset()
-    } catch {
-      setFormError('Could not add the trade.')
+      if (editingId) {
+        await updateTransaction.mutateAsync({ id: editingId, body })
+        resetEdit()
+      } else {
+        await createTransaction.mutateAsync({ body, key: idem.key() })
+        setSymbol(''); setQty(''); setPrice(''); setNotes(''); idem.reset()
+      }
+    } catch (mutationError: unknown) {
+      setFormError(editingId ? transactionUpdateErrorMessage(mutationError) : 'Could not add the trade.')
     }
   }
 
@@ -391,21 +425,24 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
     const ok = await confirm({ title: 'Delete trade?', message: `${t.side.toUpperCase()} ${t.symbol} will be removed.`, confirmText: 'Delete', tone: 'danger' })
     if (!ok) return
     await deleteTransaction.mutateAsync(t.id)
+    if (editingId === t.id) resetEdit()
   }
 
   return (
     <div className="trades">
-      <form className="trades__form" onSubmit={add}>
-        <TextInput aria-label="Symbol" placeholder="Symbol" required value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} className="input--symbol" />
-        <SelectBox aria-label="Side" value={side} onChange={(e) => setSide(e.target.value)}>
+      <form className="trades__form" onSubmit={submit}>
+        <TextInput aria-label="Symbol" placeholder="Symbol" required disabled={saving} value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} className="input--symbol" />
+        <SelectBox aria-label="Side" disabled={saving} value={side} onChange={(e) => setSide(e.target.value)}>
           <option value="buy">Buy</option>
           <option value="sell">Sell</option>
         </SelectBox>
-        <TextInput aria-label="Quantity" type="number" min="0" step="any" inputMode="decimal" placeholder="Qty" required value={qty} onChange={(e) => setQty(e.target.value)} className="num" />
-        <TextInput aria-label="Price" type="number" min="0" step="any" inputMode="decimal" placeholder="Price" required value={price} onChange={(e) => setPrice(e.target.value)} className="num" />
-        <TextInput aria-label="Currency" placeholder="CCY" required value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} className="input--ccy" />
-        <TextInput aria-label="Traded at" type="datetime-local" required value={tradedAt} onChange={(e) => setTradedAt(e.target.value)} className="input--when" />
-        <Button variant="primary" type="submit" icon="plus" loading={createTransaction.isPending} className="trades__add">Add</Button>
+        <TextInput aria-label="Quantity" type="number" min="0" step="any" inputMode="decimal" placeholder="Qty" required disabled={saving} value={qty} onChange={(e) => setQty(e.target.value)} className="num" />
+        <TextInput aria-label="Price" type="number" min="0" step="any" inputMode="decimal" placeholder="Price" required disabled={saving} value={price} onChange={(e) => setPrice(e.target.value)} className="num" />
+        <TextInput aria-label="Currency" placeholder="CCY" required maxLength={3} disabled={saving} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} className="input--ccy" />
+        <TextInput aria-label="Traded at" type="datetime-local" required disabled={saving} value={tradedAt} onChange={(e) => setTradedAt(e.target.value)} className="input--when" />
+        <TextInput aria-label="Notes" placeholder="Notes (optional)" disabled={saving} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        {editingId ? <Button variant="ghost" disabled={saving} onClick={resetEdit}>Cancel</Button> : null}
+        <Button variant="primary" type="submit" icon={editingId ? 'check' : 'plus'} loading={saving} className="trades__add">{editingId ? 'Save changes' : 'Add'}</Button>
       </form>
       {formError ? <p className="form-error" role="alert">{formError}</p> : null}
 
@@ -423,7 +460,10 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
               <span className="trade__sym">{t.symbol}</span>
               <span className="trade__qty num">{quantity(t.quantity)} × {t.price} {t.currency}</span>
               {t.notes ? <span className="trade__notes">{t.notes}</span> : null}
-              <IconButton icon="trash" label="Delete trade" size={15} className="icon-btn--danger trade__del" onClick={() => remove(t)} />
+              <div className="trade__actions">
+                <IconButton icon="edit" label={`Edit ${t.symbol} trade`} size={15} aria-pressed={editingId === t.id} disabled={saving || deleteTransaction.isPending} onClick={() => startEdit(t)} />
+                <IconButton icon="trash" label="Delete trade" size={15} className="icon-btn--danger" disabled={saving || deleteTransaction.isPending} onClick={() => remove(t)} />
+              </div>
             </li>
           ))}
         </ul>

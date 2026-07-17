@@ -51,7 +51,16 @@ export const getDiaryReviewItems = (from: string, to: string, status: DiaryRevie
   G.getApiAppDiaryReviewItems({ from, to, status, assessment, tag, cursor, limit: 50 })
 export const createTransaction = (diaryId: string, body: G.TransactionWrite, key?: string) =>
   G.postApiAppDiariesDiaryIdTransactions(diaryId, body, idempotencyHeader(key))
+export const updateTransaction = (diaryId: string, id: string, body: G.TransactionWrite) =>
+  G.putApiAppDiariesDiaryIdTransactionsId(diaryId, id, body)
 export const deleteTransaction = (diaryId: string, id: string) => G.deleteApiAppDiariesDiaryIdTransactionsId(diaryId, id)
+export function transactionUpdateErrorMessage(error: unknown) {
+  if (!(error instanceof G.ApiError)) return 'Could not save the trade. Try again.'
+  if (error.status === 400 || error.status === 422) return 'Check the symbol, quantity, price, currency, and trade time.'
+  if (error.status === 404) return 'This trade no longer exists. Refresh the diary and try again.'
+  if (error.status === 503 || error.status === 504) return 'The transaction service is temporarily unavailable. Try again.'
+  return 'Could not save the trade. Try again.'
+}
 export const getCalendar = (year: number, month: number) => G.getApiAppCalendar({ year, month })
 export const savePerformance = (date: string, pnlAmount: number, capitalBase: number | null, note: string) =>
   G.putApiAppDailyPerformanceDate(date, { pnlAmount, capitalBase, note })

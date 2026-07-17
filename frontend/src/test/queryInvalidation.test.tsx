@@ -8,9 +8,19 @@ vi.mock('../features/api', () => ({
   updateDiary: vi.fn().mockResolvedValue({}),
   saveDiaryReview: vi.fn().mockResolvedValue({}),
   deleteDiaryReview: vi.fn().mockResolvedValue({}),
+  createTransaction: vi.fn().mockResolvedValue({}),
+  updateTransaction: vi.fn().mockResolvedValue({}),
+  deleteTransaction: vi.fn().mockResolvedValue({}),
 }))
 
-import { useDeleteDiaryReviewMutation, useSaveDiaryMutation, useSaveDiaryReviewMutation } from '../features/queries'
+import {
+  useCreateTransactionMutation,
+  useDeleteDiaryReviewMutation,
+  useDeleteTransactionMutation,
+  useSaveDiaryMutation,
+  useSaveDiaryReviewMutation,
+  useUpdateTransactionMutation,
+} from '../features/queries'
 
 let client: QueryClient
 const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -42,4 +52,34 @@ test('review delete invalidates evidence item queries', async () => {
   const { result } = renderHook(() => useDeleteDiaryReviewMutation('diary-1'), { wrapper })
   await act(() => result.current.mutateAsync())
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diary-review', 'items'] })
+})
+
+test('transaction create invalidates diary transactions and calendar queries', async () => {
+  const invalidation = vi.spyOn(client, 'invalidateQueries')
+  const { result } = renderHook(() => useCreateTransactionMutation('diary-1'), { wrapper })
+  await act(() => result.current.mutateAsync({
+    body: { symbol: 'AAPL', side: 'buy', quantity: 1, price: 100, currency: 'USD', tradedAt: '2026-07-16T08:00:00.000Z', notes: null },
+    key: 'idempotency-key',
+  }))
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['transactions', 'diary-1'] })
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['calendar'] })
+})
+
+test('transaction update invalidates diary transactions and calendar queries', async () => {
+  const invalidation = vi.spyOn(client, 'invalidateQueries')
+  const { result } = renderHook(() => useUpdateTransactionMutation('diary-1'), { wrapper })
+  await act(() => result.current.mutateAsync({
+    id: 'tx-1',
+    body: { symbol: 'AAPL', side: 'sell', quantity: 2, price: 101, currency: 'USD', tradedAt: '2026-07-16T08:00:00.000Z', notes: 'Updated' },
+  }))
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['transactions', 'diary-1'] })
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['calendar'] })
+})
+
+test('transaction delete invalidates diary transactions and calendar queries', async () => {
+  const invalidation = vi.spyOn(client, 'invalidateQueries')
+  const { result } = renderHook(() => useDeleteTransactionMutation('diary-1'), { wrapper })
+  await act(() => result.current.mutateAsync('tx-1'))
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['transactions', 'diary-1'] })
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['calendar'] })
 })

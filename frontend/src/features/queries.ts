@@ -96,6 +96,13 @@ export function useCreateTransactionMutation(diaryId: string) {
   } })
 }
 
+export function useUpdateTransactionMutation(diaryId: string) {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: ({ id, body }: { id: string; body: Parameters<typeof api.updateTransaction>[2] }) => api.updateTransaction(diaryId, id, body), onSuccess: async () => {
+    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.transactions(diaryId) }), invalidateCalendar(client)])
+  } })
+}
+
 export function useDeleteTransactionMutation(diaryId: string) {
   const client = useQueryClient()
   return useMutation({ mutationFn: (id: string) => api.deleteTransaction(diaryId, id), onSuccess: async () => {

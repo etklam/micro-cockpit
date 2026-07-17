@@ -594,7 +594,7 @@
 .trade__sym { font-weight: 700; color: var(--ink); letter-spacing: 0.025em; }
 .trade__qty { color: var(--muted); flex: 1 1 140px; min-width: 0; }
 .trade__notes { color: var(--muted); font-size: var(--fs-sm); font-style: italic; flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.trade__del { margin-left: auto; }
+.trade__actions { display: flex; gap: 2px; margin-left: auto; }
 .trades__empty { color: var(--muted); font-size: var(--fs-sm); padding: var(--sp-2) 0; }
 
 .review-patterns,
