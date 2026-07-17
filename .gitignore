@@ -8,3 +8,4 @@ k8s/*secret*.local.yaml
 .secrets/
 *.secret.env
 __pycache__/
+.gstack/
