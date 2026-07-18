@@ -25,6 +25,16 @@ jobs:
           ref: ${{ forgejo.sha }}
           fetch-depth: 0
 
+      - name: Install kubectl
+        run: |
+          set -eu
+          if ! command -v kubectl >/dev/null 2>&1; then
+            apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null 2>&1
+            curl -fsSL "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o /usr/local/bin/kubectl
+            chmod +x /usr/local/bin/kubectl
+          fi
+          kubectl version --client
+
       - name: Validate repository secrets
         run: |
           set -eu
