@@ -11,6 +11,7 @@ Diary-first investment decision journal with a React application, a typed Edge B
 | [System reference](docs/reference-system.md) | Look up processes, repository layout, routes, configuration, and health endpoints |
 | [API and data reference](docs/reference-api-data.md) | Look up public routes, authentication, ProblemDetails, composition, ownership, and null rules |
 | [Architecture](docs/explanation-architecture.md) | Understand the Edge boundary, session model, schema isolation, migration runner, and trade-offs |
+| [K3s deployment guide](docs/deploy-k3s.md) | Stand up a single-node K3s cluster from a bare server: cert-manager, ExternalDNS, deploy host, Secrets, baseline, first release |
 
 Operational procedures remain in [Operations](docs/operations.md), [Database migrations](docs/database-migrations.md), and [Rollback](docs/rollback.md). Product boundaries are in [PRODUCT.md](PRODUCT.md), UI direction is in [DESIGN.md](DESIGN.md), and service ownership is summarized in [SERVICE_CATALOG.md](SERVICE_CATALOG.md).
 

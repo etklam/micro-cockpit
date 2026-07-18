@@ -73,6 +73,8 @@ docker compose up -d
 
 ## Kubernetes release deployment
 
+> First-time cluster setup (K3s, cert-manager, ExternalDNS, deploy host, lock directory, runtime Secret bootstrap, initial database baseline) is documented in [deploy-k3s.md](deploy-k3s.md). This section covers the release flow that runs once that environment is in place.
+
 Forgejo builds every application image with the full checked-out commit SHA and deploys that same SHA through `scripts/deploy-k8s-release.sh`. The helper renders a temporary Kustomize overlay, so tracked manifests are not edited. Base application manifests deliberately contain `REQUIRED_IMAGE_TAG` and cannot be deployed through the generic manifest helper. The release helper rejects mutable or shortened tags, applies all 15 application images together, records the SHA in `app.kubernetes.io/version` and `micro-cockpit/deployed-sha`, and then verifies live images, annotations, availability, and the absence of `CrashLoopBackOff`.
 
 Production runtime credentials have one authoritative source: the current `db-credentials`, `service-connection-strings`, and `app-secrets` Kubernetes Secrets in the production namespace. Forgejo Actions stores deployment infrastructure credentials only: registry credentials, the SSH key, the pinned known-hosts entry, and deployment host/user configuration. A normal release never receives, transfers, creates, patches, or replaces application runtime credentials. While holding the namespace operation lock, it verifies that all required Secrets and keys are present, applies non-secret infrastructure, and deploys the immutable application images.
