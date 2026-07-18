@@ -49,8 +49,12 @@ def main() -> int:
         if len(lines) < 3:
             errors.append(f"{path.name}: missing metadata headers")
             continue
+        header_lines = lines[:3]
+        if len(header_lines) != len(HEADER):
+            errors.append(f"{path.name}: expected {len(HEADER)} metadata headers, found {len(header_lines)}")
+            continue
         values = []
-        for pattern, line in zip(HEADER, lines[:3], strict=True):
+        for pattern, line in zip(HEADER, header_lines):
             header_match = pattern.fullmatch(line)
             values.append(header_match.group(1) if header_match else None)
         if None in values:

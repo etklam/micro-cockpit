@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Exercise append-only migration validation against isolated temporary Git histories."""
 
+from __future__ import annotations
+
 import hashlib
 import json
 import shutil
