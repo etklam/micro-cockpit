@@ -13,15 +13,17 @@ import type {
 import { cx } from './format'
 import { Icon, type IconName } from './icons'
 import { useAppearance } from './features/useAppearance'
+import { useI18n } from './i18n'
 
 /* ----------------------------- Spinner ----------------------------- */
 export function Spinner({ size = 16, className }: { size?: number; className?: string }) {
+  const { t } = useI18n()
   return (
     <span
       className={cx('spinner', className)}
       style={{ width: size, height: size }}
       role="status"
-      aria-label="Loading"
+      aria-label={t('common.loading')}
     />
   )
 }
@@ -69,11 +71,12 @@ export const IconButton = forwardRef<HTMLButtonElement, { icon: IconName; label:
 /* ------------------------- Theme toggle ---------------------------- */
 export function ThemeToggle({ className }: { className?: string }) {
   const { scheme, toggle } = useAppearance()
+  const { t } = useI18n()
   const next = scheme === 'dark' ? 'light' : 'dark'
   return (
     <IconButton
       icon={scheme === 'dark' ? 'sun' : 'moon'}
-      label={next === 'light' ? 'Switch to light mode' : 'Switch to dark mode'}
+      label={next === 'light' ? t('common.switchToLight') : t('common.switchToDark')}
       onClick={() => toggle()}
       className={cx('theme-toggle', className)}
     />
@@ -180,13 +183,14 @@ export function EmptyBox({
   )
 }
 
-export function ErrorBox({ message = 'Something went wrong.', onRetry, className }: { message?: string; onRetry?: () => void; className?: string }) {
+export function ErrorBox({ message, onRetry, className }: { message?: string; onRetry?: () => void; className?: string }) {
+  const { t } = useI18n()
   return (
     <div className={cx('state-box', 'state-box--error', className)} role="alert">
       <span className="state-box__icon state-box__icon--error"><Icon name="dot" size={12} /></span>
       <div className="state-box__body">
-        <p className="state-box__title">{message}</p>
-        {onRetry ? <Button size="sm" variant="ghost" icon="right" onClick={onRetry} className="state-box__retry">Try again</Button> : null}
+        <p className="state-box__title">{message ?? t('common.somethingWentWrong')}</p>
+        {onRetry ? <Button size="sm" variant="ghost" icon="right" onClick={onRetry} className="state-box__retry">{t('common.retry')}</Button> : null}
       </div>
     </div>
   )
@@ -265,6 +269,7 @@ export function useConfirm() {
   const [state, setState] = useState<{ opts: ConfirmOpts; resolve: (v: boolean) => void } | null>(null)
   const confirmBtnRef = useRef<HTMLButtonElement>(null)
   const headingId = useId()
+  const { t } = useI18n()
 
   const confirm = useCallback(
     (opts: ConfirmOpts) => new Promise<boolean>((resolve) => setState({ opts, resolve })),
@@ -316,13 +321,13 @@ export function useConfirm() {
             <h2 id={headingId} className="confirm__title">{state.opts.title}</h2>
             {state.opts.message ? <p className="confirm__msg">{state.opts.message}</p> : null}
             <div className="confirm__actions">
-              <Button variant="ghost" onClick={() => close(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => close(false)}>{t('common.cancel')}</Button>
               <Button
                 ref={confirmBtnRef}
                 variant={tone === 'danger' ? 'danger' : 'primary'}
                 onClick={() => close(true)}
               >
-                {state.opts.confirmText ?? 'Confirm'}
+                {state.opts.confirmText ?? t('common.confirm')}
               </Button>
             </div>
           </div>

@@ -13,6 +13,7 @@ import {
   type Appearance,
   type ColorScheme,
 } from './appearance'
+import { isLocale } from '../i18n'
 
 /**
  * Live appearance preference + one-tap light/dark toggle.
@@ -68,6 +69,7 @@ export function useAppearance() {
         timezone: profile.timezone,
         baseCurrency: profile.baseCurrency,
         appearance: next,
+        locale: isLocale(profile.locale) ? profile.locale : 'en',
       })
     } catch {
       // Local paint + mirror already applied; server will re-reconcile on next bootstrap.

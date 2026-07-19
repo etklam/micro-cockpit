@@ -4,10 +4,11 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { priceAlertCreateErrorKind, type PriceAlert, type PriceAlertEvaluationPrice, type RotationItem, type WatchlistItem } from './features/api'
 import {
   useAddPriceAlertMutation, useAddWatchlistMutation, useArticleQuery, useArticlesQuery,
-  useCalculateMutation, useCreateAgentMutation, useDeletePriceAlertMutation, useDismissPriceAlertMutation, usePartnersQuery,
+  useCreateAgentMutation, useDeletePriceAlertMutation, useDismissPriceAlertMutation, usePartnersQuery,
   usePriceAlertTriggersQuery, usePriceAlertsQuery, useRemoveWatchlistMutation, useResearchNoteQuery, useResearchTimelineQuery,
   useBootstrapQuery, useReactivatePriceAlertMutation, useRotationQuery, useRotationUniversesQuery, useSaveResearchNoteMutation, useWatchlistQuery,
 } from './features/queries'
+import { calculateTool, isToolId, type ToolId } from './features/toolsCalc'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
 import { PageSkeleton, SectionError, useCockpit } from './shell'
 import type { Page } from './shell'
@@ -20,7 +21,7 @@ export function MorePage() {
   const links: { page: Page; title: string; hint: string }[] = [
     { page: 'review', title: 'Monthly review', hint: 'Review process and outcome side by side.' },
     { page: 'alerts', title: 'Diary alerts', hint: 'Return to reflections at the right time.' },
-    { page: 'settings', title: 'Settings', hint: 'Timezone, currency, appearance, and display name.' },
+    { page: 'settings', title: 'Settings', hint: 'Timezone, currency, language, appearance, and display name.' },
     { page: 'watchlist', title: 'Watchlist', hint: 'Research symbols and keep a decision trail.' },
     { page: 'price-alerts', title: 'Price alerts', hint: 'Track levels that deserve attention.' },
     { page: 'rotation', title: 'Market rotation', hint: 'See relative group momentum.' },
@@ -291,11 +292,94 @@ export function ArticleDetailPage() {
   return <><PageHeader title={article.data.title} subtitle={article.data.publishedAt ? new Date(article.data.publishedAt).toLocaleDateString() : undefined} /><Card as="article"><p className="prose">{article.data.body}</p></Card></>
 }
 
-type Tool = 'position-sizing' | 'risk-reward' | 'fire' | 'relative-value' | 'seasonality'
-const fields: Record<Tool, { key: string; label: string; text?: boolean }[]> = { 'position-sizing': [{ key: 'accountValue', label: 'Account value' }, { key: 'riskPercent', label: 'Risk %' }, { key: 'entryPrice', label: 'Entry price' }, { key: 'stopPrice', label: 'Stop price' }], 'risk-reward': [{ key: 'entryPrice', label: 'Entry price' }, { key: 'stopPrice', label: 'Stop price' }, { key: 'targetPrice', label: 'Target price' }], fire: [{ key: 'annualExpenses', label: 'Annual expenses' }, { key: 'withdrawalRatePercent', label: 'Withdrawal rate %' }, { key: 'investedAssets', label: 'Invested assets' }], 'relative-value': [{ key: 'assetPrice', label: 'Asset price' }, { key: 'benchmarkPrice', label: 'Benchmark price' }, { key: 'historicalRatio', label: 'Historical ratio' }], seasonality: [{ key: 'returns', label: 'Returns (comma-separated)', text: true }] }
+const fields: Record<ToolId, { key: string; label: string; text?: boolean }[]> = {
+  'position-sizing': [{ key: 'accountValue', label: 'Account value' }, { key: 'riskPercent', label: 'Risk %' }, { key: 'entryPrice', label: 'Entry price' }, { key: 'stopPrice', label: 'Stop price' }],
+  'risk-reward': [{ key: 'entryPrice', label: 'Entry price' }, { key: 'stopPrice', label: 'Stop price' }, { key: 'targetPrice', label: 'Target price' }],
+  fire: [{ key: 'annualExpenses', label: 'Annual expenses' }, { key: 'withdrawalRatePercent', label: 'Withdrawal rate %' }, { key: 'investedAssets', label: 'Invested assets' }],
+  'relative-value': [{ key: 'assetPrice', label: 'Asset price' }, { key: 'benchmarkPrice', label: 'Benchmark price' }, { key: 'historicalRatio', label: 'Historical ratio' }],
+  seasonality: [{ key: 'returns', label: 'Returns (comma-separated)', text: true }],
+}
+
 export function ToolsPage() {
-  const [tool, setTool] = useState<Tool>('position-sizing'); const [values, setValues] = useState<Record<string, string>>({}); const [answer, setAnswer] = useState<Record<string, number> | null>(null); const [error, setError] = useState('')
-  const calculate = useCalculateMutation()
-  async function submit(e: FormEvent) { e.preventDefault(); setError(''); try { const payload = tool === 'seasonality' ? { returns: (values.returns ?? '').split(',').map(Number) } : Object.fromEntries(Object.entries(values).map(([k, v]) => [k, Number(v)])); setAnswer(await calculate.mutateAsync({ tool, values: payload })) } catch { setError('Could not calculate this right now.') } }
-  return <><PageHeader title="Tools" subtitle="Fast checks before committing capital" /><Card><form className="stack" onSubmit={submit}><Field label="Calculator"><SelectBox value={tool} onChange={e => { setTool(e.target.value as Tool); setValues({}); setAnswer(null) }}><option value="position-sizing">Position size</option><option value="risk-reward">Risk / reward</option><option value="fire">Financial independence</option><option value="relative-value">Relative value</option><option value="seasonality">Seasonality</option></SelectBox></Field><div className="form-row">{fields[tool].map(f => <Field key={f.key} label={f.label}><TextInput required type={f.text ? 'text' : 'number'} step={f.text ? undefined : 'any'} value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))} /></Field>)}</div>{error ? <p className="form-error" role="alert">{error}</p> : null}<Button variant="primary" type="submit" loading={calculate.isPending}>Calculate</Button></form></Card>{answer ? <Card aria-live="polite"><h2>Result</h2><div className="stat-row">{Object.entries(answer).map(([k, v]) => <Stat key={k} label={k.replace(/([A-Z])/g, ' $1')} value={Number(v).toLocaleString(undefined, { maximumFractionDigits: 4 })} />)}</div></Card> : null}</>
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requested = searchParams.get('tool')
+  const initial = requested && isToolId(requested) ? requested : 'position-sizing'
+  const [tool, setTool] = useState<ToolId>(initial)
+  const [values, setValues] = useState<Record<string, string>>({})
+  const [answer, setAnswer] = useState<Record<string, number> | null>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (requested && isToolId(requested) && requested !== tool) {
+      setTool(requested)
+      setValues({})
+      setAnswer(null)
+      setError('')
+    }
+  }, [requested, tool])
+
+  function selectTool(next: ToolId) {
+    setTool(next)
+    setValues({})
+    setAnswer(null)
+    setError('')
+    setSearchParams(next === 'position-sizing' ? {} : { tool: next }, { replace: true })
+  }
+
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+    try {
+      const payload = tool === 'seasonality'
+        ? { returns: values.returns ?? '' }
+        : Object.fromEntries(Object.entries(values).map(([k, v]) => [k, Number(v)]))
+      setAnswer(calculateTool(tool, payload))
+    } catch {
+      setError('Could not calculate this right now.')
+    }
+  }
+
+  return (
+    <>
+      <PageHeader title="Tools" subtitle="Fast checks before committing capital" />
+      <Card>
+        <form className="stack" onSubmit={submit}>
+          <Field label="Calculator">
+            <SelectBox value={tool} onChange={e => selectTool(e.target.value as ToolId)}>
+              <option value="position-sizing">Position size</option>
+              <option value="risk-reward">Risk / reward</option>
+              <option value="fire">Financial independence</option>
+              <option value="relative-value">Relative value</option>
+              <option value="seasonality">Seasonality</option>
+            </SelectBox>
+          </Field>
+          <div className="form-row">
+            {fields[tool].map(f => (
+              <Field key={f.key} label={f.label}>
+                <TextInput
+                  required
+                  type={f.text ? 'text' : 'number'}
+                  step={f.text ? undefined : 'any'}
+                  value={values[f.key] ?? ''}
+                  onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
+                />
+              </Field>
+            ))}
+          </div>
+          {error ? <p className="form-error" role="alert">{error}</p> : null}
+          <Button variant="primary" type="submit">Calculate</Button>
+        </form>
+      </Card>
+      {answer ? (
+        <Card aria-live="polite">
+          <h2>Result</h2>
+          <div className="stat-row">
+            {Object.entries(answer).map(([k, v]) => (
+              <Stat key={k} label={k.replace(/([A-Z])/g, ' $1')} value={Number(v).toLocaleString(undefined, { maximumFractionDigits: 4 })} />
+            ))}
+          </div>
+        </Card>
+      ) : null}
+    </>
+  )
 }

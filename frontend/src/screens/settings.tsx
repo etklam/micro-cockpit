@@ -10,12 +10,7 @@ import { Button, Card, Field, PageHeader, SelectBox, TextInput } from '../ui'
 import { Icon, type IconName } from '../icons'
 import { PageSkeleton, SectionError } from '../shell'
 import { cx } from '../format'
-
-const APPEARANCE_OPTIONS: { value: Appearance; label: string; hint: string; icon: IconName; swatch: string }[] = [
-  { value: 'system', label: 'System', hint: 'Match the device', icon: 'monitor', swatch: 'system' },
-  { value: 'dark', label: 'Dark', hint: 'Evening instrument', icon: 'moon', swatch: 'dark' },
-  { value: 'light', label: 'Light', hint: 'Day desk', icon: 'sun', swatch: 'light' },
-]
+import { isLocale, useI18n, type Locale } from '../i18n'
 
 const COMMON_TIMEZONES = [
   'UTC',
@@ -45,6 +40,7 @@ export function SettingsPage() {
   const bootstrap = useBootstrapQuery()
   const save = useSaveSettingsMutation()
   const { preference: appearance, setAppearance } = useAppearance()
+  const { locale, setLocale, t } = useI18n()
   const { logout } = useAuth()
   const navigate = useNavigate()
   const deviceTz = useMemo(() => deviceTimezone(), [])
@@ -56,6 +52,17 @@ export function SettingsPage() {
   const [formError, setFormError] = useState('')
   const [partialNotice, setPartialNotice] = useState('')
   const [saved, setSaved] = useState(false)
+
+  const appearanceOptions: { value: Appearance; label: string; hint: string; icon: IconName; swatch: string }[] = [
+    { value: 'system', label: t('settings.theme.system'), hint: t('settings.theme.systemHint'), icon: 'monitor', swatch: 'system' },
+    { value: 'dark', label: t('settings.theme.dark'), hint: t('settings.theme.darkHint'), icon: 'moon', swatch: 'dark' },
+    { value: 'light', label: t('settings.theme.light'), hint: t('settings.theme.lightHint'), icon: 'sun', swatch: 'light' },
+  ]
+
+  const localeOptions: { value: Locale; label: string }[] = [
+    { value: 'en', label: t('settings.language.en') },
+    { value: 'zh-Hant', label: t('settings.language.zhHant') },
+  ]
 
   useEffect(() => {
     if (!settings.data) return
@@ -81,17 +88,18 @@ export function SettingsPage() {
     const ccy = baseCurrency.trim().toUpperCase()
     setDisplayName(name)
     setBaseCurrency(ccy)
-    if (name.length < 1 || name.length > 100) { setFormError('Display name must be 1–100 characters.'); return }
-    if (!tz || tz.length > 100) { setFormError('Enter a valid IANA timezone.'); return }
-    if (!/^[A-Z]{3}$/.test(ccy)) { setFormError('Base currency must be a three-letter code.'); return }
-    if (!isAppearance(appearance)) { setFormError('Choose a valid appearance.'); return }
+    if (name.length < 1 || name.length > 100) { setFormError(t('settings.error.displayName')); return }
+    if (!tz || tz.length > 100) { setFormError(t('settings.error.timezone')); return }
+    if (!/^[A-Z]{3}$/.test(ccy)) { setFormError(t('settings.error.currency')); return }
+    if (!isAppearance(appearance)) { setFormError(t('settings.error.appearance')); return }
+    if (!isLocale(locale)) { setFormError(t('settings.error.locale')); return }
 
     try {
-      const result = await save.mutateAsync({ displayName: name, timezone: tz, baseCurrency: ccy, appearance })
+      const result = await save.mutateAsync({ displayName: name, timezone: tz, baseCurrency: ccy, appearance, locale })
       if (result.status === 'saved_session_stale') {
-        setPartialNotice(result.message)
+        setPartialNotice(t('settings.sessionStale'))
         await logout()
-        navigate('/login', { replace: true, state: { notice: result.message } })
+        navigate('/login', { replace: true, state: { notice: t('settings.sessionStale') } })
         return
       }
       setSaved(true)
@@ -99,45 +107,70 @@ export function SettingsPage() {
       setTimezone(result.settings.timezone)
       setBaseCurrency(result.settings.baseCurrency)
       if (isAppearance(result.settings.appearance)) void setAppearance(result.settings.appearance)
+      if (isLocale(result.settings.locale)) void setLocale(result.settings.locale)
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Could not save settings.')
+      setFormError(error instanceof Error ? error.message : t('settings.error.save'))
     }
   }
 
   return (
     <>
-      <PageHeader title="Settings" subtitle="Account preferences for this cockpit." />
+      <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
       <Card className="settings-form">
         <form className="stack" onSubmit={onSubmit}>
           <section className="stack">
-            <h2>Profile</h2>
-            <Field label="Email" hint="Email changes are not available in this phase.">
+            <h2>{t('settings.profile')}</h2>
+            <Field label={t('settings.email')} hint={t('settings.emailHint')}>
               <TextInput value={settings.data.email} readOnly disabled />
             </Field>
-            <Field label="Display name">
+            <Field label={t('settings.displayName')}>
               <TextInput required maxLength={100} value={displayName} onChange={e => setDisplayName(e.target.value)} />
             </Field>
           </section>
 
           <section className="stack">
-            <h2>Regional settings</h2>
-            <Field label="Account timezone" hint={`Device timezone: ${formatTimezoneLabel(deviceTz)}`}>
+            <h2>{t('settings.regional')}</h2>
+            <Field label={t('settings.language')} hint={t('settings.languageHint')}>
+              <div className="theme-picker" role="radiogroup" aria-label={t('settings.language')}>
+                {localeOptions.map(option => {
+                  const selected = locale === option.value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      className={cx('theme-picker__option', selected && 'is-selected')}
+                      onClick={() => {
+                        void setLocale(option.value)
+                        setSaved(false)
+                      }}
+                    >
+                      <span className="theme-picker__copy">
+                        <span className="theme-picker__label">{option.label}</span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </Field>
+            <Field label={t('settings.timezone')} hint={t('settings.deviceTimezone', { timezone: formatTimezoneLabel(deviceTz) })}>
               {timezoneCustom ? (
                 <TextInput
                   required
                   list="iana-timezones"
                   value={timezone}
                   onChange={e => setTimezone(e.target.value)}
-                  placeholder="Area/City"
+                  placeholder={t('settings.timezonePlaceholder')}
                 />
               ) : (
                 <SelectBox value={COMMON_TIMEZONES.includes(timezone) ? timezone : ''} onChange={e => {
                   if (e.target.value === '__custom') { setTimezoneCustom(true); return }
                   setTimezone(e.target.value)
                 }}>
-                  <option value="" disabled>Choose timezone</option>
+                  <option value="" disabled>{t('settings.chooseTimezone')}</option>
                   {COMMON_TIMEZONES.map(z => <option key={z} value={z}>{z}</option>)}
-                  <option value="__custom">Other IANA timezone…</option>
+                  <option value="__custom">{t('settings.otherTimezone')}</option>
                 </SelectBox>
               )}
               <datalist id="iana-timezones">
@@ -146,22 +179,22 @@ export function SettingsPage() {
             </Field>
             {tzMismatch ? (
               <p className="form-hint" role="status">
-                Account timezone ({timezone}) differs from this device ({deviceTz}). Diary dates and trade times use the account timezone.
+                {t('settings.timezoneMismatch', { account: timezone, device: deviceTz })}
               </p>
             ) : null}
-            <Field label="Base currency" hint="Default for new trades. Historical trades keep their own currency.">
+            <Field label={t('settings.baseCurrency')} hint={t('settings.baseCurrencyHint')}>
               <TextInput required maxLength={3} value={baseCurrency} onChange={e => setBaseCurrency(e.target.value.toUpperCase())} />
             </Field>
             <p className="form-hint">
-              Existing diary reminders keep the timezone stored when they were created. Delete and recreate a reminder to use the new account timezone.
+              {t('settings.reminderNote')}
             </p>
           </section>
 
           <section className="stack">
-            <h2>Appearance</h2>
-            <Field label="Theme" hint="Applied immediately. Save to keep it with your account.">
-              <div className="theme-picker" role="radiogroup" aria-label="Theme">
-                {APPEARANCE_OPTIONS.map(option => {
+            <h2>{t('settings.appearance')}</h2>
+            <Field label={t('settings.theme')} hint={t('settings.themeHint')}>
+              <div className="theme-picker" role="radiogroup" aria-label={t('settings.theme')}>
+                {appearanceOptions.map(option => {
                   const selected = appearance === option.value
                   return (
                     <button
@@ -192,9 +225,9 @@ export function SettingsPage() {
 
           {formError ? <p className="form-error" role="alert">{formError}</p> : null}
           {partialNotice ? <p className="form-error" role="alert">{partialNotice}</p> : null}
-          {saved ? <p className="form-hint" role="status">Settings saved.</p> : null}
+          {saved ? <p className="form-hint" role="status">{t('settings.saved')}</p> : null}
           <div className="form-actions">
-            <Button variant="primary" type="submit" loading={save.isPending}>Save settings</Button>
+            <Button variant="primary" type="submit" loading={save.isPending}>{t('settings.save')}</Button>
           </div>
         </form>
       </Card>

@@ -6,13 +6,14 @@ import { BrowserRouter } from 'react-router-dom'
 import { expect, test } from 'vitest'
 import App from '../App'
 import { AuthProvider } from '../auth/AuthProvider'
+import { I18nProvider } from '../i18n'
 import type { CalendarResponse, DiaryReviewSummaryResponse } from '../generated/edge'
 import reviewPageSource from '../MonthlyReviewPage.tsx?raw'
 import { server } from './setup'
 
 const bootstrap = {
   currentUser: { id: 'user-1', email: 'owner@example.com', displayName: 'Owner' },
-  timezone: 'Asia/Taipei', baseCurrency: 'HKD', appearance: 'system', role: 'user', accountType: 'human', currentLocalDate: '2028-02-14',
+  timezone: 'Asia/Taipei', baseCurrency: 'HKD', appearance: 'system', locale: 'en', role: 'user', accountType: 'human', currentLocalDate: '2028-02-14',
   availableProductAreas: ['today', 'diary', 'calendar'],
 }
 
@@ -43,7 +44,7 @@ function handlers(calendar: CalendarResponse = {
 function renderReview(path = '/review') {
   window.history.replaceState({}, '', path)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<QueryClientProvider client={client}><BrowserRouter><AuthProvider><App /></AuthProvider></BrowserRouter></QueryClientProvider>)
+  render(<QueryClientProvider client={client}><BrowserRouter><AuthProvider><I18nProvider><App /></I18nProvider></AuthProvider></BrowserRouter></QueryClientProvider>)
 }
 
 test('/review uses bootstrap local date and replaces with its canonical month URL', async () => {

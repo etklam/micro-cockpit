@@ -13,6 +13,7 @@ internal static class SettingsEndpoints
                 value.Timezone,
                 value.BaseCurrency,
                 value.Appearance,
+                value.Locale,
                 value.UpdatedAt));
         });
 
@@ -28,6 +29,7 @@ internal static class SettingsEndpoints
                 value.Timezone,
                 value.BaseCurrency,
                 value.Appearance,
+                value.Locale,
                 value.UpdatedAt));
         });
     }

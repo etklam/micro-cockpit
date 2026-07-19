@@ -14,6 +14,7 @@ import { Icon } from './icons'
 import { PageSkeleton, SectionError, useCockpit } from './shell'
 import { cx, formatDate, formatLongDate, formatTime, monthLabel, pct, repeatLabel, signed, signedCompact } from './format'
 import { formatTimezoneLabel } from './features/accountTime'
+import { useI18n } from './i18n'
 
 export { DiaryDetailPage, DiaryPage } from './screens/diary'
 
@@ -24,9 +25,20 @@ const PanelLink = ({ children, onClick }: { children: ReactNode; onClick: () => 
   <Button variant="ghost" size="sm" icon="arrow" onClick={onClick} className="panel__link">{children}</Button>
 )
 
+const WEEKDAYS = [
+  'calendar.weekday.sun',
+  'calendar.weekday.mon',
+  'calendar.weekday.tue',
+  'calendar.weekday.wed',
+  'calendar.weekday.thu',
+  'calendar.weekday.fri',
+  'calendar.weekday.sat',
+] as const
+
 /* =============================== TODAY ============================== */
 export function TodayPage() {
   const { go } = useCockpit()
+  const { t, format } = useI18n()
   const { data, isLoading: loading, isError: error, refetch: reload } = useDashboardQuery()
   const [note, setNote] = useState('')
   const [saved, setSaved] = useState(false)
@@ -45,7 +57,13 @@ export function TodayPage() {
   }
 
   const hour = new Date().getHours()
-  const greeting = hour < 5 ? 'Still up?' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+  const greeting = hour < 5
+    ? t('today.greeting.late')
+    : hour < 12
+      ? t('today.greeting.morning')
+      : hour < 18
+        ? t('today.greeting.afternoon')
+        : t('today.greeting.evening')
 
   if (loading || !data) {
     return (
@@ -66,75 +84,75 @@ export function TodayPage() {
       {cap?.alerts === 'available' && data.pendingAlerts && data.pendingAlerts > 0 ? (
         <button className="reminder-banner" onClick={() => go('alerts')}>
           <Icon name="bell" size={16} />
-          <span>{data.pendingAlerts} reminder{data.pendingAlerts > 1 ? 's' : ''} ready to review</span>
+          <span>{t('today.reminders', { count: data.pendingAlerts })}</span>
           <Icon name="right" size={16} />
         </button>
       ) : null}
 
       <Card className="quick-note" as="section">
-        <label className="quick-note__label" htmlFor="qn">What did you notice today?</label>
+        <label className="quick-note__label" htmlFor="qn">{t('today.quickNote.label')}</label>
         <TextArea
           id="qn" value={note} onChange={(e) => setNote(e.target.value)}
-          placeholder="A signal, a decision, a mistake worth remembering…"
+          placeholder={t('today.quickNote.placeholder')}
           className="textarea--prose"
         />
         <div className="quick-note__foot">
           <span className={cx('quick-note__status', saved && 'is-ok')}>
-            {saved ? <><Icon name="check" size={14} /> Saved</> : 'Captures the moment, dated for today.'}
+            {saved ? <><Icon name="check" size={14} /> {t('common.saved')}</> : t('today.quickNote.hint')}
           </span>
           <Button variant="primary" icon="plus" loading={saveQuickNote.isPending} onClick={saveNote} disabled={!note.trim()}>
-            Save note
+            {t('today.quickNote.save')}
           </Button>
         </div>
       </Card>
 
       <div className="card-grid">
         <Card className="panel" as="section">
-          <span className="panel__label">Today’s diary</span>
+          <span className="panel__label">{t('today.diary.label')}</span>
           <div className="panel__body">
-            <p className="panel__title">{data.diary.writtenToday ? 'You showed up today.' : 'No entry yet today.'}</p>
-            <p className="panel__sub">{data.diary.count} reflection{data.diary.count === 1 ? '' : 's'} in total.</p>
+            <p className="panel__title">{data.diary.writtenToday ? t('today.diary.written') : t('today.diary.empty')}</p>
+            <p className="panel__sub">{t('today.diary.count', { count: data.diary.count })}</p>
           </div>
-          <PanelLink onClick={() => go('diary')}>{data.diary.writtenToday ? 'Keep writing' : 'Open diary'}</PanelLink>
+          <PanelLink onClick={() => go('diary')}>{data.diary.writtenToday ? t('today.diary.keepWriting') : t('today.diary.open')}</PanelLink>
         </Card>
 
         <Card className="panel" as="section">
-          <span className="panel__label">Daily P/L</span>
+          <span className="panel__label">{t('today.pnl.label')}</span>
           <div className="panel__body">
             <span className={cx('pnl-value', 'num', `is-${pnlTone(perf?.pnlAmount)}`)}>
-              {perf ? signed(perf.pnlAmount) : '—'}
+              {perf ? signed(perf.pnlAmount) : format.empty}
             </span>
             {perf?.pnlPercent != null ? (
               <span className={cx('pnl-sub', 'num', `is-${pnlTone(perf.pnlAmount)}`)}>{pct(perf.pnlPercent)}</span>
             ) : (
-              <span className="pnl-sub is-muted">No result recorded yet.</span>
+              <span className="pnl-sub is-muted">{t('today.pnl.none')}</span>
             )}
           </div>
-          <PanelLink onClick={() => go('calendar')}>Open calendar</PanelLink>
+          <PanelLink onClick={() => go('calendar')}>{t('today.pnl.openCalendar')}</PanelLink>
         </Card>
 
         <Card className="panel" as="section">
-          <span className="panel__label">Today’s discipline</span>
+          <span className="panel__label">{t('today.discipline.label')}</span>
           <div className="panel__body">
             {data.discipline ? (
               <blockquote className="panel__quote">{data.discipline.content}</blockquote>
             ) : cap?.discipline === 'empty' ? (
-              <p className="panel__sub">No principles set yet.</p>
+              <p className="panel__sub">{t('today.discipline.empty')}</p>
             ) : (
-              <p className="panel__sub is-muted">Unavailable right now.</p>
+              <p className="panel__sub is-muted">{t('common.unavailable')}</p>
             )}
           </div>
-          <PanelLink onClick={() => go('discipline')}>Manage principles</PanelLink>
+          <PanelLink onClick={() => go('discipline')}>{t('today.discipline.manage')}</PanelLink>
         </Card>
       </div>
 
       <section className="recent" aria-labelledby="recent-h">
         <div className="recent__head">
-          <h2 id="recent-h">Recent reflections</h2>
-          <Button variant="ghost" size="sm" icon="arrow" onClick={() => go('diary')}>All</Button>
+          <h2 id="recent-h">{t('today.recent.title')}</h2>
+          <Button variant="ghost" size="sm" icon="arrow" onClick={() => go('diary')}>{t('today.recent.all')}</Button>
         </div>
         {(data.recentDiaries ?? []).length === 0 ? (
-          <EmptyBox icon="diary" title="Nothing written yet" hint="Your latest entries will gather here." />
+          <EmptyBox icon="diary" title={t('today.recent.emptyTitle')} hint={t('today.recent.emptyHint')} />
         ) : (
           <ul className="recent__list">
             {(data.recentDiaries ?? []).map((d) => (
@@ -155,10 +173,11 @@ export function TodayPage() {
   )
 }
 
-/* =============================== DIARY ============================== */
+/* =============================== CALENDAR ============================== */
 export function CalendarPage() {
   const navigate = useNavigate()
   const params = useParams()
+  const { t } = useI18n()
   const bootstrap = useBootstrapQuery()
   const accountToday = bootstrap.data?.currentLocalDate
   const year = Number(params.year) || (accountToday ? Number(accountToday.slice(0, 4)) : new Date().getFullYear())
@@ -195,7 +214,7 @@ export function CalendarPage() {
     try {
       await savePerformance.mutateAsync({ date: selected, amount: Number(amount), capital: capital ? Number(capital) : null, note })
     } catch {
-      setFormError('Could not save P/L.')
+      setFormError(t('calendar.pnl.saveError'))
     }
   }
 
@@ -205,32 +224,32 @@ export function CalendarPage() {
   return (
     <>
       <PageHeader
-        title="Calendar"
-        subtitle={summary ? `${summary.recordedDays} trading day${summary.recordedDays === 1 ? '' : 's'} this month` : undefined}
+        title={t('calendar.title')}
+        subtitle={summary ? t('calendar.subtitle', { count: summary.recordedDays }) : undefined}
       />
 
       {summary ? (
         <div className="stat-row">
-          <Stat label="Net P/L" value={signed(summary.total)} tone={pnlTone(summary.total)} />
-          <Stat label="Winning days" value={String(summary.profitDays)} tone="gain" />
-          <Stat label="Losing days" value={String(summary.lossDays)} tone="loss" />
-          <Stat label="Trading days" value={String(summary.recordedDays)} />
+          <Stat label={t('calendar.netPnl')} value={signed(summary.total)} tone={pnlTone(summary.total)} />
+          <Stat label={t('calendar.winningDays')} value={String(summary.profitDays)} tone="gain" />
+          <Stat label={t('calendar.losingDays')} value={String(summary.lossDays)} tone="loss" />
+          <Stat label={t('calendar.tradingDays')} value={String(summary.recordedDays)} />
         </div>
       ) : null}
 
       <div className="cal-head">
-        <IconButton icon="left" label="Previous month" onClick={() => shift(-1)} />
+        <IconButton icon="left" label={t('calendar.prevMonth')} onClick={() => shift(-1)} />
         <h2 className="cal-head__title">{monthLabel(cursor.year, cursor.month)}</h2>
-        <IconButton icon="right" label="Next month" onClick={() => shift(1)} />
+        <IconButton icon="right" label={t('calendar.nextMonth')} onClick={() => shift(1)} />
       </div>
-      <Link className="text-link cal-review-link" to={`/review/${cursor.year}/${String(cursor.month).padStart(2, '0')}`}>Review this month</Link>
+      <Link className="text-link cal-review-link" to={`/review/${cursor.year}/${String(cursor.month).padStart(2, '0')}`}>{t('calendar.reviewMonth')}</Link>
 
       {error ? (
         <SectionError onRetry={reload} />
       ) : (
         <Card flush as="section" className="cal">
           <div className="cal__weekdays">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((w) => <span key={w}>{w}</span>)}
+            {WEEKDAYS.map((key) => <span key={key}>{t(key)}</span>)}
           </div>
           <div className="cal__grid">
             {loading
@@ -240,12 +259,13 @@ export function CalendarPage() {
                   {data?.days.map((d) => {
                     const tone = pnlTone(d.performance?.pnlAmount)
                     const hasNote = d.diaryCount > 0
+                    const notesLabel = hasNote ? t('calendar.day.notes', { count: d.diaryCount }) : ''
                     return (
                       <button
                         key={d.date}
                         type="button"
                         className={cx('day', selected === d.date && 'is-selected', tone !== 'muted' && `is-${tone}`)}
-                        aria-label={`${formatDate(d.date)}${d.performance ? `, ${signedCompact(d.performance.pnlAmount)}` : ', no result'}${hasNote ? `, ${d.diaryCount} note${d.diaryCount > 1 ? 's' : ''}` : ''}`}
+                        aria-label={`${formatDate(d.date)}${d.performance ? `, ${signedCompact(d.performance.pnlAmount)}` : `, ${t('calendar.day.noResult')}`}${hasNote ? `, ${notesLabel}` : ''}`}
                         onClick={() => { setSelected(d.date); const next = new URLSearchParams(search); next.set('day', d.date); setSearch(next) }}
                       >
                         <span className="day__num num">{Number(d.date.slice(-2))}</span>
@@ -254,7 +274,7 @@ export function CalendarPage() {
                         ) : (
                           <span className="day__pnl is-dash">·</span>
                         )}
-                        {hasNote ? <span className="day__note" aria-label={`${d.diaryCount} note${d.diaryCount > 1 ? 's' : ''}`} /> : null}
+                        {hasNote ? <span className="day__note" aria-label={notesLabel} /> : null}
                       </button>
                     )
                   })}
@@ -271,19 +291,19 @@ export function CalendarPage() {
         </div>
         <form className="pnl-form__body" onSubmit={save}>
           <div className="form-row">
-            <Field label="P/L amount">
+            <Field label={t('calendar.pnl.amount')}>
               <TextInput type="number" step="any" inputMode="decimal" required value={amount} onChange={(e) => setAmount(e.target.value)} className="num" />
             </Field>
-            <Field label="Capital base" hint="Optional" className="field--grow">
+            <Field label={t('calendar.pnl.capital')} hint={t('common.optional')} className="field--grow">
               <TextInput type="number" min="0" step="any" inputMode="decimal" value={capital} onChange={(e) => setCapital(e.target.value)} className="num" />
             </Field>
           </div>
-          <Field label="Note">
-            <TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="What shaped the day?" maxLength={280} />
+          <Field label={t('calendar.pnl.note')}>
+            <TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('calendar.pnl.notePlaceholder')} maxLength={280} />
           </Field>
           {formError ? <p className="form-error" role="alert">{formError}</p> : null}
           <div className="form-actions">
-            <Button variant="primary" type="submit" icon="check" loading={savePerformance.isPending}>Save P/L</Button>
+            <Button variant="primary" type="submit" icon="check" loading={savePerformance.isPending}>{t('calendar.pnl.save')}</Button>
           </div>
         </form>
       </Card>
@@ -300,6 +320,7 @@ function validCalendarDay(value: string | null, year: number, month: number): bo
 /* ============================ DISCIPLINE =========================== */
 export function DisciplinePage() {
   const { confirm } = useCockpit()
+  const { t } = useI18n()
   const { data, isLoading: loading, isError: error, refetch: reload } = useDisciplinesQuery()
   const items = data?.items ?? []
   const [content, setContent] = useState('')
@@ -314,24 +335,29 @@ export function DisciplinePage() {
       await createDiscipline.mutateAsync(content.trim())
       setContent('')
     } catch {
-      setFormError('Could not add the principle.')
+      setFormError(t('discipline.addError'))
     }
   }
 
   async function remove(d: Discipline) {
-    const ok = await confirm({ title: 'Remove principle?', message: 'This will no longer appear as a daily discipline.', confirmText: 'Remove', tone: 'danger' })
+    const ok = await confirm({
+      title: t('discipline.removeTitle'),
+      message: t('discipline.removeMessage'),
+      confirmText: t('discipline.remove'),
+      tone: 'danger',
+    })
     if (!ok) return
     await deleteDiscipline.mutateAsync(d.id)
   }
 
   return (
     <>
-      <PageHeader title="Discipline" subtitle="The rules you keep, returned to you each day." />
+      <PageHeader title={t('discipline.title')} subtitle={t('discipline.subtitle')} />
 
       <Card as="section" className="inline-form-wrap">
         <form className="inline-form" onSubmit={add}>
-          <TextInput value={content} onChange={(e) => setContent(e.target.value)} placeholder="A principle worth remembering" required maxLength={280} />
-          <Button variant="primary" type="submit" icon="plus" loading={createDiscipline.isPending}>Add</Button>
+          <TextInput value={content} onChange={(e) => setContent(e.target.value)} placeholder={t('discipline.placeholder')} required maxLength={280} />
+          <Button variant="primary" type="submit" icon="plus" loading={createDiscipline.isPending}>{t('discipline.add')}</Button>
         </form>
         {formError ? <p className="form-error" role="alert">{formError}</p> : null}
       </Card>
@@ -341,14 +367,14 @@ export function DisciplinePage() {
       ) : loading ? (
         <ul className="principle-list">{Array.from({ length: 3 }, (_, i) => <li key={i}><Card className="principle"><div className="skel" style={{ height: 18, width: '80%' }} /></Card></li>)}</ul>
       ) : items.length === 0 ? (
-        <EmptyBox icon="compass" title="No principles yet" hint="Write the rules you want to live by as a trader. One surfaces on your dashboard each day." />
+        <EmptyBox icon="compass" title={t('discipline.emptyTitle')} hint={t('discipline.emptyHint')} />
       ) : (
         <ol className="principle-list">
           {items.map((d) => (
             <li key={d.id}>
               <Card as="article" className="principle">
                 <blockquote className="principle__text">{d.content}</blockquote>
-                <IconButton icon="trash" label="Remove principle" size={16} className="icon-btn--danger" onClick={() => remove(d)} />
+                <IconButton icon="trash" label={t('discipline.removeLabel')} size={16} className="icon-btn--danger" onClick={() => remove(d)} />
               </Card>
             </li>
           ))}
@@ -361,6 +387,7 @@ export function DisciplinePage() {
 /* ============================== ALERTS ============================= */
 export function AlertsPage() {
   const { confirm } = useCockpit()
+  const { t } = useI18n()
   const bootstrap = useBootstrapQuery()
   const alertsQuery = useAlertsQuery()
   const alerts = alertsQuery.data?.items ?? []
@@ -412,72 +439,72 @@ export function AlertsPage() {
   async function add(e: FormEvent) {
     e.preventDefault()
     setFormError('')
-    if (!timezone) { setFormError('Account timezone is still loading.'); return }
-    if (!diaryId) { setFormError('Choose a diary.'); return }
+    if (!timezone) { setFormError(t('alerts.timezoneLoading')); return }
+    if (!diaryId) { setFormError(t('alerts.chooseRequired')); return }
     try {
       await createAlert.mutateAsync({ diaryId, startLocalDate: date, localTime: time, timezone, repeatMode: repeat })
     } catch {
-      setFormError('Could not create the alert.')
+      setFormError(t('alerts.createError'))
     }
   }
 
   async function dismiss(a: Alert) { await dismissAlert.mutateAsync(a.id) }
   async function remove(a: Alert) {
-    const ok = await confirm({ title: 'Delete alert?', confirmText: 'Delete', tone: 'danger' })
+    const ok = await confirm({ title: t('alerts.deleteTitle'), confirmText: t('common.delete'), tone: 'danger' })
     if (!ok) return
     await deleteAlert.mutateAsync(a.id)
   }
 
-  const titleFor = (id: string) => titleCache.get(id) ?? (selectedDiary.data?.id === id ? selectedDiary.data.title : null) ?? 'Diary reminder'
+  const titleFor = (id: string) => titleCache.get(id) ?? (selectedDiary.data?.id === id ? selectedDiary.data.title : null) ?? t('alerts.fallbackTitle')
 
   return (
     <>
-      <PageHeader title="Alerts" subtitle="Reminders to sit down and write." />
+      <PageHeader title={t('alerts.title')} subtitle={t('alerts.subtitle')} />
 
       <Card flush as="section" className="alert-form">
         <form className="alert-form__body" onSubmit={add}>
           <div className="form-row">
-            <Field label="Find diary" className="field--grow" hint="Search by title or content. Results are paged.">
-              <TextInput value={pickerQuery} onChange={(e) => setPickerQuery(e.target.value)} placeholder="Search diaries" />
+            <Field label={t('alerts.findDiary')} className="field--grow" hint={t('alerts.findHint')}>
+              <TextInput value={pickerQuery} onChange={(e) => setPickerQuery(e.target.value)} placeholder={t('alerts.searchPlaceholder')} />
             </Field>
           </div>
           <div className="form-row">
-            <Field label="Diary" className="field--grow">
+            <Field label={t('alerts.diary')} className="field--grow">
               <SelectBox required value={diaryId} onChange={(e) => {
                 setDiaryId(e.target.value)
                 const match = diaries.find(d => d.id === e.target.value)
                 if (match) setSelectedTitle(match.title)
               }} disabled={!diaries.length && !diaryId}>
                 {diaryId && !diaries.some(d => d.id === diaryId) ? (
-                  <option value={diaryId}>{selectedTitle || 'Selected diary'}</option>
+                  <option value={diaryId}>{selectedTitle || t('alerts.selectedDiary')}</option>
                 ) : null}
-                <option value="" disabled>Choose a diary</option>
+                <option value="" disabled>{t('alerts.chooseDiary')}</option>
                 {diaries.map((d) => <option key={d.id} value={d.id}>{d.title} · {d.localDate}</option>)}
               </SelectBox>
             </Field>
-            <Field label="Date">
+            <Field label={t('alerts.date')}>
               <TextInput type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
             </Field>
           </div>
           <div className="form-row">
-            <Field label="Time">
+            <Field label={t('alerts.time')}>
               <TextInput type="time" required value={time} onChange={(e) => setTime(e.target.value)} />
             </Field>
-            <Field label="Repeat" className="field--grow">
+            <Field label={t('alerts.repeat')} className="field--grow">
               <SelectBox value={repeat} onChange={(e) => setRepeat(e.target.value)}>
-                <option value="none">Once</option>
-                <option value="week">Weekdays this week</option>
-                <option value="month">Weekdays this month</option>
+                <option value="none">{t('alerts.repeat.once')}</option>
+                <option value="week">{t('alerts.repeat.week')}</option>
+                <option value="month">{t('alerts.repeat.month')}</option>
               </SelectBox>
             </Field>
           </div>
-          {timezone ? <p className="form-hint">New reminders use account timezone: {formatTimezoneLabel(timezone)}</p> : null}
+          {timezone ? <p className="form-hint">{t('alerts.timezoneHint', { timezone: formatTimezoneLabel(timezone) })}</p> : null}
           {formError ? <p className="form-error" role="alert">{formError}</p> : null}
           <div className="form-actions">
             <Button variant="primary" type="submit" icon="bell" loading={createAlert.isPending} disabled={!diaryId || !timezone}>
-              Create alert
+              {t('alerts.create')}
             </Button>
-            {!diaries.length && !loading && !diaryId ? <span className="form-hint">Create a diary entry first, or refine the search.</span> : null}
+            {!diaries.length && !loading && !diaryId ? <span className="form-hint">{t('alerts.createFirst')}</span> : null}
           </div>
         </form>
       </Card>
@@ -487,7 +514,7 @@ export function AlertsPage() {
       ) : loading ? (
         <ul className="alert-list">{Array.from({ length: 2 }, (_, i) => <li key={i}><Card className="alert"><div className="skel" style={{ height: 18, width: '60%' }} /></Card></li>)}</ul>
       ) : alerts.length === 0 ? (
-        <EmptyBox icon="bell" title="No alerts set" hint="Schedule a nudge to review a specific diary entry." />
+        <EmptyBox icon="bell" title={t('alerts.emptyTitle')} hint={t('alerts.emptyHint')} />
       ) : (
         <ul className="alert-list">
           {alerts.map((a) => (
@@ -501,8 +528,8 @@ export function AlertsPage() {
                   </p>
                 </div>
                 <div className="alert__actions">
-                  {a.status === 'active' ? <Button size="sm" variant="ghost" icon="check" onClick={() => dismiss(a)}>Dismiss</Button> : null}
-                  <IconButton icon="trash" label="Delete alert" size={16} className="icon-btn--danger" onClick={() => remove(a)} />
+                  {a.status === 'active' ? <Button size="sm" variant="ghost" icon="check" onClick={() => dismiss(a)}>{t('alerts.dismiss')}</Button> : null}
+                  <IconButton icon="trash" label={t('alerts.deleteLabel')} size={16} className="icon-btn--danger" onClick={() => remove(a)} />
                 </div>
               </Card>
             </li>

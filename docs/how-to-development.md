@@ -125,6 +125,54 @@ For server state:
 
 Raw `fetch` calls, internal service URLs, duplicate handwritten transport types, and frontend copies of backend market formulas are not accepted.
 
+## Internationalization (i18n)
+
+Supported UI locales: `en`, `zh-Hant`. Unknown values fall back to `en`.
+
+### Locale resolution order
+
+1. Authenticated: account `locale` from bootstrap/settings (server source of truth).
+2. Anonymous / pre-login: `localStorage` key `td_locale` (last selection).
+3. First visit: browser language when it maps to a supported locale, else English.
+
+Changing language updates the UI immediately. Authenticated saves also `PUT /api/app/settings` with the rest of the profile. Local storage is never the authenticated source of truth.
+
+### Architecture
+
+Lightweight typed internal layer (no i18n library dependency):
+
+| Path | Role |
+|---|---|
+| `frontend/src/i18n/locale.ts` | Locale type, normalize, mirror, browser detect |
+| `frontend/src/i18n/messages/en.ts` | English catalog (stable keys) |
+| `frontend/src/i18n/messages/zh-Hant.ts` | Traditional Chinese catalog |
+| `frontend/src/i18n/translate.ts` | Lookup + English fallback + missing-key warn |
+| `frontend/src/i18n/format.ts` | Locale-aware date/number/currency helpers |
+| `frontend/src/i18n/errors.ts` | Map API status/body markers to keys |
+| `frontend/src/i18n/I18nProvider.tsx` | Context, `useI18n` / `useT` |
+
+Pages must use `t('key')` / `useI18n()` — never import message dictionaries directly.
+
+### Add a translation key
+
+1. Add the key and English value to `messages/en.ts`.
+2. Add the Traditional Chinese value to `messages/zh-Hant.ts` (natural product language).
+3. Use `t('your.key')` in components. Interpolation: `t('key', { count: 2 })`. Plurals: define `key_other` when `count !== 1`.
+
+### Formatting conventions
+
+Use `format` from `useI18n()` or the active-locale wrappers in `frontend/src/format.ts`. Do not scatter bare `toLocaleString()` with browser defaults for diary workflow UI. Missing numeric values stay `—` / translated empty, never zero.
+
+Keep tickers, user content, tags, Markdown, API keys, currency codes, and raw numbers untranslated.
+
+### Verification
+
+```sh
+npm --prefix frontend run test
+npm --prefix frontend run lint
+npm --prefix frontend run build
+```
+
 ## Add a database migration
 
 Read [Database migrations](database-migrations.md) before editing.

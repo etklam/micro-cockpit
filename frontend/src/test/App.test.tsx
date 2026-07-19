@@ -6,11 +6,12 @@ import { BrowserRouter } from 'react-router-dom'
 import { expect, test } from 'vitest'
 import App from '../App'
 import { AuthProvider } from '../auth/AuthProvider'
+import { I18nProvider } from '../i18n'
 import { server } from './setup'
 
 const bootstrap = {
   currentUser: { id: '11111111-1111-1111-1111-111111111111', email: 'owner@example.com', displayName: 'Owner' },
-  timezone: 'Asia/Taipei', baseCurrency: 'USD', appearance: 'system', role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
+  timezone: 'Asia/Taipei', baseCurrency: 'USD', appearance: 'system', locale: 'en', role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
   availableProductAreas: ['today', 'diary', 'calendar'],
 }
 
@@ -36,9 +37,29 @@ function authenticatedHandlers() {
 function renderApp(path: string) {
   window.history.replaceState({}, '', path)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<QueryClientProvider client={client}><BrowserRouter><AuthProvider><App /></AuthProvider></BrowserRouter></QueryClientProvider>)
+  render(<QueryClientProvider client={client}><BrowserRouter><AuthProvider><I18nProvider><App /></I18nProvider></AuthProvider></BrowserRouter></QueryClientProvider>)
   return client
 }
+
+test('public landing introduces the product and free tools', async () => {
+  server.use(http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })))
+  renderApp('/')
+  expect(await screen.findByRole('heading', { name: 'A quiet cockpit for reflection.' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Try tools free' })).toHaveAttribute('href', '/tools')
+  expect(screen.getByRole('link', { name: 'Open tools' })).toHaveAttribute('href', '/tools')
+})
+
+test('tools page is usable without signing in', async () => {
+  server.use(http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })))
+  renderApp('/tools?tool=risk-reward')
+  expect(await screen.findByRole('heading', { name: 'Tools' })).toBeInTheDocument()
+  expect(screen.getByLabelText('Calculator')).toHaveValue('risk-reward')
+  await userEvent.type(screen.getByLabelText('Entry price'), '100')
+  await userEvent.type(screen.getByLabelText('Stop price'), '90')
+  await userEvent.type(screen.getByLabelText('Target price'), '130')
+  await userEvent.click(screen.getByRole('button', { name: 'Calculate' }))
+  expect(await screen.findByText('3')).toBeInTheDocument()
+})
 
 test('restores a session and renders a deep calendar link', async () => {
   server.use(...authenticatedHandlers())

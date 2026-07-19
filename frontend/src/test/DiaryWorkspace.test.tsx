@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { expect, test, vi } from 'vitest'
 import { AuthProvider } from '../auth/AuthProvider'
+import { I18nProvider } from '../i18n'
 import { DiaryDetailPage, DiaryPage } from '../screens/diary'
 import { MarkdownView, plainExcerpt, safeUrlTransform } from '../features/markdown'
 import { normalizeTags, parseDiaryFilters } from '../features/diaryFilters'
@@ -20,7 +21,7 @@ const diaryB = {
 
 const bootstrap = {
   currentUser: { id: '11111111-1111-1111-1111-111111111111', email: 'owner@example.com', displayName: 'Owner' },
-  timezone: 'UTC', baseCurrency: 'USD', appearance: 'system', role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
+  timezone: 'UTC', baseCurrency: 'USD', appearance: 'system', locale: 'en', role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
   availableProductAreas: ['today', 'diary', 'calendar'],
 }
 
@@ -30,12 +31,14 @@ function renderDiary(initial = '/diary', confirmImpl: () => Promise<boolean> = a
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initial]}>
         <AuthProvider>
-          <CockpitProvider value={{ go: () => undefined, confirm: confirmImpl }}>
-            <Routes>
-              <Route path="/diary" element={<DiaryPage />} />
-              <Route path="/diary/:diaryId" element={<DiaryDetailPage />} />
-            </Routes>
-          </CockpitProvider>
+          <I18nProvider>
+            <CockpitProvider value={{ go: () => undefined, confirm: confirmImpl }}>
+              <Routes>
+                <Route path="/diary" element={<DiaryPage />} />
+                <Route path="/diary/:diaryId" element={<DiaryDetailPage />} />
+              </Routes>
+            </CockpitProvider>
+          </I18nProvider>
         </AuthProvider>
       </MemoryRouter>
     </QueryClientProvider>,

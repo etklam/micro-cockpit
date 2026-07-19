@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import { ErrorBox } from './ui'
 import type { ConfirmOpts } from './ui'
+import { useI18n } from './i18n'
 
 export type Page =
   | 'today' | 'diary' | 'calendar' | 'discipline' | 'alerts' | 'more' | 'review' | 'settings'
@@ -12,7 +13,8 @@ export const useCockpit = () => useContext(CockpitContext)
 export const CockpitProvider = CockpitContext.Provider
 
 export function SectionError({ onRetry }: { onRetry: () => void }) {
-  return <ErrorBox message="Couldn’t reach the cockpit." onRetry={onRetry} />
+  const { t } = useI18n()
+  return <ErrorBox message={t('common.couldNotReach')} onRetry={onRetry} />
 }
 
 export function PageSkeleton({ rows = 3 }: { rows?: number }) {

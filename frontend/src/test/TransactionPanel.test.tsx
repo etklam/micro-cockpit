@@ -6,6 +6,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { expect, test } from 'vitest'
 import App from '../App'
 import { AuthProvider } from '../auth/AuthProvider'
+import { I18nProvider } from '../i18n'
 import type { TransactionResponse, TransactionWrite } from '../generated/edge'
 import { utcToAccountDateTimeLocal } from '../features/accountTime'
 import { server } from './setup'
@@ -29,7 +30,7 @@ const bootstrap = {
   currentUser: { id: '11111111-1111-1111-1111-111111111111', email: 'owner@example.com', displayName: 'Owner' },
   timezone: 'Asia/Taipei',
   baseCurrency: 'USD',
-  appearance: 'system',
+  appearance: 'system', locale: 'en',
   role: 'user',
   accountType: 'human',
   currentLocalDate: '2026-07-16',
@@ -112,7 +113,7 @@ function authenticatedHandlers(options?: {
 function renderDiaryDetail() {
   window.history.replaceState({}, '', `/diary/${diaryId}`)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
-  render(<QueryClientProvider client={client}><BrowserRouter><AuthProvider><App /></AuthProvider></BrowserRouter></QueryClientProvider>)
+  render(<QueryClientProvider client={client}><BrowserRouter><AuthProvider><I18nProvider><App /></I18nProvider></AuthProvider></BrowserRouter></QueryClientProvider>)
   return client
 }
 
@@ -126,7 +127,7 @@ test('edit populates the transaction form from the selected trade', async () => 
 
   expect(screen.getByLabelText('Symbol')).toHaveValue('AAPL')
   expect(screen.getByLabelText('Side')).toHaveValue('buy')
-  expect(screen.getByLabelText('Quantity')).toHaveValue(2)
+  expect(screen.getByLabelText('Qty')).toHaveValue(2)
   expect(screen.getByLabelText('Price')).toHaveValue(190.5)
   expect(screen.getByLabelText('Currency')).toHaveValue('USD')
   expect(screen.getByLabelText('Traded at')).toHaveValue(utcToAccountDateTimeLocal(trade.tradedAt, 'Asia/Taipei'))
@@ -147,8 +148,8 @@ test('saving an edited trade calls update with the diary and transaction ids', a
   await user.clear(screen.getByLabelText('Symbol'))
   await user.type(screen.getByLabelText('Symbol'), 'msft')
   await user.selectOptions(screen.getByLabelText('Side'), 'sell')
-  await user.clear(screen.getByLabelText('Quantity'))
-  await user.type(screen.getByLabelText('Quantity'), '3')
+  await user.clear(screen.getByLabelText('Qty'))
+  await user.type(screen.getByLabelText('Qty'), '3')
   await user.clear(screen.getByLabelText('Price'))
   await user.type(screen.getByLabelText('Price'), '210.25')
   await user.clear(screen.getByLabelText('Currency'))
@@ -186,7 +187,7 @@ test('successful update exits edit mode and refreshes the list', async () => {
   expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument()
   expect(screen.getByLabelText('Symbol')).toHaveValue('')
-  expect(screen.getByLabelText('Quantity')).toHaveValue(null)
+  expect(screen.getByLabelText('Qty')).toHaveValue(null)
 })
 
 test('cancel restores create mode without changing data', async () => {
@@ -250,7 +251,7 @@ test('create still posts a new trade for the diary', async () => {
 
   expect(await screen.findByText('No trades logged.')).toBeInTheDocument()
   await user.type(screen.getByLabelText('Symbol'), 'aapl')
-  await user.type(screen.getByLabelText('Quantity'), '1.5')
+  await user.type(screen.getByLabelText('Qty'), '1.5')
   await user.type(screen.getByLabelText('Price'), '100')
   await user.type(screen.getByLabelText('Notes'), 'First fill')
   await user.click(screen.getByRole('button', { name: 'Add' }))

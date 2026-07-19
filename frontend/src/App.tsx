@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, type ReactNode } from 'react'
+import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthProvider'
 import { LoginPage } from './auth/LoginPage'
 import { RegisterPage } from './auth/RegisterPage'
@@ -15,25 +15,27 @@ import { reconcileAppearance, subscribeSystemAppearance, type Appearance, isAppe
 import { accountMonthYear } from './features/accountTime'
 import { MonthlyReviewPage, MonthlyReviewRedirect } from './MonthlyReviewPage'
 import { CockpitProvider, SectionError, type Page } from './shell'
+import { isLocale, reconcileLocale, useI18n } from './i18n'
+import { LandingPage } from './LandingPage'
 
 const PATHS: Record<Page, string> = {
   today: '/today', diary: '/diary', calendar: '/calendar', discipline: '/discipline', alerts: '/alerts',
   more: '/more', review: '/review', settings: '/settings', watchlist: '/watchlist', 'price-alerts': '/price-alerts', rotation: '/rotation', partners: '/partners',
   articles: '/articles', tools: '/tools',
 }
-const NAV: { id: Page; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
-  { id: 'today', label: 'Today', icon: 'today' },
-  { id: 'diary', label: 'Diary', icon: 'diary' },
-  { id: 'calendar', label: 'Calendar', icon: 'calendar' },
-  { id: 'discipline', label: 'Discipline', icon: 'compass' },
-  { id: 'alerts', label: 'Alerts', icon: 'bell' },
+const NAV: { id: Page; labelKey: 'nav.today' | 'nav.diary' | 'nav.calendar' | 'nav.discipline' | 'nav.alerts'; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+  { id: 'today', labelKey: 'nav.today', icon: 'today' },
+  { id: 'diary', labelKey: 'nav.diary', icon: 'diary' },
+  { id: 'calendar', labelKey: 'nav.calendar', icon: 'calendar' },
+  { id: 'discipline', labelKey: 'nav.discipline', icon: 'compass' },
+  { id: 'alerts', labelKey: 'nav.alerts', icon: 'bell' },
 ]
-const MORE: { id: Page; label: string }[] = [
-  { id: 'review', label: 'Monthly review' },
-  { id: 'settings', label: 'Settings' },
-  { id: 'watchlist', label: 'Watchlist' }, { id: 'price-alerts', label: 'Price alerts' },
-  { id: 'rotation', label: 'Market rotation' }, { id: 'partners', label: 'Partners' },
-  { id: 'articles', label: 'Articles' }, { id: 'tools', label: 'Tools' },
+const MORE: { id: Page; labelKey: 'nav.review' | 'nav.settings' | 'nav.watchlist' | 'nav.priceAlerts' | 'nav.rotation' | 'nav.partners' | 'nav.articles' | 'nav.tools' }[] = [
+  { id: 'review', labelKey: 'nav.review' },
+  { id: 'settings', labelKey: 'nav.settings' },
+  { id: 'watchlist', labelKey: 'nav.watchlist' }, { id: 'price-alerts', labelKey: 'nav.priceAlerts' },
+  { id: 'rotation', labelKey: 'nav.rotation' }, { id: 'partners', labelKey: 'nav.partners' },
+  { id: 'articles', labelKey: 'nav.articles' }, { id: 'tools', labelKey: 'nav.tools' },
 ]
 
 export default function App() {
@@ -41,9 +43,10 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/" element={<RootEntry />} />
+      <Route path="/tools" element={<ToolsEntry />} />
       <Route element={<RequireAuth />}>
         <Route element={<Shell />}>
-          <Route index element={<Navigate to="/today" replace />} />
           <Route path="/today" element={<TodayPage />} />
           <Route path="/diary" element={<DiaryPage />} />
           <Route path="/diary/:diaryId" element={<DiaryDetailPage />} />
@@ -61,11 +64,48 @@ export default function App() {
           <Route path="/partners" element={<PartnersPage />} />
           <Route path="/articles" element={<ArticlesPage />} />
           <Route path="/articles/:slug" element={<ArticleDetailPage />} />
-          <Route path="/tools" element={<ToolsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>
     </Routes>
+  )
+}
+
+function RootEntry() {
+  const { state } = useAuth()
+  if (state === 'restoring') return null
+  if (state === 'authenticated') return <Navigate to="/today" replace />
+  return <PublicShell><LandingPage /></PublicShell>
+}
+
+function ToolsEntry() {
+  const { state } = useAuth()
+  if (state === 'restoring') return null
+  if (state === 'authenticated') return <Shell><ToolsPage /></Shell>
+  return <PublicShell><ToolsPage /></PublicShell>
+}
+
+function PublicShell({ children }: { children: ReactNode }) {
+  const { t, locale, setLocale } = useI18n()
+  return (
+    <div className="public-shell">
+      <header className="public-shell__top">
+        <Link to="/" className="public-shell__brand" aria-label={t('brand.name')}>
+          <Brand />
+        </Link>
+        <nav className="public-shell__nav" aria-label={t('landing.nav.label')}>
+          <Link to="/tools">{t('nav.tools')}</Link>
+          <Link to="/login">{t('landing.cta.signIn')}</Link>
+          <Link className="btn btn--primary btn--sm" to="/register"><span className="btn__label">{t('landing.cta.register')}</span></Link>
+          <div className="lang-toggle" role="group" aria-label="Language">
+            <button type="button" className={locale === 'en' ? 'is-active' : undefined} onClick={() => { void setLocale('en') }}>EN</button>
+            <button type="button" className={locale === 'zh-Hant' ? 'is-active' : undefined} onClick={() => { void setLocale('zh-Hant') }}>繁</button>
+          </div>
+          <ThemeToggle />
+        </nav>
+      </header>
+      <main className="public-shell__main" id="content">{children}</main>
+    </div>
   )
 }
 
@@ -79,15 +119,17 @@ function RequireAuth() {
 
 type BootstrapData = NonNullable<ReturnType<typeof useBootstrapQuery>['data']>
 
-function Shell() {
+function Shell({ children }: { children?: ReactNode }) {
   const navigate = useNavigate()
   const { logout } = useAuth()
   const { confirm, confirmNode } = useConfirm()
+  const { t } = useI18n()
   const bootstrap = useBootstrapQuery()
   useEffect(() => {
     if (!bootstrap.data) return
     const appearance = isAppearance(bootstrap.data.appearance) ? bootstrap.data.appearance as Appearance : 'system'
     reconcileAppearance(appearance)
+    if (isLocale(bootstrap.data.locale)) reconcileLocale(bootstrap.data.locale)
     return subscribeSystemAppearance(() => appearance)
   }, [bootstrap.data])
   if (bootstrap.isLoading) return null
@@ -103,12 +145,12 @@ function Shell() {
   }
   return (
     <CockpitProvider value={{ go, confirm }}>
-      <a className="skip-link" href="#content">Skip to content</a>
+      <a className="skip-link" href="#content">{t('common.skipToContent')}</a>
       <div className="shell">
         <Sidebar cockpit={bootstrap.data} onSignOut={logout} />
         <div className="main">
           <MobileTop cockpit={bootstrap.data} onSignOut={logout} />
-          <main className="content" id="content"><Outlet /></main>
+          <main className="content" id="content">{children ?? <Outlet />}</main>
         </div>
         <MobileNav />
         {confirmNode}
@@ -127,21 +169,22 @@ function CalendarRedirect() {
 
 function Sidebar({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: () => void }) {
   const location = useLocation()
+  const { t } = useI18n()
   const moreOpen = MORE.some(item => location.pathname.startsWith(PATHS[item.id]))
   return (
     <aside className="sidebar" aria-label="Primary">
       <Brand />
       <div className="sidebar__body">
-        <div className="sidebar__label">Reflect</div>
+        <div className="sidebar__label">{t('nav.reflect')}</div>
         <nav className="nav" aria-label="Primary sections">
           {NAV.map(item => <NavItem key={item.id} item={item} />)}
         </nav>
         <details className="more-nav" open={moreOpen}>
-          <summary>Decision support</summary>
+          <summary>{t('nav.decisionSupport')}</summary>
           <div className="more-nav__list">
             {MORE.map(item => (
               <NavLink key={item.id} className={({ isActive }) => cx('nav__item', isActive && 'is-active')} to={PATHS[item.id]}>
-                {item.label}
+                {t(item.labelKey)}
               </NavLink>
             ))}
           </div>
@@ -154,7 +197,7 @@ function Sidebar({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: ()
         </div>
         <div className="sidebar__tools">
           <ThemeToggle />
-          <Button variant="ghost" icon="logout" onClick={onSignOut} className="signout-btn">Sign out</Button>
+          <Button variant="ghost" icon="logout" onClick={onSignOut} className="signout-btn">{t('common.signOut')}</Button>
         </div>
       </div>
     </aside>
@@ -162,17 +205,19 @@ function Sidebar({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: ()
 }
 
 function NavItem({ item }: { item: (typeof NAV)[number] }) {
-  return <NavLink to={PATHS[item.id]} className={({ isActive }) => cx('nav__item', isActive && 'is-active')}><Icon name={item.icon} size={18} /><span>{item.label}</span></NavLink>
+  const { t } = useI18n()
+  return <NavLink to={PATHS[item.id]} className={({ isActive }) => cx('nav__item', isActive && 'is-active')}><Icon name={item.icon} size={18} /><span>{t(item.labelKey)}</span></NavLink>
 }
 
 function MobileTop({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: () => void }) {
+  const { t } = useI18n()
   return (
     <header className="mobile-top">
       <Brand compact />
       <span className="mobile-top__meta">{cockpit.currentLocalDate}</span>
       <div className="mobile-top__actions">
         <ThemeToggle />
-        <IconButton icon="logout" label="Sign out" onClick={onSignOut} />
+        <IconButton icon="logout" label={t('common.signOut')} onClick={onSignOut} />
       </div>
     </header>
   )
@@ -180,8 +225,12 @@ function MobileTop({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: 
 function MobileNav() {
   const mobile = NAV.slice(0, 4)
   const location = useLocation()
+  const { t } = useI18n()
   const moreActive = location.pathname.startsWith('/more') || location.pathname.startsWith('/alerts') || MORE.some(item => location.pathname.startsWith(PATHS[item.id]))
-  return <nav className="mobile-nav" aria-label="Sections">{mobile.map(item => <NavLink key={item.id} to={PATHS[item.id]} className={({ isActive }) => cx('mobile-nav__item', isActive && 'is-active')}><Icon name={item.icon} size={20} /><span>{item.label}</span></NavLink>)}<NavLink to="/more" className={cx('mobile-nav__item', moreActive && 'is-active')}><Icon name="layers" size={20} /><span>More</span></NavLink></nav>
+  return <nav className="mobile-nav" aria-label="Sections">{mobile.map(item => <NavLink key={item.id} to={PATHS[item.id]} className={({ isActive }) => cx('mobile-nav__item', isActive && 'is-active')}><Icon name={item.icon} size={20} /><span>{t(item.labelKey)}</span></NavLink>)}<NavLink to="/more" className={cx('mobile-nav__item', moreActive && 'is-active')}><Icon name="layers" size={20} /><span>{t('common.more')}</span></NavLink></nav>
 }
 
-function NotFoundPage() { return <ErrorBox message="Page not found." /> }
+function NotFoundPage() {
+  const { t } = useI18n()
+  return <ErrorBox message={t('common.pageNotFound')} />
+}

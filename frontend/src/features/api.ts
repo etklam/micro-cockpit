@@ -1,5 +1,12 @@
 import { useRef } from 'react'
 import * as G from '../generated/edge'
+import { getActiveFormatLocale } from '../format'
+import {
+  diaryMutationErrorMessage as i18nDiaryMutationErrorMessage,
+  diaryDeleteErrorMessage as i18nDiaryDeleteErrorMessage,
+  transactionDeleteErrorMessage as i18nTransactionDeleteErrorMessage,
+  transactionUpdateErrorMessage as i18nTransactionUpdateErrorMessage,
+} from '../i18n/errors'
 
 const idempotencyHeader = (key?: string): RequestInit | undefined =>
   key ? { headers: { 'Idempotency-Key': key } } : undefined
@@ -66,29 +73,13 @@ export const updateDiary = (id: string, localDate: string, title: string, conten
   G.putApiAppDiariesId(id, { localDate, title, content, tags })
 export const deleteDiary = (id: string) => G.deleteApiAppDiariesId(id)
 export function diaryMutationErrorMessage(error: unknown) {
-  if (!(error instanceof G.ApiError)) return 'Could not save the entry. Try again.'
-  if (error.status === 400 || error.status === 422) {
-    if (error.responseBody.includes('too_many_tags')) return 'At most 10 tags are allowed.'
-    if (error.responseBody.includes('invalid_tag')) return 'One or more tags are invalid.'
-    if (error.responseBody.includes('title_required')) return 'Title is required.'
-    return 'Check the date, title, content, and tags.'
-  }
-  if (error.status === 404) return 'This diary entry no longer exists. Refresh and try again.'
-  if (error.status === 409) return 'This create request conflicts with a previous one. Refresh and try again.'
-  if (error.status === 503 || error.status === 504) return 'The diary service is temporarily unavailable. Try again.'
-  return 'Could not save the entry. Try again.'
+  return i18nDiaryMutationErrorMessage(getActiveFormatLocale(), error)
 }
 export function diaryDeleteErrorMessage(error: unknown) {
-  if (!(error instanceof G.ApiError)) return 'Could not delete the entry. Try again.'
-  if (error.status === 404) return 'This diary entry no longer exists. Refresh and try again.'
-  if (error.status === 503 || error.status === 504) return 'The diary service is temporarily unavailable. Try again.'
-  return 'Could not delete the entry. Try again.'
+  return i18nDiaryDeleteErrorMessage(getActiveFormatLocale(), error)
 }
 export function transactionDeleteErrorMessage(error: unknown) {
-  if (!(error instanceof G.ApiError)) return 'Could not delete the trade. Try again.'
-  if (error.status === 404) return 'This trade no longer exists. Refresh the diary and try again.'
-  if (error.status === 503 || error.status === 504) return 'The transaction service is temporarily unavailable. Try again.'
-  return 'Could not delete the trade. Try again.'
+  return i18nTransactionDeleteErrorMessage(getActiveFormatLocale(), error)
 }
 export const getTransactions = (diaryId: string) => G.getApiAppDiariesDiaryIdTransactions(diaryId)
 export async function getDiaryReview(diaryId: string): Promise<DiaryReview | null> {
@@ -105,11 +96,7 @@ export const updateTransaction = (diaryId: string, id: string, body: G.Transacti
   G.putApiAppDiariesDiaryIdTransactionsId(diaryId, id, body)
 export const deleteTransaction = (diaryId: string, id: string) => G.deleteApiAppDiariesDiaryIdTransactionsId(diaryId, id)
 export function transactionUpdateErrorMessage(error: unknown) {
-  if (!(error instanceof G.ApiError)) return 'Could not save the trade. Try again.'
-  if (error.status === 400 || error.status === 422) return 'Check the symbol, quantity, price, currency, and trade time.'
-  if (error.status === 404) return 'This trade no longer exists. Refresh the diary and try again.'
-  if (error.status === 503 || error.status === 504) return 'The transaction service is temporarily unavailable. Try again.'
-  return 'Could not save the trade. Try again.'
+  return i18nTransactionUpdateErrorMessage(getActiveFormatLocale(), error)
 }
 export const getCalendar = (year: number, month: number) => G.getApiAppCalendar({ year, month })
 export const savePerformance = (date: string, pnlAmount: number, capitalBase: number | null, note: string) =>
@@ -153,18 +140,6 @@ export const getMarketRotation = (universe: string) => G.getApiAppRotationMonito
 export const getPartners = () => G.getApiAppPartners()
 export const getArticles = () => G.getApiContentPosts()
 export const getArticle = (slug: string) => G.getApiContentPostsSlug(slug)
-export function calculate(tool: string, values: Record<string, unknown>): Promise<Record<string, number>> {
-  const dispatch: Record<string, () => Promise<Record<string, number>>> = {
-    'position-sizing': () => G.postApiAppToolsPositionSizing(values as unknown as G.PositionSizing) as Promise<Record<string, number>>,
-    'risk-reward': () => G.postApiAppToolsRiskReward(values as unknown as G.RiskReward) as Promise<Record<string, number>>,
-    'fire': () => G.postApiAppToolsFire(values as unknown as G.Fire) as Promise<Record<string, number>>,
-    'relative-value': () => G.postApiAppToolsRelativeValue(values as unknown as G.RelativeValue) as Promise<Record<string, number>>,
-    'seasonality': () => G.postApiAppToolsSeasonality(values as unknown as G.Seasonality) as Promise<Record<string, number>>,
-  }
-  const operation = dispatch[tool]
-  if (!operation) throw new Error('unknown_tool')
-  return operation()
-}
 export const createAgent = (name: string) => G.postApiAppAgents({
   name,
   displayName: name,

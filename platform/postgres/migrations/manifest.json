@@ -95,6 +95,11 @@
       "id": "0019",
       "filename": "0019_identity_user_preferences.sql",
       "sha256": "62d38c8b85cf6c9d9f1ad03ee146ce4ef4a9b77c2062a34e62e63e8642e635bb"
+    },
+    {
+      "id": "0020",
+      "filename": "0020_identity_user_locale.sql",
+      "sha256": "8b848e2285d7af9f78919c11a3a8cfc0d51db7594a87f4e7027731cfb30be3ff"
     }
   ]
 }

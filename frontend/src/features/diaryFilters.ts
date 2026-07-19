@@ -88,23 +88,31 @@ export function listPathFromReturnTo(returnTo: string | null | undefined): { pat
   return { pathname: '/diary', search: decoded ? `?${decoded}` : '' }
 }
 
-export function normalizeTags(input: string[]): { tags: string[]; error: string } {
+/** Error is a stable i18n message key (or '') — UI translates via t(error). */
+export type TagNormalizeError =
+  | ''
+  | 'diary.tag.tooLong'
+  | 'diary.tag.controlChars'
+  | 'diary.tag.invalidChars'
+  | 'diary.tag.tooMany'
+
+export function normalizeTags(input: string[]): { tags: string[]; error: TagNormalizeError } {
   const seen = new Set<string>()
   const tags: string[] = []
   for (const raw of input) {
     const tag = raw.trim().toLowerCase()
     if (!tag) continue
-    if (tag.length > 32) return { tags: [], error: 'Each tag must be 32 characters or fewer.' }
+    if (tag.length > 32) return { tags: [], error: 'diary.tag.tooLong' }
     if ([...tag].some(ch => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127)) {
-      return { tags: [], error: 'Tags cannot include control characters.' }
+      return { tags: [], error: 'diary.tag.controlChars' }
     }
-    if (!/^[\p{L}\p{N}][\p{L}\p{N}\s\-._/+]*$/u.test(tag)) return { tags: [], error: 'Tags may only use letters, numbers, spaces, and - _ . / +.' }
+    if (!/^[\p{L}\p{N}][\p{L}\p{N}\s\-._/+]*$/u.test(tag)) return { tags: [], error: 'diary.tag.invalidChars' }
     if (!seen.has(tag)) {
       seen.add(tag)
       tags.push(tag)
     }
   }
-  if (tags.length > 10) return { tags: [], error: 'At most 10 tags per diary.' }
+  if (tags.length > 10) return { tags: [], error: 'diary.tag.tooMany' }
   return { tags, error: '' }
 }
 

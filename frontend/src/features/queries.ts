@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import * as session from '../api'
 import * as api from './api'
 import { isAppearance, reconcileAppearance } from './appearance'
+import { isLocale, reconcileLocale } from '../i18n'
 
 export type DiaryListKeyFilters = {
   q: string
@@ -212,7 +213,6 @@ function usePriceAlertLifecycleMutation(operation: (id: string) => Promise<unkno
 }
 export const useDismissPriceAlertMutation = () => usePriceAlertLifecycleMutation(api.dismissPriceAlert)
 export const useReactivatePriceAlertMutation = () => usePriceAlertLifecycleMutation(api.reactivatePriceAlert)
-export const useCalculateMutation = () => useMutation({ mutationFn: ({ tool, values }: { tool: string; values: Record<string, unknown> }) => api.calculate(tool, values) })
 export const useCreateAgentMutation = () => useMutation({ mutationFn: api.createAgent })
 
 export function useSaveDiaryReviewMutation(diaryId: string) {
@@ -262,6 +262,7 @@ export function useSaveSettingsMutation() {
         }
       }
       if (isAppearance(settings.appearance)) reconcileAppearance(settings.appearance)
+      if (isLocale(settings.locale)) reconcileLocale(settings.locale)
       await Promise.all([
         client.invalidateQueries({ queryKey: queryKeys.settings }),
         client.invalidateQueries({ queryKey: queryKeys.bootstrap }),

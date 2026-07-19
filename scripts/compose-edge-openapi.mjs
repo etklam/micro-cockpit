@@ -175,13 +175,13 @@ const stockPageSchema = {
 }
 const bootstrapSchema = {
   type: 'object',
-  required: ['currentUser', 'timezone', 'baseCurrency', 'appearance', 'role', 'accountType', 'currentLocalDate', 'availableProductAreas'],
+  required: ['currentUser', 'timezone', 'baseCurrency', 'appearance', 'locale', 'role', 'accountType', 'currentLocalDate', 'availableProductAreas'],
   properties: {
     currentUser: {
       type: 'object', required: ['id', 'email', 'displayName'],
       properties: { id: { type: 'string', format: 'uuid' }, email: { type: 'string' }, displayName: { type: 'string' } },
     },
-    timezone: { type: 'string' }, baseCurrency: { type: 'string' }, appearance: { type: 'string' },
+    timezone: { type: 'string' }, baseCurrency: { type: 'string' }, appearance: { type: 'string' }, locale: { type: 'string' },
     role: { type: 'string' }, accountType: { type: 'string' },
     currentLocalDate: { type: 'string', format: 'date' },
     availableProductAreas: { type: 'array', items: { type: 'string' } },

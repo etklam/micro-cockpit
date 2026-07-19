@@ -6,11 +6,12 @@ import { BrowserRouter } from 'react-router-dom'
 import { expect, test } from 'vitest'
 import App from '../App'
 import { AuthProvider } from '../auth/AuthProvider'
+import { I18nProvider } from '../i18n'
 import { server } from './setup'
 
 const bootstrap = {
   currentUser: { id: '11111111-1111-1111-1111-111111111111', email: 'owner@example.com', displayName: 'Owner' },
-  timezone: 'Asia/Taipei', baseCurrency: 'USD', appearance: 'system', role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
+  timezone: 'Asia/Taipei', baseCurrency: 'USD', appearance: 'system', locale: 'en', role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
   availableProductAreas: ['rotation'],
 }
 
@@ -60,7 +61,7 @@ function handlers(options?: { bootstrap?: unknown; universes?: unknown; monitor?
 function renderRotation(path = '/rotation?universe=SECTORS&scope=sector') {
   window.history.replaceState({}, '', path)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<QueryClientProvider client={client}><BrowserRouter><AuthProvider><App /></AuthProvider></BrowserRouter></QueryClientProvider>)
+  render(<QueryClientProvider client={client}><BrowserRouter><AuthProvider><I18nProvider><App /></I18nProvider></AuthProvider></BrowserRouter></QueryClientProvider>)
   return client
 }
 
