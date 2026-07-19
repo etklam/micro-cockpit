@@ -18,6 +18,9 @@ spec:
       containers:
         - name: postgres
           image: postgres:17-alpine
+          # Leave headroom for one pool per service plus the migration and operator connections.
+          # The default PostgreSQL limit of 100 is too small for the 13-service topology.
+          command: ["docker-entrypoint.sh", "postgres", "-c", "max_connections=500", "-c", "shared_buffers=256MB"]
           ports:
             - containerPort: 5432
           env:
