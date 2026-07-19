@@ -45,9 +45,11 @@ public sealed class PartnerDiaryApiTests
         Assert.Equal(HttpStatusCode.NotFound,
             (await ownerClient.GetAsync($"/internal/partner-diaries?ownerId={owner}&from=2026-07-01&to=2026-07-31")).StatusCode);
 
-        // Range validation (max 366 days inclusive => DayNumber delta > 366 fails).
+        // Inclusive max 366 days: DayNumber delta 365 ok, 366 fails.
+        Assert.Equal(HttpStatusCode.OK,
+            (await partnerClient.GetAsync($"/internal/partner-diaries?ownerId={owner}&from=2025-07-10&to=2026-07-10")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest,
-            (await partnerClient.GetAsync($"/internal/partner-diaries?ownerId={owner}&from=2025-01-01&to=2026-07-10")).StatusCode);
+            (await partnerClient.GetAsync($"/internal/partner-diaries?ownerId={owner}&from=2025-07-09&to=2026-07-10")).StatusCode);
 
         using var allowed = await partnerClient.GetAsync($"/internal/partner-diaries?ownerId={owner}&from=2026-07-01&to=2026-07-31");
         Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);

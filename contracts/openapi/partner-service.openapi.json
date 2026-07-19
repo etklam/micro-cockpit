@@ -78,68 +78,6 @@
             "bearerAuth": []
           }
         ]
-      },
-      "post": {
-        "tags": [
-          "TradeDiary.Partner"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LinkWrite"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Link"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
       }
     },
     "/internal/partners/{id}/accept": {
@@ -671,62 +609,6 @@
           }
         }
       },
-      "Link": {
-        "required": [
-          "id",
-          "requesterUserId",
-          "partnerUserId",
-          "partnerType",
-          "status",
-          "createdAt",
-          "updatedAt"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "requesterUserId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "partnerUserId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "partnerType": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "LinkWrite": {
-        "required": [
-          "partnerUserId",
-          "partnerType"
-        ],
-        "type": "object",
-        "properties": {
-          "partnerUserId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "partnerType": {
-            "type": "string"
-          }
-        }
-      },
       "PartnerLinkView": {
         "required": [
           "id",
@@ -735,6 +617,7 @@
           "status",
           "createdAt",
           "updatedAt",
+          "acceptedAt",
           "initiatedByMe",
           "myShareDiaries",
           "partnerShareDiaries",
@@ -764,6 +647,13 @@
             "type": "string",
             "format": "date-time"
           },
+          "acceptedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
           "initiatedByMe": {
             "type": "boolean"
           },
@@ -774,7 +664,10 @@
             "type": "boolean"
           },
           "partnerDisplayName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

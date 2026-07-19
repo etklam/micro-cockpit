@@ -791,7 +791,10 @@
             "format": "uuid"
           },
           "displayName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

@@ -227,7 +227,9 @@ For a change that adds a migration, also run the append-only validator against t
 
 ## Run disposable-stack smoke tests
 
-The manual E2E workflow in `.github/workflows/e2e.yml` starts the full Compose stack with ephemeral secrets and runs authentication, idempotency, ownership, release-path, degradation, and database-role checks.
+The manual E2E workflow in `.github/workflows/e2e.yml` starts the full Compose stack with ephemeral secrets and runs authentication, idempotency, ownership, **partner compare**, release-path, degradation, and database-role checks (in that order: auth → journal idempotency → JWT ownership → partner compare → release paths → degradation → role isolation).
+
+Partner compare (`tests/smoke-partner-compare.sh`) needs `EDGE_URL`, `TEST_PASSWORD`, and `LOCAL_REGISTRATION_KEY`. It registers two users with the registration key, exercises invitation → redeem → diary/review/transaction → share → compare privacy → unshare → revoke, checks the inclusive 366-day compare window, and sets `locale=zh-Hant` on one account as a practicality probe.
 
 To inspect individual runtime scripts, see `tests/smoke-*.sh`, `tests/service-unavailable-degradation.sh`, and `tests/postgres-role-isolation.sh`. Run them only against a disposable local stack with the required environment variables.
 

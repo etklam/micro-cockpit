@@ -6,7 +6,6 @@ export type ApiKeyTokenRequest = { "apiKey": string }
 export type ApiKeyTokenResponse = { "accessToken": string; "expiresAt": string }
 export type AppBootstrapResponse = { "currentUser": { "id": string; "email": string; "displayName": string }; "timezone": string; "baseCurrency": string; "appearance": string; "locale": string; "role": string; "accountType": string; "currentLocalDate": string; "availableProductAreas": Array<string> }
 export type AuditResponse = { "id": string; "actorUserId": null | string; "action": string; "resourceType": string; "resourceId": null | string; "details": JsonElement; "occurredAt": string }
-export type AuthorizationResponse = { "allowed": boolean }
 export type BarsResponse = { "contractVersion": number | string; "symbol": string; "items": Array<PublishedBarResponse> }
 export type CalculateResponse = { "universeId": string; "snapshotDate": string; "status": string; "formulaVersion": string }
 export type CalendarResponse = { "year": number; "month": number; "summary": MonthSummaryResponse | null; "days": Array<{ "date": string; "performance": PerformanceResponse | null; "diaryCount": number; "transactionCount": number; "alertCount": number | null }>; "capabilities": { "alerts": CapabilityStatus } }
@@ -16,7 +15,6 @@ export type CollectionResponseOfDiaryAlertResponse = { "items": Array<DiaryAlert
 export type CollectionResponseOfDisciplineResponse = { "items": Array<DisciplineResponse> }
 export type CollectionResponseOfInvitationListItem = { "items": Array<InvitationListItem> }
 export type CollectionResponseOfJobResponse = { "items": Array<JobResponse> }
-export type CollectionResponseOfPartnerLinkView = { "items": Array<PartnerLinkView> }
 export type CollectionResponseOfPostResponse = { "items": Array<PostResponse> }
 export type CollectionResponseOfPriceAlertResponse = { "items": Array<PriceAlertResponse> }
 export type CollectionResponseOfStockResponse = { "items": Array<StockResponse> }
@@ -55,8 +53,6 @@ export type JobAcceptedResponse = { "id": string; "status": string }
 export type JobResponse = { "id": string; "jobType": string; "status": string; "requestedBy": string; "createdAt": string; "updatedAt": string }
 export type JobWrite = { "jobType": string; "payload": JsonElement }
 export type JsonElement = unknown
-export type Link = { "id": string; "requesterUserId": string; "partnerUserId": string; "partnerType": string; "status": string; "createdAt": string; "updatedAt": string }
-export type LinkWrite = { "partnerUserId": string; "partnerType": string }
 export type LoginRequest = { "email": string; "password": string }
 export type MistakeTagCountResponse = { "tag": string; "count": number | string }
 export type MonitorMarketState = { "state": null | string; "breadthPercent": number | null; "benchmarkAboveMa200": null | boolean; "status": string }
@@ -68,9 +64,10 @@ export type NoteWrite = { "content": null | string }
 export type PartnerCompareCapabilitiesResponse = { "partnerDiaries": PartnerDiaryCapability }
 export type PartnerCompareDayResponse = { "localDate": string; "mine": Array<PartnerCompareDiaryItem>; "partner": Array<PartnerCompareDiaryItem> }
 export type PartnerCompareDiaryItem = { "id": string; "localDate": string; "title": string; "content": string; "tags": Array<string> }
-export type PartnerCompareResponse = { "linkId": string; "partnerDisplayName": string; "partnerUserId": string; "from": string; "to": string; "days": Array<PartnerCompareDayResponse>; "capabilities": PartnerCompareCapabilitiesResponse }
+export type PartnerCompareResponse = { "linkId": string; "partnerDisplayName": string | null; "from": string; "to": string; "days": Array<PartnerCompareDayResponse>; "capabilities": PartnerCompareCapabilitiesResponse }
 export type PartnerDiaryCapability = "available" | "not_shared" | "unavailable"
-export type PartnerLinkView = { "id": string; "otherUserId": string; "partnerType": string; "status": string; "createdAt": string; "updatedAt": string; "initiatedByMe": boolean; "myShareDiaries": boolean; "partnerShareDiaries": boolean; "partnerDisplayName": string }
+export type PartnerLinkBrowserCollectionResponse = { "items": Array<PartnerLinkBrowserResponse> }
+export type PartnerLinkBrowserResponse = { "id": string; "partnerType": string; "status": string; "createdAt": string; "updatedAt": string; "acceptedAt": string | null; "initiatedByMe": boolean; "myShareDiaries": boolean; "partnerShareDiaries": boolean; "partnerDisplayName": string | null }
 export type PerformanceResponse = { "localDate": string; "pnlAmount": number; "capitalBase": number | null; "pnlPercent": number | null; "note": string }
 export type PerformanceWrite = { "pnlAmount": number; "capitalBase": number | null; "note": null | string }
 export type PositionSizing = { "accountValue": number; "riskPercent": number; "entryPrice": number; "stopPrice": number }
@@ -190,13 +187,9 @@ export const deleteApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: st
 export const deleteApiAppDiariesDiaryIdReview = (diaryId: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/review`, { method: "DELETE", ...extra })
 export const getApiAppDiariesDiaryIdReview = (diaryId: string, extra?: RequestInit) => request<DiaryReviewResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/review`, { method: "GET", ...extra })
 export const putApiAppDiariesDiaryIdReview = (diaryId: string, body: DiaryReviewWrite, extra?: RequestInit) => request<DiaryReviewResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/review`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const getApiAppPartners = (extra?: RequestInit) => request<CollectionResponseOfPartnerLinkView>("/api/app/partners", { method: "GET", ...extra })
-export const postApiAppPartners = (body: LinkWrite, extra?: RequestInit) => request<Link>("/api/app/partners", { method: "POST", body: JSON.stringify(body), ...extra })
 export const deleteApiAppPartnersId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/partners/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const postApiAppPartnersIdAccept = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/partners/${encodeURIComponent(String(id))}/accept`, { method: "POST", ...extra })
 export const putApiAppPartnersIdSharePolicy = (id: string, body: SharePolicyWrite, extra?: RequestInit) => request<unknown>(`/api/app/partners/${encodeURIComponent(String(id))}/share-policy`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const getApiAppPartnersOwnerIdAuthorization = (ownerId: string, query: { "resource": string }, extra?: RequestInit) => request<AuthorizationResponse>(`/api/app/partners/${encodeURIComponent(String(ownerId))}/authorization` + withQuery(query), { method: "GET", ...extra })
-export const getApiAppPartnersIdSummary = (id: string, extra?: RequestInit) => request<PartnerLinkView>(`/api/app/partners/${encodeURIComponent(String(id))}/summary`, { method: "GET", ...extra })
 export const getApiAppPartnersInvitations = (extra?: RequestInit) => request<CollectionResponseOfInvitationListItem>("/api/app/partners/invitations", { method: "GET", ...extra })
 export const postApiAppPartnersInvitations = (extra?: RequestInit) => request<InvitationCreatedResponse>("/api/app/partners/invitations", { method: "POST", ...extra })
 export const deleteApiAppPartnersInvitationsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/partners/invitations/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
@@ -237,6 +230,8 @@ export const getApiAppDashboard = (extra?: RequestInit) => request<DashboardResp
 export const getApiAppCalendar = (query: { "year": number; "month": number }, extra?: RequestInit) => request<CalendarResponse>("/api/app/calendar" + withQuery(query), { method: "GET", ...extra })
 export const getApiAppStocksSymbolPage = (symbol: string, extra?: RequestInit) => request<StockPageResponse>(`/api/app/stocks/${encodeURIComponent(String(symbol))}/page`, { method: "GET", ...extra })
 export const getApiAppPartnersLinkIdCompare = (linkId: string, query: { "from"?: string; "to"?: string }, extra?: RequestInit) => request<PartnerCompareResponse>(`/api/app/partners/${encodeURIComponent(String(linkId))}/compare` + withQuery(query), { method: "GET", ...extra })
+export const getApiAppPartners = (extra?: RequestInit) => request<PartnerLinkBrowserCollectionResponse>("/api/app/partners", { method: "GET", ...extra })
+export const getApiAppPartnersIdSummary = (id: string, extra?: RequestInit) => request<PartnerLinkBrowserResponse>(`/api/app/partners/${encodeURIComponent(String(id))}/summary`, { method: "GET", ...extra })
 export const getApiAppSettings = (extra?: RequestInit) => request<UserSettingsResponse>("/api/app/settings", { method: "GET", ...extra })
 export const putApiAppSettings = (body: UserSettingsWrite, extra?: RequestInit) => request<UserSettingsResponse>("/api/app/settings", { method: "PUT", body: JSON.stringify(body), ...extra })
 export const postApiAuthRegister = (body: RegisterRequest, extra?: RequestInit) => request<RegisterResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(body), ...extra })

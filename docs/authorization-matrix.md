@@ -62,11 +62,11 @@ Cross-user resources remain concealed with `404`; authentication failures use th
 | Price Alert | POST | `/internal/price-alerts/{id}/dismiss` | `/api/app/price-alerts/{id}/dismiss` | human user, admin | — | — | — | `404` |
 | Price Alert | POST | `/internal/price-alerts/{id}/reactivate` | `/api/app/price-alerts/{id}/reactivate` | human user, admin | — | — | — | `404` |
 | Price Alert | GET | `/internal/price-alerts/{id}/triggers` | `/api/app/price-alerts/{id}/triggers` | human user, admin | — | — | — | `404` |
-| Partner | GET, POST | `/internal/partners` | `/api/app/partners` | human user, admin | — | — | — | caller relationships only |
+| Partner | GET | `/internal/partners` | `/api/app/partners` | human user, admin | — | — | — | caller relationships only; human create is invitation-only (no raw POST) |
 | Partner | POST | `/internal/partners/{id}/accept` | `/api/app/partners/{id}/accept` | human user, admin | — | — | — | `404` |
 | Partner | DELETE | `/internal/partners/{id}` | `/api/app/partners/{id}` | human user, admin | — | — | — | `404` |
 | Partner | PUT | `/internal/partners/{id}/share-policy` | `/api/app/partners/{id}/share-policy` | human user, admin | — | — | — | `404` (shareDiaries only in UI v1) |
-| Partner | GET | `/internal/partners/{ownerId}/authorization` | `/api/app/partners/{ownerId}/authorization` | human user, admin | — | — | — | unauthorized relationship is concealed |
+| Partner | GET | `/internal/partners/{ownerId}/authorization` | (Journal composition only) | human user, admin | — | — | — | unauthorized relationship is concealed |
 | Partner | GET | `/internal/partners/{id}/summary` | `/api/app/partners/{id}/summary` | human user, admin | — | — | — | `404` for non-members |
 | Partner | GET, POST | `/internal/partners/invitations` | `/api/app/partners/invitations` | human user, admin | — | — | — | creator-only list; raw code once on create |
 | Partner | DELETE | `/internal/partners/invitations/{id}` | `/api/app/partners/invitations/{id}` | human user, admin | — | — | — | `404` |

@@ -396,7 +396,7 @@ diary.MapGet("/partner-diaries", async (
     IHttpClientFactory httpFactory) =>
 {
     if (!JournalAccess.TryUser(request, out var viewerId)) return Results.Unauthorized();
-    if (to < from || to.DayNumber - from.DayNumber > 366) return Results.Problem("invalid_date_range", statusCode: 400);
+    if (DiaryReviewRules.InvalidRange(from, to)) return Results.Problem("invalid_date_range", statusCode: 400);
     if (ownerId == viewerId) return Results.Problem("not_found", statusCode: 404);
 
     var allowed = await PartnerShare.IsDiarySharedAsync(httpFactory, request, ownerId);

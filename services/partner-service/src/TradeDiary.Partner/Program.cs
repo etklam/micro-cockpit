@@ -46,7 +46,7 @@ app.MapGet("/internal/partners", async (HttpRequest req, NpgsqlDataSource db, IH
 {
     if (!User(req, out var user)) return Results.Unauthorized();
     await using var c = db.CreateCommand("""
-        SELECT l.id, l.requester_user_id, l.partner_user_id, l.partner_type, l.status, l.created_at, l.updated_at,
+        SELECT l.id, l.requester_user_id, l.partner_user_id, l.partner_type, l.status, l.created_at, l.updated_at, l.accepted_at,
                coalesce(mine.share_diaries, false), coalesce(theirs.share_diaries, false)
         FROM partner.partner_links l
         LEFT JOIN partner.partner_share_policies mine ON mine.link_id = l.id AND mine.owner_user_id = $1
@@ -70,40 +70,21 @@ app.MapGet("/internal/partners", async (HttpRequest req, NpgsqlDataSource db, IH
     {
         var item = items[i];
         names.TryGetValue(item.OtherUserId, out var displayName);
-        items[i] = item with { PartnerDisplayName = string.IsNullOrWhiteSpace(displayName) ? "Partner" : displayName! };
+        items[i] = item with { PartnerDisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName };
     }
     return Results.Ok(new CollectionResponse<PartnerLinkView>(items));
 })
 .Produces<CollectionResponse<PartnerLinkView>>(200).ProducesProblem(401);
 
-app.MapPost("/internal/partners", async (LinkWrite x, HttpRequest req, NpgsqlDataSource db) =>
-{
-    if (!User(req, out var user)) return Results.Unauthorized();
-    if (x.PartnerUserId == user || x.PartnerType is not ("human" or "agent")) return Results.Problem("invalid_partner", statusCode: 400);
-    var id = Guid.NewGuid();
-    await using var c = db.CreateCommand("""
-        INSERT INTO partner.partner_links(id,requester_user_id,partner_user_id,partner_type,status)
-        VALUES($1,$2,$3,$4,'pending')
-        RETURNING id,requester_user_id,partner_user_id,partner_type,status,created_at,updated_at
-        """);
-    c.Parameters.AddWithValue(id); c.Parameters.AddWithValue(user); c.Parameters.AddWithValue(x.PartnerUserId); c.Parameters.AddWithValue(x.PartnerType);
-    try
-    {
-        await using var r = await c.ExecuteReaderAsync();
-        await r.ReadAsync();
-        return Results.Created($"/internal/partners/{id}", Read(r));
-    }
-    catch (PostgresException e) when (e.SqlState is PostgresErrorCodes.UniqueViolation)
-    {
-        return Results.Problem("link_exists", statusCode: 409);
-    }
-})
-.Produces<Link>(201).ProducesProblem(400).ProducesProblem(401).ProducesProblem(409);
-
 app.MapPost("/internal/partners/{id:guid}/accept", async (Guid id, HttpRequest req, NpgsqlDataSource db) =>
 {
     if (!User(req, out var user)) return Results.Unauthorized();
-    await using var c = db.CreateCommand("UPDATE partner.partner_links SET status='accepted',updated_at=now() WHERE id=$1 AND partner_user_id=$2 AND status='pending'");
+    // accepted_at is append-only: set only on first accept, never overwritten.
+    await using var c = db.CreateCommand("""
+        UPDATE partner.partner_links
+        SET status='accepted', accepted_at=coalesce(accepted_at, now()), updated_at=now()
+        WHERE id=$1 AND partner_user_id=$2 AND status='pending'
+        """);
     c.Parameters.AddWithValue(id); c.Parameters.AddWithValue(user);
     return await c.ExecuteNonQueryAsync() == 0 ? Results.Problem("not_found", statusCode: 404) : Results.NoContent();
 })
@@ -155,7 +136,7 @@ app.MapGet("/internal/partners/{id:guid}/summary", async (Guid id, HttpRequest r
 {
     if (!User(req, out var user)) return Results.Unauthorized();
     await using var c = db.CreateCommand("""
-        SELECT l.id, l.requester_user_id, l.partner_user_id, l.partner_type, l.status, l.created_at, l.updated_at,
+        SELECT l.id, l.requester_user_id, l.partner_user_id, l.partner_type, l.status, l.created_at, l.updated_at, l.accepted_at,
                coalesce(mine.share_diaries, false), coalesce(theirs.share_diaries, false)
         FROM partner.partner_links l
         LEFT JOIN partner.partner_share_policies mine ON mine.link_id = l.id AND mine.owner_user_id = $2
@@ -169,7 +150,7 @@ app.MapGet("/internal/partners/{id:guid}/summary", async (Guid id, HttpRequest r
     var link = ReadLink(r, user);
     var names = await ResolveDisplayNames(httpFactory, req, [link.OtherUserId]);
     names.TryGetValue(link.OtherUserId, out var displayName);
-    return Results.Ok(link with { PartnerDisplayName = string.IsNullOrWhiteSpace(displayName) ? "Partner" : displayName! });
+    return Results.Ok(link with { PartnerDisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName });
 })
 .Produces<PartnerLinkView>(200).ProducesProblem(401).ProducesProblem(404);
 
@@ -264,8 +245,8 @@ app.MapPost("/internal/partners/invitations/redeem", async (RedeemInvitation bod
 
     var linkId = Guid.NewGuid();
     await using (var insert = new NpgsqlCommand("""
-        INSERT INTO partner.partner_links(id, requester_user_id, partner_user_id, partner_type, status)
-        VALUES ($1, $2, $3, 'human', 'accepted')
+        INSERT INTO partner.partner_links(id, requester_user_id, partner_user_id, partner_type, status, accepted_at)
+        VALUES ($1, $2, $3, 'human', 'accepted', now())
         """, connection, tx))
     {
         insert.Parameters.AddWithValue(linkId);
@@ -304,16 +285,12 @@ app.Run();
 
 static bool User(HttpRequest r, out Guid id) => Guid.TryParse(r.HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out id);
 
-static Link Read(NpgsqlDataReader r) => new(
-    r.GetGuid(0), r.GetGuid(1), r.GetGuid(2), r.GetString(3), r.GetString(4),
-    DateTime.SpecifyKind(r.GetDateTime(5), DateTimeKind.Utc),
-    DateTime.SpecifyKind(r.GetDateTime(6), DateTimeKind.Utc));
-
 static PartnerLinkView ReadLink(NpgsqlDataReader r, Guid viewer)
 {
     var requester = r.GetGuid(1);
     var partner = r.GetGuid(2);
     var other = requester == viewer ? partner : requester;
+    DateTime? acceptedAt = r.IsDBNull(7) ? null : DateTime.SpecifyKind(r.GetDateTime(7), DateTimeKind.Utc);
     return new PartnerLinkView(
         r.GetGuid(0),
         other,
@@ -321,10 +298,11 @@ static PartnerLinkView ReadLink(NpgsqlDataReader r, Guid viewer)
         r.GetString(4),
         DateTime.SpecifyKind(r.GetDateTime(5), DateTimeKind.Utc),
         DateTime.SpecifyKind(r.GetDateTime(6), DateTimeKind.Utc),
+        acceptedAt,
         InitiatedByMe: requester == viewer,
-        MyShareDiaries: r.GetBoolean(7),
-        PartnerShareDiaries: r.GetBoolean(8),
-        PartnerDisplayName: "");
+        MyShareDiaries: r.GetBoolean(8),
+        PartnerShareDiaries: r.GetBoolean(9),
+        PartnerDisplayName: null);
 }
 
 static string CreateInvitationCode()
@@ -346,9 +324,9 @@ static bool TryNormalizeCode(string? raw, out string code)
 static string Base64Url(ReadOnlySpan<byte> bytes) =>
     Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-static async Task<Dictionary<Guid, string>> ResolveDisplayNames(IHttpClientFactory httpFactory, HttpRequest request, IEnumerable<Guid> ids)
+static async Task<Dictionary<Guid, string?>> ResolveDisplayNames(IHttpClientFactory httpFactory, HttpRequest request, IEnumerable<Guid> ids)
 {
-    var result = new Dictionary<Guid, string>();
+    var result = new Dictionary<Guid, string?>();
     var list = ids.Distinct().ToArray();
     if (list.Length == 0) return result;
     var client = httpFactory.CreateClient("identity");
@@ -361,17 +339,16 @@ static async Task<Dictionary<Guid, string>> ResolveDisplayNames(IHttpClientFacto
         if (!response.IsSuccessStatusCode) return result;
         var payload = await response.Content.ReadFromJsonAsync<CollectionResponse<DisplayNameItem>>();
         if (payload?.Items is null) return result;
-        foreach (var item in payload.Items) result[item.UserId] = item.DisplayName;
+        foreach (var item in payload.Items)
+            result[item.UserId] = string.IsNullOrWhiteSpace(item.DisplayName) ? null : item.DisplayName;
     }
     catch (HttpRequestException) { /* display names degrade to placeholder */ }
     catch (TaskCanceledException) { }
     return result;
 }
 
-record LinkWrite(Guid PartnerUserId, string PartnerType);
 record SharePolicyWrite(bool ShareDiaries);
 record SharePolicy(bool ShareDiaries, bool ShareTransactions, bool SharePerformance);
-record Link(Guid Id, Guid RequesterUserId, Guid PartnerUserId, string PartnerType, string Status, DateTime CreatedAt, DateTime UpdatedAt);
 record PartnerLinkView(
     Guid Id,
     Guid OtherUserId,
@@ -379,17 +356,18 @@ record PartnerLinkView(
     string Status,
     DateTime CreatedAt,
     DateTime UpdatedAt,
+    DateTime? AcceptedAt,
     bool InitiatedByMe,
     bool MyShareDiaries,
     bool PartnerShareDiaries,
-    string PartnerDisplayName);
+    string? PartnerDisplayName);
 record AuthorizationResponse(bool Allowed);
 record CollectionResponse<T>(List<T> Items);
 record InvitationCreatedResponse(Guid Id, string Code, DateTime ExpiresAt);
 record InvitationListItem(Guid Id, string Status, DateTime ExpiresAt, DateTime CreatedAt);
 record RedeemInvitation(string Code);
 record RedeemInvitationResponse(Guid LinkId);
-record DisplayNameItem(Guid UserId, string DisplayName);
+record DisplayNameItem(Guid UserId, string? DisplayName);
 
 // ponytail: shared OpenAPI security wiring — bearerAuth for user routes, serviceKey for internal admin/worker/events.
 // Duplicated per service intentionally: no shared kernel is allowed across services.

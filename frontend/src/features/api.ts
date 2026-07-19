@@ -148,10 +148,18 @@ export const setPartnerShareDiaries = (id: string, shareDiaries: boolean) =>
   G.putApiAppPartnersIdSharePolicy(id, { shareDiaries })
 export const getPartnerCompare = (linkId: string, from?: string, to?: string) =>
   G.getApiAppPartnersLinkIdCompare(linkId, { from, to })
-export type PartnerLink = G.PartnerLinkView
+export type PartnerLink = G.PartnerLinkBrowserResponse
 export type PartnerInvitation = G.InvitationListItem
 export type PartnerCompare = G.PartnerCompareResponse
 export type PartnerDiaryCapability = G.PartnerDiaryCapability
+export type PartnerCompareErrorKind = 'missing' | 'auth' | 'invalid_range' | 'unavailable'
+export function partnerCompareErrorKind(error: unknown): PartnerCompareErrorKind {
+  if (!(error instanceof G.ApiError)) return 'unavailable'
+  if (error.status === 401 || error.status === 403) return 'auth'
+  if (error.status === 400 || error.status === 422) return 'invalid_range'
+  if (error.status === 404) return 'missing'
+  return 'unavailable'
+}
 export const getArticles = () => G.getApiContentPosts()
 export const getArticle = (slug: string) => G.getApiContentPostsSlug(slug)
 export const createAgent = (name: string) => G.postApiAppAgents({

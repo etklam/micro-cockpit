@@ -60,7 +60,9 @@ public sealed class PartnerInvitationApiTests
         Assert.False(link.MyShareDiaries);
         Assert.False(link.PartnerShareDiaries);
         Assert.True(link.InitiatedByMe);
-        Assert.False(string.IsNullOrWhiteSpace(link.PartnerDisplayName));
+        Assert.Null(link.PartnerDisplayName);
+        Assert.NotNull(link.AcceptedAt);
+        var acceptedAt = link.AcceptedAt!.Value;
 
         Assert.Equal(HttpStatusCode.NotFound, (await charlieClient.GetAsync($"/internal/partners/{redeemed.LinkId}/summary")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await charlieClient.DeleteAsync($"/internal/partners/{redeemed.LinkId}")).StatusCode);
@@ -103,11 +105,66 @@ public sealed class PartnerInvitationApiTests
         Assert.Equal(HttpStatusCode.BadRequest,
             (await charlieClient.PostAsJsonAsync("/internal/partners/invitations/redeem", new { code = created4.Code })).StatusCode);
 
+        // accepted_at is append-only: revoke does not clear it; updates leave it unchanged.
+        await fixture.ExecuteAsync("UPDATE partner.partner_links SET updated_at = now() + interval '1 hour' WHERE id=$1", redeemed.LinkId);
+        var acceptedStill = await fixture.ScalarAsync<DateTime>("SELECT accepted_at FROM partner.partner_links WHERE id=$1", redeemed.LinkId);
+        Assert.Equal(DateTime.SpecifyKind(acceptedAt, DateTimeKind.Utc), DateTime.SpecifyKind(acceptedStill, DateTimeKind.Utc));
+
         Assert.Equal(HttpStatusCode.NoContent, (await aliceClient.DeleteAsync($"/internal/partners/{redeemed.LinkId}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,
             (await bobClient.PutAsJsonAsync($"/internal/partners/{redeemed.LinkId}/share-policy", new { shareDiaries = true })).StatusCode);
         var afterRevoke = await bobClient.GetFromJsonAsync<Authz>($"/internal/partners/{alice}/authorization?resource=diary", Json);
         Assert.False(afterRevoke!.Allowed);
+        var acceptedAfterRevoke = await fixture.ScalarAsync<DateTime?>("SELECT accepted_at FROM partner.partner_links WHERE id=$1", redeemed.LinkId);
+        Assert.NotNull(acceptedAfterRevoke);
+    }
+
+    [Fact]
+    public async Task Display_names_degrade_when_identity_returns_null_or_fails()
+    {
+        await using var fixture = await PartnerFixture.StartAsync(identityMode: IdentityMode.NullNames);
+        var alice = Guid.NewGuid();
+        var bob = Guid.NewGuid();
+        using var aliceClient = fixture.Client(alice);
+        using var bobClient = fixture.Client(bob);
+        using var create = await aliceClient.PostAsync("/internal/partners/invitations", null);
+        var created = await create.Content.ReadFromJsonAsync<InvitationCreated>(Json);
+        using var redeem = await bobClient.PostAsJsonAsync("/internal/partners/invitations/redeem", new { code = created!.Code });
+        var redeemed = await redeem.Content.ReadFromJsonAsync<Redeemed>(Json);
+        var summary = await aliceClient.GetFromJsonAsync<PartnerLinkView>($"/internal/partners/{redeemed!.LinkId}/summary", Json);
+        Assert.Null(summary!.PartnerDisplayName);
+
+        await using var failFixture = await PartnerFixture.StartAsync(identityMode: IdentityMode.Fail);
+        using var alice2 = failFixture.Client(alice);
+        using var bob2 = failFixture.Client(bob);
+        using var create2 = await alice2.PostAsync("/internal/partners/invitations", null);
+        var created2 = await create2.Content.ReadFromJsonAsync<InvitationCreated>(Json);
+        using var redeem2 = await bob2.PostAsJsonAsync("/internal/partners/invitations/redeem", new { code = created2!.Code });
+        var redeemed2 = await redeem2.Content.ReadFromJsonAsync<Redeemed>(Json);
+        var summary2 = await alice2.GetFromJsonAsync<PartnerLinkView>($"/internal/partners/{redeemed2!.LinkId}/summary", Json);
+        Assert.Null(summary2!.PartnerDisplayName);
+    }
+
+    [Fact]
+    public async Task Legacy_pending_accept_sets_accepted_at_once_without_raw_create_endpoint()
+    {
+        await using var fixture = await PartnerFixture.StartAsync();
+        var alice = Guid.NewGuid();
+        var bob = Guid.NewGuid();
+        var linkId = Guid.NewGuid();
+        await fixture.ExecuteAsync("INSERT INTO partner.partner_links(id,requester_user_id,partner_user_id,partner_type,status) VALUES($1,$2,$3,'human','pending')", linkId, alice, bob);
+        using var aliceClient = fixture.Client(alice);
+        using var bobClient = fixture.Client(bob);
+
+        Assert.Equal(HttpStatusCode.MethodNotAllowed,
+            (await aliceClient.PostAsJsonAsync("/internal/partners", new { partnerUserId = bob, partnerType = "human" })).StatusCode);
+        Assert.Null(await fixture.ScalarAsync<DateTime?>("SELECT accepted_at FROM partner.partner_links WHERE id=$1", linkId));
+        Assert.Equal(HttpStatusCode.NoContent, (await bobClient.PostAsync($"/internal/partners/{linkId}/accept", null)).StatusCode);
+        var accepted = await fixture.ScalarAsync<DateTime>("SELECT accepted_at FROM partner.partner_links WHERE id=$1", linkId);
+        Assert.NotEqual(default, accepted);
+        await fixture.ExecuteAsync("UPDATE partner.partner_links SET updated_at = now() + interval '2 hours' WHERE id=$1", linkId);
+        var still = await fixture.ScalarAsync<DateTime>("SELECT accepted_at FROM partner.partner_links WHERE id=$1", linkId);
+        Assert.Equal(DateTime.SpecifyKind(accepted, DateTimeKind.Utc), DateTime.SpecifyKind(still, DateTimeKind.Utc));
     }
 
     [Fact]
@@ -138,7 +195,9 @@ public sealed class PartnerInvitationApiTests
     private sealed record CollectionResponse<T>(List<T> Items);
     private sealed record PartnerLinkView(
         Guid Id, Guid OtherUserId, string PartnerType, string Status, DateTime CreatedAt, DateTime UpdatedAt,
-        bool InitiatedByMe, bool MyShareDiaries, bool PartnerShareDiaries, string PartnerDisplayName);
+        DateTime? AcceptedAt, bool InitiatedByMe, bool MyShareDiaries, bool PartnerShareDiaries, string? PartnerDisplayName);
+
+    private enum IdentityMode { Default, NullNames, Fail }
 
     private sealed class PartnerFixture : IAsyncDisposable
     {
@@ -148,14 +207,14 @@ public sealed class PartnerInvitationApiTests
         private NpgsqlDataSource _dataSource = null!;
         private WebApplicationFactory<Program> _factory = null!;
 
-        internal static async Task<PartnerFixture> StartAsync()
+        internal static async Task<PartnerFixture> StartAsync(IdentityMode identityMode = IdentityMode.Default)
         {
             var fixture = new PartnerFixture();
             await fixture._postgres.StartAsync();
             fixture._setup = new NpgsqlConnection(fixture._postgres.GetConnectionString());
             await fixture._setup.OpenAsync();
             var root = Path.GetFullPath("../../../../..", AppContext.BaseDirectory);
-            foreach (var file in new[] { "0011_partner_content_operations.sql", "0021_partner_invitations.sql" })
+            foreach (var file in new[] { "0011_partner_content_operations.sql", "0021_partner_invitations.sql", "0022_partner_link_accepted_at.sql" })
                 await new NpgsqlCommand(await File.ReadAllTextAsync(Path.Combine(root, "platform/postgres/migrations", file)), fixture._setup)
                     .ExecuteNonQueryAsync();
 
@@ -171,6 +230,7 @@ public sealed class PartnerInvitationApiTests
                         options.DefaultAuthenticateScheme = TestAuth.Scheme;
                         options.DefaultChallengeScheme = TestAuth.Scheme;
                     }).AddScheme<AuthenticationSchemeOptions, TestAuth>(TestAuth.Scheme, _ => { });
+                    services.AddHttpClient("identity").ConfigurePrimaryHttpMessageHandler(() => new StubIdentityHandler(identityMode));
                 });
             });
             return fixture;
@@ -206,12 +266,49 @@ public sealed class PartnerInvitationApiTests
             return (long)(await command.ExecuteScalarAsync())!;
         }
 
+        internal async Task<T> ScalarAsync<T>(string sql, params object[] args)
+        {
+            await using var command = new NpgsqlCommand(sql, _setup);
+            foreach (var arg in args) command.Parameters.AddWithValue(arg);
+            var value = await command.ExecuteScalarAsync();
+            if (value is null or DBNull) return default!;
+            return (T)value;
+        }
+
         public async ValueTask DisposeAsync()
         {
             _factory.Dispose();
             await _dataSource.DisposeAsync();
             await _setup.DisposeAsync();
             await _postgres.DisposeAsync();
+        }
+    }
+
+    private sealed class StubIdentityHandler(IdentityMode mode) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (mode == IdentityMode.Fail)
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+            // Null/blank display names must degrade to Partner placeholder in service layer.
+            var body = mode == IdentityMode.NullNames
+                ? """{"items":[{"userId":"00000000-0000-0000-0000-000000000001","displayName":null},{"userId":"00000000-0000-0000-0000-000000000002","displayName":"  "}]}"""
+                : """{"items":[]}""";
+            // Always answer with null names for any ids so degradation is exercised regardless of GUID.
+            if (mode == IdentityMode.NullNames)
+            {
+                var ids = request.RequestUri!.Query.TrimStart('?').Split('&')
+                    .Select(p => p.Split('=', 2))
+                    .Where(p => p.Length == 2 && p[0] == "ids")
+                    .SelectMany(p => Uri.UnescapeDataString(p[1]).Split(',', StringSplitOptions.RemoveEmptyEntries))
+                    .ToArray();
+                var items = string.Join(",", ids.Select(id => $"{{\"userId\":\"{id}\",\"displayName\":null}}"));
+                body = $"{{\"items\":[{items}]}}";
+            }
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            });
         }
     }
 

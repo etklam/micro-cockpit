@@ -143,7 +143,7 @@ Responses never include stack traces, SQL, internal URLs, credentials, or downst
 
 Diary, Quick Note, and transaction creation support `Idempotency-Key`. A retry with the same user, operation, key, and payload returns the stored result. Reusing the key with another payload returns `409`.
 
-Structured review fields are optional. Scores accept `1..5` or `null`; missing scores are excluded from averages. Summary ranges are limited to 366 days. See `DiaryReviewWrite` and `DiaryReviewSummaryResponse` in OpenAPI for fixed emotion, process-assessment, and mistake-tag values.
+Structured review fields are optional. Scores accept `1..5` or `null`; missing scores are excluded from averages. Summary ranges are limited to an **inclusive 366-day** span: `to.DayNumber - from.DayNumber <= 365` (`DiaryReviewRules.InvalidRange`). See `DiaryReviewWrite` and `DiaryReviewSummaryResponse` in OpenAPI for fixed emotion, process-assessment, and mistake-tag values.
 
 ### Discipline and diary alerts
 
@@ -205,14 +205,15 @@ The raw `percentile2w` contract range is `0` through `1`; clients may format it 
 
 ### Partners, content, tools, and operations
 
+Human partner creation is **invitation-only** (no raw human `POST /api/app/partners` create). Redeem creates an already-`accepted` link and sets **`acceptedAt`**; accept on a pending link also sets `acceptedAt` (`null` while pending). Compare requires accepted membership. Partner display names come from Identity and **degrade to `null`** if Identity is unavailable. Edge composes compare via Partner then Journal; browser partner/compare DTOs never include transactions or review fields. Compare `from`/`to` allow an inclusive 366-day window (`to.DayNumber - from.DayNumber <= 365`).
+
 | Methods | Path |
 |---|---|
-| GET, POST | `/api/app/partners` |
+| GET | `/api/app/partners` |
 | DELETE | `/api/app/partners/{id}` |
 | POST | `/api/app/partners/{id}/accept` |
 | PUT | `/api/app/partners/{id}/share-policy` |
 | GET | `/api/app/partners/{id}/summary` |
-| GET | `/api/app/partners/{ownerId}/authorization` |
 | GET, POST | `/api/app/partners/invitations` |
 | DELETE | `/api/app/partners/invitations/{id}` |
 | POST | `/api/app/partners/invitations/redeem` |

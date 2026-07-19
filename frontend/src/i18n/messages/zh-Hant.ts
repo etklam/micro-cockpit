@@ -372,6 +372,7 @@ export const zhHant: Messages = {
   // Partners
   'partners.title': '合作夥伴',
   'partners.subtitle': '邀請信任的人、控制日記分享，並並排比較。',
+  'partners.displayFallback': '合作夥伴',
   'partners.invite.createTitle': '建立邀請',
   'partners.invite.createHint': '產生一次性邀請碼，在應用外分享。邀請碼只顯示一次，並在 7 天後失效。',
   'partners.invite.create': '建立邀請碼',
@@ -420,6 +421,10 @@ export const zhHant: Messages = {
   'partners.compare.empty': '此範圍沒有日記日期',
   'partners.compare.emptyHint': '擴大日期範圍，或先寫下日記。',
   'partners.compare.unavailable': '無法開啟比較畫面。',
+  'partners.compare.invalidDate': '請輸入有效的日期範圍。',
+  'partners.compare.rangeTooLarge': '請選擇 366 個曆日以內的範圍。',
+  'partners.compare.missing': '找不到此夥伴關係，或此關係已不再有效。',
+  'partners.compare.auth': '你沒有權限開啟此比較畫面。',
   'partners.compare.cap.available': '此範圍可讀取夥伴日記。',
   'partners.compare.cap.notShared': '夥伴尚未與你分享日記。',
   'partners.compare.cap.unavailable': '目前無法載入夥伴日記。',
@@ -429,6 +434,7 @@ export const zhHant: Messages = {
   'partners.agent.create': '建立代理',
   'partners.agent.copy': '複製金鑰',
   'partners.agent.saved': '我已儲存',
+  'partners.agent.copyFailed': '無法複製 API 金鑰，請手動複製。',
   'partners.error.createInvite': '無法建立邀請。',
   'partners.error.redeem': '邀請碼無效。',
   'partners.error.revokeInvite': '無法撤銷邀請。',
@@ -436,4 +442,5 @@ export const zhHant: Messages = {
   'partners.error.revoke': '無法撤銷夥伴關係。',
   'partners.error.share': '無法更新分享設定。',
   'partners.error.createAgent': '無法建立代理。',
+  'partners.error.copy': '無法複製邀請碼，請手動複製。',
 }

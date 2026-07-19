@@ -105,6 +105,11 @@
       "id": "0021",
       "filename": "0021_partner_invitations.sql",
       "sha256": "6f65fa78366efe9ec947aa78fff7493e78e8ad67fd2d7484a5296679202e8364"
+    },
+    {
+      "id": "0022",
+      "filename": "0022_partner_link_accepted_at.sql",
+      "sha256": "2fca2d363ced500bec48e378d8b1f8d4b6df0d4588ab6ddd26c111c8fd957638"
     }
   ]
 }

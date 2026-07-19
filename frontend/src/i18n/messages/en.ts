@@ -382,6 +382,7 @@ export const en = {
   // Partners
   'partners.title': 'Partners',
   'partners.subtitle': 'Invite a trusted person, control diary sharing, and compare side by side.',
+  'partners.displayFallback': 'Partner',
   'partners.invite.createTitle': 'Create invitation',
   'partners.invite.createHint': 'Generate a one-time code to share outside the app. The code is shown once and expires in 7 days.',
   'partners.invite.create': 'Create invitation code',
@@ -430,6 +431,10 @@ export const en = {
   'partners.compare.empty': 'No diary days in this range',
   'partners.compare.emptyHint': 'Widen the dates or write a diary entry first.',
   'partners.compare.unavailable': 'This compare view is unavailable.',
+  'partners.compare.invalidDate': 'Enter a valid date range.',
+  'partners.compare.rangeTooLarge': 'Choose a range of 366 calendar days or fewer.',
+  'partners.compare.missing': 'This partnership was not found or is no longer active.',
+  'partners.compare.auth': 'You are not allowed to open this compare view.',
   'partners.compare.cap.available': 'Partner diaries are available for this range.',
   'partners.compare.cap.notShared': 'Partner diaries are not shared with you.',
   'partners.compare.cap.unavailable': 'Partner diaries could not be loaded right now.',
@@ -439,6 +444,7 @@ export const en = {
   'partners.agent.create': 'Create agent',
   'partners.agent.copy': 'Copy key',
   'partners.agent.saved': 'I saved it',
+  'partners.agent.copyFailed': 'Could not copy the API key. Copy it manually.',
   'partners.error.createInvite': 'Could not create an invitation.',
   'partners.error.redeem': 'That invitation code is not valid.',
   'partners.error.revokeInvite': 'Could not revoke the invitation.',
@@ -446,6 +452,7 @@ export const en = {
   'partners.error.revoke': 'Could not revoke the partnership.',
   'partners.error.share': 'Could not update sharing.',
   'partners.error.createAgent': 'Could not create the agent.',
+  'partners.error.copy': 'Could not copy the invitation code. Copy it manually.',
 } as const
 
 export type MessageKey = keyof typeof en

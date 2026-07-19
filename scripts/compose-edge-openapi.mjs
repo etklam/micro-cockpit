@@ -250,16 +250,37 @@ collected.set('PartnerCompareCapabilitiesResponse', {
 })
 collected.set('PartnerCompareResponse', {
   type: 'object',
-  required: ['linkId', 'partnerDisplayName', 'partnerUserId', 'from', 'to', 'days', 'capabilities'],
+  required: ['linkId', 'partnerDisplayName', 'from', 'to', 'days', 'capabilities'],
   properties: {
     linkId: { type: 'string', format: 'uuid' },
-    partnerDisplayName: { type: 'string' },
-    partnerUserId: { type: 'string', format: 'uuid' },
+    partnerDisplayName: { type: ['string', 'null'] },
     from: { type: 'string', format: 'date' },
     to: { type: 'string', format: 'date' },
     days: { type: 'array', items: { $ref: '#/components/schemas/PartnerCompareDayResponse' } },
     capabilities: { $ref: '#/components/schemas/PartnerCompareCapabilitiesResponse' },
   },
+})
+// Browser partner DTOs: no raw partner user IDs (OtherUserId stays internal-only).
+collected.set('PartnerLinkBrowserResponse', {
+  type: 'object',
+  required: ['id', 'partnerType', 'status', 'createdAt', 'updatedAt', 'acceptedAt', 'initiatedByMe', 'myShareDiaries', 'partnerShareDiaries', 'partnerDisplayName'],
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    partnerType: { type: 'string' },
+    status: { type: 'string' },
+    createdAt: { type: 'string', format: 'date-time' },
+    updatedAt: { type: 'string', format: 'date-time' },
+    acceptedAt: { type: ['string', 'null'], format: 'date-time' },
+    initiatedByMe: { type: 'boolean' },
+    myShareDiaries: { type: 'boolean' },
+    partnerShareDiaries: { type: 'boolean' },
+    partnerDisplayName: { type: ['string', 'null'] },
+  },
+})
+collected.set('PartnerLinkBrowserCollectionResponse', {
+  type: 'object',
+  required: ['items'],
+  properties: { items: { type: 'array', items: { $ref: '#/components/schemas/PartnerLinkBrowserResponse' } } },
 })
 
 const dateQuery = (name, required = false) => ({ name, in: 'query', required, schema: { type: 'string', format: 'date' } })
@@ -276,6 +297,36 @@ Object.assign(paths,
 )
 // Settings endpoints (typed forwarders, not MapProxy) — declared explicitly.
 Object.assign(paths, {
+  '/api/app/partners': {
+    get: {
+      operationId: opId('get', '/api/app/partners'),
+      summary: 'List partner links (browser DTO, no raw user IDs)',
+      security: [{ bearerAuth: [] }],
+      responses: {
+        200: { description: 'Success', content: { 'application/json': { schema: { $ref: '#/components/schemas/PartnerLinkBrowserCollectionResponse' } } } },
+        401: { $ref: '#/components/responses/Problem' },
+        502: { $ref: '#/components/responses/Problem' },
+        503: { $ref: '#/components/responses/Problem' },
+        504: { $ref: '#/components/responses/Problem' },
+      },
+    },
+  },
+  '/api/app/partners/{id}/summary': {
+    get: {
+      operationId: opId('get', '/api/app/partners/{id}/summary'),
+      summary: 'Partner link summary (browser DTO, no raw user IDs)',
+      security: [{ bearerAuth: [] }],
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+      responses: {
+        200: { description: 'Success', content: { 'application/json': { schema: { $ref: '#/components/schemas/PartnerLinkBrowserResponse' } } } },
+        401: { $ref: '#/components/responses/Problem' },
+        404: { $ref: '#/components/responses/Problem' },
+        502: { $ref: '#/components/responses/Problem' },
+        503: { $ref: '#/components/responses/Problem' },
+        504: { $ref: '#/components/responses/Problem' },
+      },
+    },
+  },
   '/api/app/settings': {
     get: {
       operationId: opId('get', '/api/app/settings'),

@@ -6,12 +6,24 @@ internal static class PartnerEndpoints
 {
     internal static void Map(WebApplication app)
     {
-        EdgeTransport.MapProxy(app, "/api/app/partners", "partner", "/internal/partners", [HttpMethods.Get, HttpMethods.Post]);
+        // Browser surface: no raw UUID partner create, no public authorization probe.
+        // Legacy accept/list/revoke remain for pending links; invitation codes are the create path.
+        app.MapGet("/api/app/partners", async (HttpContext context, EdgeTransport transport) =>
+        {
+            var response = await transport.GetAsync<PartnerLinkCollectionResponse>("partner", "/internal/partners", context);
+            if (!response.IsSuccess) return transport.ProblemFor(response, context);
+            return Results.Ok(new PartnerLinkBrowserCollectionResponse(
+                response.Value!.Items.Select(PartnerBrowserMapping.ToBrowser).ToList()));
+        });
         EdgeTransport.MapProxy(app, "/api/app/partners/{id:guid}", "partner", "/internal/partners/{id}", [HttpMethods.Delete]);
         EdgeTransport.MapProxy(app, "/api/app/partners/{id:guid}/accept", "partner", "/internal/partners/{id}/accept", [HttpMethods.Post]);
         EdgeTransport.MapProxy(app, "/api/app/partners/{id:guid}/share-policy", "partner", "/internal/partners/{id}/share-policy", [HttpMethods.Put]);
-        EdgeTransport.MapProxy(app, "/api/app/partners/{ownerId:guid}/authorization", "partner", "/internal/partners/{ownerId}/authorization", [HttpMethods.Get]);
-        EdgeTransport.MapProxy(app, "/api/app/partners/{id:guid}/summary", "partner", "/internal/partners/{id}/summary", [HttpMethods.Get]);
+        app.MapGet("/api/app/partners/{id:guid}/summary", async (Guid id, HttpContext context, EdgeTransport transport) =>
+        {
+            var response = await transport.GetAsync<PartnerLinkViewResponse>("partner", $"/internal/partners/{id:D}/summary", context);
+            if (!response.IsSuccess) return transport.ProblemFor(response, context);
+            return Results.Ok(PartnerBrowserMapping.ToBrowser(response.Value!));
+        });
         EdgeTransport.MapProxy(app, "/api/app/partners/invitations", "partner", "/internal/partners/invitations", [HttpMethods.Get])
             .RequireRateLimiting(PartnerRateLimiting.InviteRead);
         EdgeTransport.MapProxy(app, "/api/app/partners/invitations", "partner", "/internal/partners/invitations", [HttpMethods.Post])
@@ -32,6 +44,21 @@ internal static class PartnerEndpoints
             return CompositionResults.ToHttpResult(result, transport, context);
         });
     }
+}
+
+internal static class PartnerBrowserMapping
+{
+    internal static PartnerLinkBrowserResponse ToBrowser(PartnerLinkViewResponse link) => new(
+        link.Id,
+        link.PartnerType,
+        link.Status,
+        link.CreatedAt,
+        link.UpdatedAt,
+        link.AcceptedAt,
+        link.InitiatedByMe,
+        link.MyShareDiaries,
+        link.PartnerShareDiaries,
+        string.IsNullOrWhiteSpace(link.PartnerDisplayName) ? null : link.PartnerDisplayName);
 }
 
 internal static class PartnerRateLimiting
@@ -125,8 +152,7 @@ internal static class PartnerCompareComposition
         var days = dayMap.Select(pair => new PartnerCompareDayResponse(pair.Key, pair.Value.Mine, pair.Value.Partner)).ToList();
         return CompositionResult<PartnerCompareResponse>.Success(new PartnerCompareResponse(
             link.Id,
-            link.PartnerDisplayName,
-            link.OtherUserId,
+            string.IsNullOrWhiteSpace(link.PartnerDisplayName) ? null : link.PartnerDisplayName,
             rangeFrom,
             rangeTo,
             days,
@@ -151,7 +177,8 @@ internal static class PartnerCompareComposition
             error = "invalid_date_range";
             return false;
         }
-        if (rangeTo.DayNumber - rangeFrom.DayNumber > 366)
+        // Inclusive max 366 days => DayNumber delta <= 365.
+        if (rangeTo.DayNumber - rangeFrom.DayNumber > 365)
         {
             error = "range_too_large";
             return false;
@@ -180,6 +207,8 @@ internal static class PartnerCompareComposition
             cursor = response.Value.NextCursor;
             if (string.IsNullOrEmpty(cursor)) break;
         }
+        if (!string.IsNullOrEmpty(cursor))
+            return ([], new CompositionFailure(StatusCodes.Status503ServiceUnavailable, DownstreamFailure.None));
         return (items, null);
     }
 
@@ -198,10 +227,23 @@ public enum PartnerDiaryCapability
     Unavailable
 }
 
+// Browser Edge DTOs: no raw partner user IDs.
+public sealed record PartnerLinkBrowserCollectionResponse(IReadOnlyList<PartnerLinkBrowserResponse> Items);
+public sealed record PartnerLinkBrowserResponse(
+    Guid Id,
+    string PartnerType,
+    string Status,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    DateTime? AcceptedAt,
+    bool InitiatedByMe,
+    bool MyShareDiaries,
+    bool PartnerShareDiaries,
+    string? PartnerDisplayName);
+
 public sealed record PartnerCompareResponse(
     Guid LinkId,
-    string PartnerDisplayName,
-    Guid PartnerUserId,
+    string? PartnerDisplayName,
     DateOnly From,
     DateOnly To,
     IReadOnlyList<PartnerCompareDayResponse> Days,
@@ -221,7 +263,8 @@ public sealed record PartnerCompareDiaryItem(
 
 public sealed record PartnerCompareCapabilitiesResponse(PartnerDiaryCapability PartnerDiaries);
 
-// Partner service DTOs used by Edge composition / proxies (schema names must match service OpenAPI).
+// Partner service DTOs used by Edge composition (internal; may include OtherUserId).
+internal sealed record PartnerLinkCollectionResponse(IReadOnlyList<PartnerLinkViewResponse> Items);
 internal sealed record PartnerLinkViewResponse(
     Guid Id,
     Guid OtherUserId,
@@ -229,10 +272,11 @@ internal sealed record PartnerLinkViewResponse(
     string Status,
     DateTime CreatedAt,
     DateTime UpdatedAt,
+    DateTime? AcceptedAt,
     bool InitiatedByMe,
     bool MyShareDiaries,
     bool PartnerShareDiaries,
-    string PartnerDisplayName);
+    string? PartnerDisplayName);
 
 internal sealed record PartnerDiaryCollectionResponse(IReadOnlyList<PartnerDiaryItemResponse> Items);
 internal sealed record PartnerDiaryItemResponse(Guid Id, DateOnly LocalDate, string Title, string Content, IReadOnlyList<string> Tags);

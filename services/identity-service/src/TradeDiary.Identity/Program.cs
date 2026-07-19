@@ -261,7 +261,13 @@ app.MapGet("/internal/users/display-names", async (string? ids, ClaimsPrincipal 
     command.Parameters.AddWithValue(requested.ToArray());
     await using var reader = await command.ExecuteReaderAsync();
     var items = new List<DisplayNameItem>();
-    while (await reader.ReadAsync()) items.Add(new DisplayNameItem(reader.GetGuid(0), reader.GetString(1)));
+    while (await reader.ReadAsync())
+    {
+        // Nullable-safe: treat DB null/blank as absent so callers can degrade.
+        string? name = reader.IsDBNull(1) ? null : reader.GetString(1);
+        if (string.IsNullOrWhiteSpace(name)) name = null;
+        items.Add(new DisplayNameItem(reader.GetGuid(0), name));
+    }
     return Results.Ok(new CollectionResponse<DisplayNameItem>(items));
 })
 .RequireAuthorization()
@@ -446,7 +452,7 @@ record ApiKeyTokenResponse(string AccessToken, DateTime ExpiresAt);
 record SsoProvidersResponse(string[] EnabledProviders);
 record UserSettingsResponse(string Email, string DisplayName, string Timezone, string BaseCurrency, string Appearance, string Locale, DateTime UpdatedAt);
 record UserSettingsWrite(string DisplayName, string Timezone, string BaseCurrency, string Appearance, string Locale);
-record DisplayNameItem(Guid UserId, string DisplayName);
+record DisplayNameItem(Guid UserId, string? DisplayName);
 record CollectionResponse<T>(List<T> Items);
 
 // ponytail: shared OpenAPI security wiring — bearerAuth for user routes, serviceKey for internal admin/worker/events.

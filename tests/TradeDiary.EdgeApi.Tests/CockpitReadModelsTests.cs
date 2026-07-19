@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 public sealed class CockpitCompositionTests
 {
@@ -369,7 +370,268 @@ public sealed class CockpitCompositionTests
         Assert.Equal(new DateOnly(2026, 7, 13), CockpitComposition.ResolveLocalDate(user, utc));
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(Func<string, string, HttpResponseMessage> responder)
+    [Fact]
+    public async Task Partner_list_and_summary_strip_raw_user_ids()
+    {
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service != "partner") return Json(HttpStatusCode.OK, "{}");
+            if (path.StartsWith("/internal/partners/", StringComparison.Ordinal) && path.EndsWith("/summary", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK,
+                    "{\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\"otherUserId\":\"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\",\"partnerType\":\"human\",\"status\":\"accepted\",\"createdAt\":\"2026-07-01T00:00:00Z\",\"updatedAt\":\"2026-07-02T00:00:00Z\",\"acceptedAt\":\"2026-07-01T01:00:00Z\",\"initiatedByMe\":true,\"myShareDiaries\":true,\"partnerShareDiaries\":false,\"partnerDisplayName\":\"Bob\"}");
+            if (path.StartsWith("/internal/partners", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK,
+                    "{\"items\":[{\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\"otherUserId\":\"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\",\"partnerType\":\"human\",\"status\":\"accepted\",\"createdAt\":\"2026-07-01T00:00:00Z\",\"updatedAt\":\"2026-07-02T00:00:00Z\",\"acceptedAt\":\"2026-07-01T01:00:00Z\",\"initiatedByMe\":true,\"myShareDiaries\":true,\"partnerShareDiaries\":false,\"partnerDisplayName\":\"Bob\"}]}");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+        using var client = factory.CreateClient();
+
+        using var list = await client.GetAsync("/api/app/partners");
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        var listBody = await list.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("otherUserId", listBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", listBody, StringComparison.OrdinalIgnoreCase);
+        using var listDoc = JsonDocument.Parse(listBody);
+        Assert.Equal("Bob", listDoc.RootElement.GetProperty("items")[0].GetProperty("partnerDisplayName").GetString());
+
+        using var summary = await client.GetAsync("/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/summary");
+        Assert.Equal(HttpStatusCode.OK, summary.StatusCode);
+        var summaryBody = await summary.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("otherUserId", summaryBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", summaryBody, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Partner_authorization_is_not_public_and_uuid_create_is_not_proxied()
+    {
+        using var factory = CreateFactory((_, _) => Json(HttpStatusCode.OK, "{\"allowed\":true}"));
+        using var client = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await client.GetAsync("/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/authorization?resource=diary")).StatusCode);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed,
+            (await client.PostAsync("/api/app/partners", new StringContent("{\"partnerUserId\":\"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\",\"partnerType\":\"human\"}", Encoding.UTF8, "application/json"))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Partner_compare_strips_user_ids_and_enforces_inclusive_366_day_range()
+    {
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service == "partner" && path.Contains("/summary", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK,
+                    "{\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\"otherUserId\":\"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\",\"partnerType\":\"human\",\"status\":\"accepted\",\"createdAt\":\"2026-07-01T00:00:00Z\",\"updatedAt\":\"2026-07-02T00:00:00Z\",\"acceptedAt\":\"2026-07-01T01:00:00Z\",\"initiatedByMe\":true,\"myShareDiaries\":true,\"partnerShareDiaries\":true,\"partnerDisplayName\":\"Bob\"}");
+            if (service == "journal" && path.StartsWith("/internal/partner-diaries", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK,
+                    "{\"items\":[{\"id\":\"cccccccc-cccc-cccc-cccc-cccccccccccc\",\"localDate\":\"2026-07-10\",\"title\":\"P\",\"content\":\"pc\",\"tags\":[\"tag\"]}]}");
+            if (service == "journal" && path.StartsWith("/internal/diaries", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK,
+                    "{\"items\":[{\"id\":\"dddddddd-dddd-dddd-dddd-dddddddddddd\",\"localDate\":\"2026-07-10\",\"title\":\"M\",\"content\":\"mc\",\"tags\":[],\"createdAt\":\"2026-07-10T00:00:00Z\",\"updatedAt\":\"2026-07-10T00:00:00Z\"}],\"nextCursor\":null}");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+        using var client = factory.CreateClient();
+
+        using var ok = await client.GetAsync("/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2025-07-15&to=2026-07-15");
+        Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+        var body = await ok.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("partnerUserId", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("otherUserId", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", body, StringComparison.OrdinalIgnoreCase);
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("Bob", doc.RootElement.GetProperty("partnerDisplayName").GetString());
+        Assert.Equal("available", doc.RootElement.GetProperty("capabilities").GetProperty("partnerDiaries").GetString());
+
+        // DayNumber delta 366 (>365) is rejected for inclusive 366-day max.
+        using var tooLarge = await client.GetAsync("/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2025-07-14&to=2026-07-15");
+        Assert.Equal(HttpStatusCode.BadRequest, tooLarge.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, "not_shared")]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "unavailable")]
+    public async Task Partner_compare_capability_maps_partner_diary_failures(HttpStatusCode partnerStatus, string expected)
+    {
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service == "partner" && path.Contains("/summary", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, PartnerSummary(share: true, displayName: null));
+            if (service == "journal" && path.StartsWith("/internal/partner-diaries", StringComparison.Ordinal))
+                return Json(partnerStatus, "{}");
+            if (service == "journal" && path.StartsWith("/internal/diaries", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, "{\"items\":[],\"nextCursor\":null}");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+        using var response = await factory.CreateClient().GetAsync(
+            "/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2026-07-01&to=2026-07-31");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(expected, doc.RootElement.GetProperty("capabilities").GetProperty("partnerDiaries").GetString());
+        Assert.Equal(JsonValueKind.Null, doc.RootElement.GetProperty("partnerDisplayName").ValueKind);
+    }
+
+    [Theory]
+    [InlineData("pending")]
+    [InlineData("revoked")]
+    public async Task Partner_compare_non_accepted_link_is_non_disclosing_404(string status)
+    {
+        using var factory = CreateFactory((service, path) =>
+            service == "partner" && path.Contains("/summary", StringComparison.Ordinal)
+                ? Json(HttpStatusCode.OK, PartnerSummary(status: status, share: true))
+                : Json(HttpStatusCode.OK, "{\"items\":[],\"nextCursor\":null}"));
+        using var response = await factory.CreateClient().GetAsync(
+            "/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2026-07-01&to=2026-07-31");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("pending", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("revoked", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Partner_compare_unrelated_summary_is_404()
+    {
+        using var factory = CreateFactory((service, path) =>
+            service == "partner" && path.Contains("/summary", StringComparison.Ordinal)
+                ? Json(HttpStatusCode.NotFound, "{}")
+                : Json(HttpStatusCode.OK, "{\"items\":[],\"nextCursor\":null}"));
+        using var response = await factory.CreateClient().GetAsync(
+            "/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2026-07-01&to=2026-07-31");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Partner_compare_share_disabled_skips_partner_journal_and_is_not_shared()
+    {
+        var partnerJournalCalls = 0;
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service == "partner" && path.Contains("/summary", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, PartnerSummary(share: false));
+            if (service == "journal" && path.StartsWith("/internal/partner-diaries", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref partnerJournalCalls);
+                return Json(HttpStatusCode.OK, "{\"items\":[]}");
+            }
+            if (service == "journal" && path.StartsWith("/internal/diaries", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, "{\"items\":[],\"nextCursor\":null}");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+        using var response = await factory.CreateClient().GetAsync(
+            "/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2026-07-01&to=2026-07-31");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("not_shared", doc.RootElement.GetProperty("capabilities").GetProperty("partnerDiaries").GetString());
+        Assert.Equal(0, partnerJournalCalls);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task Partner_compare_partner_journal_auth_failure_fails_request(HttpStatusCode status)
+    {
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service == "partner" && path.Contains("/summary", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, PartnerSummary(share: true));
+            if (service == "journal" && path.StartsWith("/internal/partner-diaries", StringComparison.Ordinal))
+                return Json(status, "{}");
+            if (service == "journal" && path.StartsWith("/internal/diaries", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, "{\"items\":[],\"nextCursor\":null}");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+        using var response = await factory.CreateClient().GetAsync(
+            "/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2026-07-01&to=2026-07-31");
+        Assert.Equal(status, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task Partner_compare_my_journal_failure_fails_request(HttpStatusCode status)
+    {
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service == "partner" && path.Contains("/summary", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, PartnerSummary(share: false));
+            if (service == "journal" && path.StartsWith("/internal/diaries", StringComparison.Ordinal))
+                return Json(status, "{}");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+        using var response = await factory.CreateClient().GetAsync(
+            "/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2026-07-01&to=2026-07-31");
+        Assert.Equal(status, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Partner_compare_orders_days_newest_first_with_multiple_entries_and_strips_private_fields()
+    {
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service == "partner" && path.Contains("/summary", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, PartnerSummary(share: true));
+            if (service == "journal" && path.StartsWith("/internal/partner-diaries", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, """
+                    {"items":[
+                      {"id":"cccccccc-cccc-cccc-cccc-cccccccccccc","localDate":"2026-07-11","title":"P1","content":"pc1","tags":["tag"]},
+                      {"id":"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee","localDate":"2026-07-11","title":"P2","content":"pc2","tags":[]}
+                    ]}
+                    """);
+            if (service == "journal" && path.StartsWith("/internal/diaries", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, """
+                    {"items":[
+                      {"id":"dddddddd-dddd-dddd-dddd-dddddddddddd","localDate":"2026-07-12","title":"M-new","content":"mc-new","tags":[],"createdAt":"2026-07-12T00:00:00Z","updatedAt":"2026-07-12T00:00:00Z"},
+                      {"id":"ffffffff-ffff-ffff-ffff-ffffffffffff","localDate":"2026-07-10","title":"M-old","content":"mc-old","tags":["mine"],"createdAt":"2026-07-10T00:00:00Z","updatedAt":"2026-07-10T00:00:00Z"}
+                    ],"nextCursor":null}
+                    """);
+            return Json(HttpStatusCode.OK, "{}");
+        });
+        using var response = await factory.CreateClient().GetAsync(
+            "/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2026-07-01&to=2026-07-31");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var days = doc.RootElement.GetProperty("days").EnumerateArray().ToList();
+        Assert.Equal(new[] { "2026-07-12", "2026-07-11", "2026-07-10" }, days.Select(d => d.GetProperty("localDate").GetString()!).ToArray());
+        Assert.Equal(2, days[1].GetProperty("partner").GetArrayLength());
+        Assert.Equal("M-new", days[0].GetProperty("mine")[0].GetProperty("title").GetString());
+        Assert.DoesNotContain("thesis", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("transaction", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("disciplineScore", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("userId", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("otherUserId", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Partner_compare_default_range_is_30_account_local_days()
+    {
+        // Test auth timezone is Asia/Taipei; fixed UTC maps to 2026-07-20 local.
+        var fixedUtc = new DateTimeOffset(2026, 7, 19, 16, 0, 0, TimeSpan.Zero);
+        string? diariesPath = null;
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service == "partner" && path.Contains("/summary", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, PartnerSummary(share: false));
+            if (service == "journal" && path.StartsWith("/internal/diaries", StringComparison.Ordinal))
+            {
+                diariesPath = path;
+                return Json(HttpStatusCode.OK, "{\"items\":[],\"nextCursor\":null}");
+            }
+            return Json(HttpStatusCode.OK, "{}");
+        }, time: new FixedTimeProvider(fixedUtc));
+        using var response = await factory.CreateClient().GetAsync(
+            "/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("2026-06-21", doc.RootElement.GetProperty("from").GetString());
+        Assert.Equal("2026-07-20", doc.RootElement.GetProperty("to").GetString());
+        Assert.Contains("from=2026-06-21", diariesPath);
+        Assert.Contains("to=2026-07-20", diariesPath);
+    }
+
+    private static string PartnerSummary(bool share = true, string status = "accepted", string? displayName = "Bob") =>
+        $"{{\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\"otherUserId\":\"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\",\"partnerType\":\"human\",\"status\":\"{status}\",\"createdAt\":\"2026-07-01T00:00:00Z\",\"updatedAt\":\"2026-07-02T00:00:00Z\",\"acceptedAt\":\"2026-07-01T01:00:00Z\",\"initiatedByMe\":true,\"myShareDiaries\":true,\"partnerShareDiaries\":{(share ? "true" : "false")},\"partnerDisplayName\":{(displayName is null ? "null" : $"\"{displayName}\"")}}}";
+
+    private static WebApplicationFactory<Program> CreateFactory(Func<string, string, HttpResponseMessage> responder, TimeProvider? time = null)
     {
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
@@ -380,8 +642,13 @@ public sealed class CockpitCompositionTests
                         options.DefaultChallengeScheme = TestAuthenticationHandler.Scheme;
                     })
                     .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.Scheme, _ => { });
+                if (time is not null)
+                {
+                    services.RemoveAll<TimeProvider>();
+                    services.AddSingleton(time);
+                }
 
-                foreach (var service in new[] { "identity", "journal", "performance", "discipline", "reminder", "stock-research", "market-data", "rotation" })
+                foreach (var service in new[] { "identity", "journal", "performance", "discipline", "reminder", "stock-research", "market-data", "rotation", "partner" })
                 {
                     services.AddHttpClient(service)
                         .ConfigurePrimaryHttpMessageHandler(() => new DownstreamHandler(service, responder));
@@ -402,7 +669,7 @@ public sealed class CockpitCompositionTests
                         options.DefaultChallengeScheme = TestAuthenticationHandler.Scheme;
                     })
                     .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.Scheme, _ => { });
-                foreach (var service in new[] { "identity", "journal", "performance", "discipline", "reminder", "stock-research", "market-data", "rotation" })
+                foreach (var service in new[] { "identity", "journal", "performance", "discipline", "reminder", "stock-research", "market-data", "rotation", "partner" })
                     services.AddHttpClient(service).ConfigurePrimaryHttpMessageHandler(() => new AsyncDownstreamHandler(service, responder));
             });
         });
@@ -480,6 +747,11 @@ public sealed class CockpitCompositionTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             responder(service, request.RequestUri!.PathAndQuery, cancellationToken);
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 
     private sealed class TestAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>

@@ -77,7 +77,8 @@ The canonical ownership rules are in [`contracts/schema-ownership.json`](../cont
 | `JournalEndpoints` | Diary, transaction, Quick Note, and review routes |
 | `FeatureEndpoints` | Performance, discipline, and diary-alert routes |
 | `ResearchEndpoints` | Stock research, market data, price alerts, and rotation |
-| `AdminEndpoints` | Partners, tools, content administration, operations administration |
+| `PartnerEndpoints` | Partner lists, invitations, sharing policy, and privacy-safe compare composition |
+| `AdminEndpoints` | Tools, content administration, operations administration |
 
 `EdgeTransport` applies a per-request downstream timeout, propagates request cancellation and correlation IDs, forwards authorization and idempotency headers, and maps transport failures to safe ProblemDetails responses. `X-Registration-Key` is forwarded only when the Edge register route explicitly opts in for Identity registration.
 

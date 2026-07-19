@@ -49,7 +49,7 @@ jobs:
             "$EDGE_URL/api/auth/register")
           test "$code" = 201 || test "$code" = 409
 
-      - name: Smoke tests (Edge auth, BFF, events, reminders, rotation, degradation)
+      - name: Smoke tests (Edge auth, ownership, partner compare, release paths, degradation)
         env:
           EDGE_URL: http://127.0.0.1:5099
           TEST_EMAIL: owner@example.com
@@ -61,6 +61,7 @@ jobs:
           ./tests/smoke-auth.sh
           ./tests/smoke-journal-idempotency.sh
           ./tests/smoke-jwt-ownership.sh
+          ./tests/smoke-partner-compare.sh
           ./tests/smoke-release-paths.sh
           ./tests/service-unavailable-degradation.sh
           ./tests/postgres-role-isolation.sh
