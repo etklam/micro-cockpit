@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { applyAppearance, isAppearance, type Appearance } from '../features/appearance'
+import { isAppearance, type Appearance } from '../features/appearance'
+import { useAppearance } from '../features/useAppearance'
 import { deviceTimezone, formatTimezoneLabel } from '../features/accountTime'
 import { useBootstrapQuery, useSaveSettingsMutation, useSettingsQuery } from '../features/queries'
 import { useAuth } from '../auth/AuthProvider'
 import { Button, Card, Field, PageHeader, SelectBox, TextInput } from '../ui'
+import { Icon, type IconName } from '../icons'
 import { PageSkeleton, SectionError } from '../shell'
+import { cx } from '../format'
+
+const APPEARANCE_OPTIONS: { value: Appearance; label: string; hint: string; icon: IconName; swatch: string }[] = [
+  { value: 'system', label: 'System', hint: 'Match the device', icon: 'monitor', swatch: 'system' },
+  { value: 'dark', label: 'Dark', hint: 'Evening instrument', icon: 'moon', swatch: 'dark' },
+  { value: 'light', label: 'Light', hint: 'Day desk', icon: 'sun', swatch: 'light' },
+]
 
 const COMMON_TIMEZONES = [
   'UTC',
@@ -35,6 +44,7 @@ export function SettingsPage() {
   const settings = useSettingsQuery()
   const bootstrap = useBootstrapQuery()
   const save = useSaveSettingsMutation()
+  const { preference: appearance, setAppearance } = useAppearance()
   const { logout } = useAuth()
   const navigate = useNavigate()
   const deviceTz = useMemo(() => deviceTimezone(), [])
@@ -43,7 +53,6 @@ export function SettingsPage() {
   const [timezone, setTimezone] = useState('')
   const [timezoneCustom, setTimezoneCustom] = useState(false)
   const [baseCurrency, setBaseCurrency] = useState('USD')
-  const [appearance, setAppearance] = useState<Appearance>('system')
   const [formError, setFormError] = useState('')
   const [partialNotice, setPartialNotice] = useState('')
   const [saved, setSaved] = useState(false)
@@ -54,7 +63,6 @@ export function SettingsPage() {
     setTimezone(settings.data.timezone)
     setTimezoneCustom(!COMMON_TIMEZONES.includes(settings.data.timezone))
     setBaseCurrency(settings.data.baseCurrency)
-    setAppearance(isAppearance(settings.data.appearance) ? settings.data.appearance : 'system')
   }, [settings.data])
 
   if (settings.isLoading || bootstrap.isLoading) return <PageSkeleton rows={3} />
@@ -78,8 +86,6 @@ export function SettingsPage() {
     if (!/^[A-Z]{3}$/.test(ccy)) { setFormError('Base currency must be a three-letter code.'); return }
     if (!isAppearance(appearance)) { setFormError('Choose a valid appearance.'); return }
 
-    // Optimistic local apply for appearance; server remains source of truth after save.
-    applyAppearance(appearance)
     try {
       const result = await save.mutateAsync({ displayName: name, timezone: tz, baseCurrency: ccy, appearance })
       if (result.status === 'saved_session_stale') {
@@ -92,7 +98,7 @@ export function SettingsPage() {
       setDisplayName(result.settings.displayName)
       setTimezone(result.settings.timezone)
       setBaseCurrency(result.settings.baseCurrency)
-      setAppearance(isAppearance(result.settings.appearance) ? result.settings.appearance : appearance)
+      if (isAppearance(result.settings.appearance)) void setAppearance(result.settings.appearance)
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Could not save settings.')
     }
@@ -153,16 +159,34 @@ export function SettingsPage() {
 
           <section className="stack">
             <h2>Appearance</h2>
-            <Field label="Theme">
-              <SelectBox value={appearance} onChange={e => {
-                const next = e.target.value as Appearance
-                setAppearance(next)
-                applyAppearance(next)
-              }}>
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </SelectBox>
+            <Field label="Theme" hint="Applied immediately. Save to keep it with your account.">
+              <div className="theme-picker" role="radiogroup" aria-label="Theme">
+                {APPEARANCE_OPTIONS.map(option => {
+                  const selected = appearance === option.value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      className={cx('theme-picker__option', selected && 'is-selected')}
+                      onClick={() => {
+                        void setAppearance(option.value)
+                        setSaved(false)
+                      }}
+                    >
+                      <span className={cx('theme-picker__swatch', `theme-picker__swatch--${option.swatch}`)} aria-hidden="true" />
+                      <span className="theme-picker__copy">
+                        <span className="theme-picker__label">
+                          <Icon name={option.icon} size={14} style={{ display: 'inline-block', verticalAlign: '-2px', marginRight: 6 }} />
+                          {option.label}
+                        </span>
+                        <span className="theme-picker__hint">{option.hint}</span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
             </Field>
           </section>
 

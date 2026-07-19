@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthProvider'
-import { Brand, Button, Field, TextInput } from '../ui'
+import { Brand, Button, Field, TextInput, ThemeToggle } from '../ui'
 
 export function LoginPage() {
   const { state, login } = useAuth()
@@ -26,6 +26,9 @@ export function LoginPage() {
   return (
     <main className="login">
       <div className="login__glow" aria-hidden="true" />
+      <div className="login__theme">
+        <ThemeToggle />
+      </div>
       <form className="login__card" onSubmit={submit}>
         <Brand />
         <div className="login__head">

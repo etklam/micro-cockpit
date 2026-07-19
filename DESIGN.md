@@ -41,7 +41,7 @@ Do not drift toward:
 ## 2. Design principles
 
 1. **Reflection and numbers, equal weight.** Prose gets a real reading measure (serif, ~65–70ch). Numbers get tabular precision and signed direction.
-2. **Quiet by default.** Surfaces are deep and calm. One violet signal lamp does all accent work. Negative space is a material.
+2. **Quiet by default.** Surfaces are deep and calm. One amber-iron signal lamp does all accent work. Negative space is a material.
 3. **Instrument, not stage.** Density only where the task needs it. Familiar affordances. Consistent vocabulary screen to screen.
 4. **Honesty over performance.** Copy never gamifies. “You showed up today” is the ceiling of praise.
 5. **Reward opening it.** The daily discipline principle and the quick-note capture sit at the top of the day. Starting to write is the lowest-friction act on screen.
@@ -140,9 +140,11 @@ Avoid stacking three equal “metric tiles” as the visual identity of a page. 
 
 ## 5. Color system
 
-Dark-only in v1. All tokens are **OKLCH**. Source of truth: `frontend/src/index.css`.
+Dark is the home theme; light is a true-neutral day desk. Preference is
+`system | light | dark` (Settings → Appearance), applied via `html[data-theme]`.
+All tokens are **OKLCH**. Source of truth: `frontend/src/index.css`.
 
-### Surfaces (graphite + whisper of brand hue 279)
+### Surfaces (iron graphite + whisper of brand hue 72)
 
 | Token | Role |
 | --- | --- |
@@ -163,7 +165,7 @@ Dark-only in v1. All tokens are **OKLCH**. Source of truth: `frontend/src/index.
 
 ### Brand — the signal lamp
 
-Violet (hue **279**) is the **only** chromatic accent for chrome.
+Amber-iron (hue **72**) is the **only** chromatic accent for chrome — restrained, never violet/blue-purple.
 
 | Token | Role |
 | --- | --- |
@@ -327,7 +329,7 @@ Every interactive control supports:
 
 - rest · hover · active/press · focus-visible · disabled · loading (where async)
 
-Focus-visible uses `--ring` (violet soft outline). Never remove focus without a visible replacement.
+Focus-visible uses `--ring` (amber soft outline). Never remove focus without a visible replacement.
 
 ---
 
@@ -434,7 +436,7 @@ Empty states explain what will appear and how to begin — never blame.
 ### Engineering constraints
 
 - Plain CSS classes — no CSS-in-JS, no Tailwind, no component library
-- Dark-only `color-scheme: dark`
+- Dual theme via `html[data-theme="dark|light"]` + matching `color-scheme`
 - Frontend talks only to Edge API
 - Preserve existing class names used by tests and page markup unless intentionally migrated together
 

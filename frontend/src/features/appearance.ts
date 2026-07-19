@@ -1,4 +1,5 @@
 export type Appearance = 'system' | 'light' | 'dark'
+export type ColorScheme = 'light' | 'dark'
 
 const STORAGE_KEY = 'td_appearance'
 const ROOT_ATTR = 'data-theme'
@@ -20,20 +21,38 @@ export function writeAppearanceMirror(value: Appearance) {
   try { localStorage.setItem(STORAGE_KEY, value) } catch { /* private mode */ }
 }
 
-function resolvedScheme(preference: Appearance): 'light' | 'dark' {
+export function resolveAppearance(preference: Appearance): ColorScheme {
   if (preference === 'light' || preference === 'dark') return preference
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
 }
 
+export function readDocumentScheme(): ColorScheme {
+  return document.documentElement.getAttribute(ROOT_ATTR) === 'light' ? 'light' : 'dark'
+}
+
 /** Apply preference to <html data-theme="light|dark">. system follows OS. */
 export function applyAppearance(preference: Appearance) {
-  const scheme = resolvedScheme(preference)
+  const scheme = resolveAppearance(preference)
   document.documentElement.setAttribute(ROOT_ATTR, scheme)
   document.documentElement.style.colorScheme = scheme
   const meta = document.querySelector('meta[name="color-scheme"]')
   if (meta) meta.setAttribute('content', scheme)
   const themeColor = document.querySelector('meta[name="theme-color"]')
-  if (themeColor) themeColor.setAttribute('content', scheme === 'light' ? '#f4f2f8' : '#14121c')
+  if (themeColor) themeColor.setAttribute('content', scheme === 'light' ? '#f5f5f4' : '#121110')
+  return scheme
+}
+
+/** Local preference: mirror + paint. */
+export function setAppearancePreference(preference: Appearance): ColorScheme {
+  writeAppearanceMirror(preference)
+  return applyAppearance(preference)
+}
+
+/** Flip between explicit light/dark (drops system). */
+export function toggleLightDark(preference: Appearance = readAppearanceMirror() ?? 'system'): Appearance {
+  const next: Appearance = resolveAppearance(preference) === 'dark' ? 'light' : 'dark'
+  setAppearancePreference(next)
+  return next
 }
 
 /** First-paint: mirror before React. Server preference wins after bootstrap. */
@@ -48,8 +67,7 @@ export function bootAppearanceFromMirror() {
  */
 export function reconcileAppearance(server: Appearance | null | undefined) {
   if (!isAppearance(server)) return
-  writeAppearanceMirror(server)
-  applyAppearance(server)
+  setAppearancePreference(server)
 }
 
 /** Keep system preference in sync with OS while preference is system. */

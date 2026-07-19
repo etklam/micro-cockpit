@@ -1,41 +1,43 @@
 /* ============================================================
    Micro Cockpit — design tokens & base
-   Quiet instrument / refined dark. OKLCH throughout.
-   Brand seed: violet hue 279 — signal lamp, not wallpaper.
+   Quiet instrument. Dark is home; light is a day desk.
+   Brand seed: amber-iron hue 72 — signal lamp, not wallpaper.
+   Not violet, not blue-purple, not navy-gold costume.
    See DESIGN.md · PRODUCT.md
    ============================================================ */
 
-:root {
-  /* ---- Surfaces: deep graphite, whisper of brand violet ---- */
-  --bg:           oklch(0.142 0.007 279);
-  --bg-elevated:  oklch(0.122 0.007 279);
-  --surface:      oklch(0.188 0.009 279);
-  --surface-2:    oklch(0.158 0.008 279);
-  --overlay:      oklch(0.222 0.010 279);
-  --sidebar:      oklch(0.128 0.007 279);
+:root,
+html[data-theme="dark"] {
+  /* ---- Surfaces: deep iron graphite, almost achromatic ---- */
+  --bg:           oklch(0.135 0.005 80);
+  --bg-elevated:  oklch(0.112 0.004 80);
+  --surface:      oklch(0.185 0.006 80);
+  --surface-2:    oklch(0.155 0.005 80);
+  --overlay:      oklch(0.228 0.007 80);
+  --sidebar:      oklch(0.118 0.004 80);
 
   /* ---- Text ---- */
-  --ink:          oklch(0.945 0.004 279);
-  --muted:        oklch(0.705 0.012 279);
-  --faint:        oklch(0.505 0.014 279);
+  --ink:          oklch(0.955 0.004 80);
+  --muted:        oklch(0.72 0.010 80);
+  --faint:        oklch(0.52 0.012 80);
 
-  /* ---- Brand / signal lamp (violet) ---- */
-  --primary:          oklch(0.68 0.145 279);
-  --primary-hover:    oklch(0.74 0.14 279);
-  --primary-press:    oklch(0.58 0.155 279);
-  --primary-btn:      oklch(0.52 0.16 279);
-  --primary-btn-hover: oklch(0.58 0.16 279);
-  --on-primary:       oklch(0.99 0 0);
-  --primary-soft:     color-mix(in oklch, var(--primary) 14%, transparent);
-  --primary-line:     color-mix(in oklch, var(--primary) 40%, transparent);
+  /* ---- Brand / signal lamp (amber-iron, restrained) ---- */
+  --primary:          oklch(0.80 0.09 72);
+  --primary-hover:    oklch(0.86 0.08 72);
+  --primary-press:    oklch(0.70 0.10 70);
+  --primary-btn:      oklch(0.62 0.11 68);
+  --primary-btn-hover: oklch(0.68 0.10 70);
+  --on-primary:       oklch(0.16 0.01 70);
+  --primary-soft:     color-mix(in oklch, var(--primary) 12%, transparent);
+  --primary-line:     color-mix(in oklch, var(--primary) 36%, transparent);
 
   /* ---- Semantic: restrained; direction never color-alone ---- */
-  --gain:        oklch(0.74 0.12 155);
-  --gain-soft:   color-mix(in oklch, var(--gain) 12%, transparent);
-  --loss:        oklch(0.68 0.15 25);
-  --loss-soft:   color-mix(in oklch, var(--loss) 12%, transparent);
-  --warn:        oklch(0.80 0.12 85);
-  --warn-soft:   color-mix(in oklch, var(--warn) 12%, transparent);
+  --gain:        oklch(0.76 0.11 155);
+  --gain-soft:   color-mix(in oklch, var(--gain) 13%, transparent);
+  --loss:        oklch(0.70 0.14 25);
+  --loss-soft:   color-mix(in oklch, var(--loss) 13%, transparent);
+  --warn:        oklch(0.82 0.11 85);
+  --warn-soft:   color-mix(in oklch, var(--warn) 13%, transparent);
 
   /* Aliases used by charts / rotation (semantic parity) */
   --success:      var(--gain);
@@ -45,9 +47,12 @@
   --danger-line:  color-mix(in oklch, var(--loss) 40%, transparent);
 
   /* ---- Lines ---- */
-  --border:        color-mix(in oklch, var(--ink) 8%, transparent);
-  --border-strong: color-mix(in oklch, var(--ink) 15%, transparent);
-  --hairline:      color-mix(in oklch, var(--ink) 5%, transparent);
+  --border:        color-mix(in oklch, var(--ink) 9%, transparent);
+  --border-strong: color-mix(in oklch, var(--ink) 16%, transparent);
+  --hairline:      color-mix(in oklch, var(--ink) 5.5%, transparent);
+  --line:          var(--border);
+  --accent:        var(--primary);
+  --radius:        var(--r-lg);
 
   /* ---- Typography ---- */
   --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -94,10 +99,13 @@
   --z-toast: 600;
 
   /* ---- Elevation (dark: soft, wide, low) ---- */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.36);
-  --shadow-lg: 0 20px 56px rgba(0, 0, 0, 0.52);
-  --ring: 0 0 0 3px color-mix(in oklch, var(--primary) 36%, transparent);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.40);
+  --shadow-md: 0 10px 28px oklch(0 0 0 / 0.42);
+  --shadow-lg: 0 24px 60px oklch(0 0 0 / 0.55);
+  --inset-top: inset 0 1px 0 oklch(0 0 0 / 0.22);
+  --ring: 0 0 0 3px color-mix(in oklch, var(--primary) 34%, transparent);
+  --select-chevron: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8a29a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  --picker-filter: invert(0.78) saturate(0.78);
 
   /* ---- Motion ---- */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -109,43 +117,48 @@
   color-scheme: dark;
 }
 
-/* Light appearance — same tokens, inverted luminance. Applied via data-theme. */
+/* Light appearance — true neutral day desk (not cream, not violet wash). */
 html[data-theme="light"] {
-  --bg:           oklch(0.975 0.006 279);
-  --bg-elevated:  oklch(0.995 0.004 279);
-  --surface:      oklch(0.995 0.004 279);
-  --surface-2:    oklch(0.955 0.008 279);
-  --overlay:      oklch(0.94 0.01 279);
-  --sidebar:      oklch(0.97 0.008 279);
+  --bg:           oklch(0.972 0.002 240);
+  --bg-elevated:  oklch(0.995 0.001 240);
+  --surface:      oklch(0.995 0.001 240);
+  --surface-2:    oklch(0.95 0.003 240);
+  --overlay:      oklch(0.93 0.004 240);
+  --sidebar:      oklch(0.965 0.002 240);
 
-  --ink:          oklch(0.22 0.02 279);
-  --muted:        oklch(0.42 0.02 279);
-  --faint:        oklch(0.58 0.015 279);
+  --ink:          oklch(0.24 0.01 70);
+  --muted:        oklch(0.44 0.012 70);
+  --faint:        oklch(0.58 0.01 70);
 
-  --primary:          oklch(0.48 0.16 279);
-  --primary-hover:    oklch(0.42 0.16 279);
-  --primary-press:    oklch(0.38 0.15 279);
-  --primary-btn:      oklch(0.45 0.16 279);
-  --primary-btn-hover: oklch(0.40 0.16 279);
+  --primary:          oklch(0.50 0.11 65);
+  --primary-hover:    oklch(0.44 0.12 65);
+  --primary-press:    oklch(0.40 0.12 65);
+  --primary-btn:      oklch(0.48 0.12 65);
+  --primary-btn-hover: oklch(0.42 0.12 65);
   --on-primary:       oklch(0.99 0 0);
-  --primary-soft:     color-mix(in oklch, var(--primary) 12%, transparent);
-  --primary-line:     color-mix(in oklch, var(--primary) 36%, transparent);
+  --primary-soft:     color-mix(in oklch, var(--primary) 10%, transparent);
+  --primary-line:     color-mix(in oklch, var(--primary) 32%, transparent);
 
-  --gain:        oklch(0.48 0.12 155);
+  --gain:        oklch(0.46 0.12 155);
   --gain-soft:   color-mix(in oklch, var(--gain) 12%, transparent);
   --loss:        oklch(0.50 0.15 25);
   --loss-soft:   color-mix(in oklch, var(--loss) 12%, transparent);
-  --warn:        oklch(0.55 0.12 85);
+  --warn:        oklch(0.54 0.12 85);
   --warn-soft:   color-mix(in oklch, var(--warn) 12%, transparent);
 
-  --border:        color-mix(in oklch, var(--ink) 10%, transparent);
+  --border:        color-mix(in oklch, var(--ink) 11%, transparent);
   --border-strong: color-mix(in oklch, var(--ink) 18%, transparent);
-  --hairline:      color-mix(in oklch, var(--ink) 6%, transparent);
+  --hairline:      color-mix(in oklch, var(--ink) 7%, transparent);
+  --line:          var(--border);
+  --accent:        var(--primary);
 
-  --shadow-sm: 0 1px 2px rgba(20, 16, 40, 0.08);
-  --shadow-md: 0 8px 24px rgba(20, 16, 40, 0.10);
-  --shadow-lg: 0 20px 56px rgba(20, 16, 40, 0.14);
-  --ring: 0 0 0 3px color-mix(in oklch, var(--primary) 28%, transparent);
+  --shadow-sm: 0 1px 2px oklch(0.2 0.01 70 / 0.06);
+  --shadow-md: 0 10px 28px oklch(0.2 0.01 70 / 0.08);
+  --shadow-lg: 0 24px 60px oklch(0.2 0.01 70 / 0.11);
+  --inset-top: inset 0 1px 0 oklch(0.2 0.01 70 / 0.04);
+  --ring: 0 0 0 3px color-mix(in oklch, var(--primary) 24%, transparent);
+  --select-chevron: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b6560' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  --picker-filter: invert(0.2) saturate(0.9);
 
   color-scheme: light;
 }
@@ -158,8 +171,7 @@ html { -webkit-text-size-adjust: 100%; }
 
 body {
   background:
-    radial-gradient(1200px 600px at 12% -8%, color-mix(in oklch, var(--primary) 7%, transparent), transparent 60%),
-    radial-gradient(900px 480px at 100% 0%, color-mix(in oklch, var(--primary) 4%, transparent), transparent 55%),
+    radial-gradient(900px 480px at 8% -12%, color-mix(in oklch, var(--primary) 4%, transparent), transparent 58%),
     var(--bg);
   background-attachment: fixed;
   color: var(--ink);

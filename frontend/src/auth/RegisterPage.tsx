@@ -4,7 +4,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import * as session from '../api'
 import { ApiError } from '../generated/edge'
 import { useAuth } from './AuthProvider'
-import { Brand, Button, Field, TextInput } from '../ui'
+import { Brand, Button, Field, TextInput, ThemeToggle } from '../ui'
 
 const defaultTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 const destination = (state: unknown) => (state as { from?: string } | null)?.from ?? '/today'
@@ -44,6 +44,9 @@ export function RegisterPage() {
   return (
     <main className="login">
       <div className="login__glow" aria-hidden="true" />
+      <div className="login__theme">
+        <ThemeToggle />
+      </div>
       <form className="login__card" onSubmit={submit}>
         <Brand />
         <div className="login__head">

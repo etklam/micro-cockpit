@@ -3,7 +3,7 @@ import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } fr
 import { useAuth } from './auth/AuthProvider'
 import { LoginPage } from './auth/LoginPage'
 import { RegisterPage } from './auth/RegisterPage'
-import { Brand, Button, ErrorBox, IconButton, useConfirm } from './ui'
+import { Brand, Button, ErrorBox, IconButton, ThemeToggle, useConfirm } from './ui'
 import { Icon } from './icons'
 import { cx } from './format'
 import './App.css'
@@ -152,7 +152,10 @@ function Sidebar({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: ()
           <strong>{cockpit.currentUser.displayName || cockpit.currentUser.email}</strong>
           <span>{cockpit.baseCurrency} · {cockpit.timezone}</span>
         </div>
-        <Button variant="ghost" icon="logout" onClick={onSignOut} className="signout-btn">Sign out</Button>
+        <div className="sidebar__tools">
+          <ThemeToggle />
+          <Button variant="ghost" icon="logout" onClick={onSignOut} className="signout-btn">Sign out</Button>
+        </div>
       </div>
     </aside>
   )
@@ -163,7 +166,16 @@ function NavItem({ item }: { item: (typeof NAV)[number] }) {
 }
 
 function MobileTop({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: () => void }) {
-  return <header className="mobile-top"><Brand compact /><span className="mobile-top__meta">{cockpit.currentLocalDate}</span><IconButton icon="logout" label="Sign out" onClick={onSignOut} /></header>
+  return (
+    <header className="mobile-top">
+      <Brand compact />
+      <span className="mobile-top__meta">{cockpit.currentLocalDate}</span>
+      <div className="mobile-top__actions">
+        <ThemeToggle />
+        <IconButton icon="logout" label="Sign out" onClick={onSignOut} />
+      </div>
+    </header>
+  )
 }
 function MobileNav() {
   const mobile = NAV.slice(0, 4)

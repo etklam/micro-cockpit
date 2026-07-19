@@ -12,6 +12,7 @@ import type {
 } from 'react'
 import { cx } from './format'
 import { Icon, type IconName } from './icons'
+import { useAppearance } from './features/useAppearance'
 
 /* ----------------------------- Spinner ----------------------------- */
 export function Spinner({ size = 16, className }: { size?: number; className?: string }) {
@@ -64,6 +65,20 @@ export const IconButton = forwardRef<HTMLButtonElement, { icon: IconName; label:
     )
   },
 )
+
+/* ------------------------- Theme toggle ---------------------------- */
+export function ThemeToggle({ className }: { className?: string }) {
+  const { scheme, toggle } = useAppearance()
+  const next = scheme === 'dark' ? 'light' : 'dark'
+  return (
+    <IconButton
+      icon={scheme === 'dark' ? 'sun' : 'moon'}
+      label={next === 'light' ? 'Switch to light mode' : 'Switch to dark mode'}
+      onClick={() => toggle()}
+      className={cx('theme-toggle', className)}
+    />
+  )
+}
 
 /* ------------------------------- Card ------------------------------ */
 export function Card({ className, flush, as: Tag = 'div', ...rest }: { flush?: boolean; as?: 'div' | 'section' | 'article' } & ComponentPropsWithoutRef<'div'>) {

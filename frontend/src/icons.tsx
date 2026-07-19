@@ -7,6 +7,7 @@ export type IconName =
   | 'today' | 'diary' | 'calendar' | 'compass' | 'bell'
   | 'plus' | 'trash' | 'edit' | 'check' | 'close'
   | 'left' | 'right' | 'arrow' | 'logout' | 'sparkle' | 'dot' | 'layers'
+  | 'sun' | 'moon' | 'monitor'
 
 const PATHS: Record<IconName, string> = {
   today: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>',
@@ -26,6 +27,9 @@ const PATHS: Record<IconName, string> = {
   sparkle: '<path d="M12 3c.6 4.2 1.8 5.4 6 6-4.2.6-5.4 1.8-6 6-.6-4.2-1.8-5.4-6-6 4.2-.6 5.4-1.8 6-6z"/>',
   dot: '<circle cx="12" cy="12" r="5" fill="currentColor" stroke="none"/>',
   layers: '<path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 8.5 9 5 9-5"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
+  moon: '<path d="M20 13.5A7.5 7.5 0 1 1 10.5 4 6 6 0 0 0 20 13.5z"/>',
+  monitor: '<rect x="3.5" y="4.5" width="17" height="12" rx="2"/><path d="M8 20h8M12 16.5V20"/>',
 }
 
 export function Icon({
