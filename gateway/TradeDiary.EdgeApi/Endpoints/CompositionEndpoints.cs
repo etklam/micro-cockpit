@@ -36,6 +36,9 @@ internal static class CompositionResults
     internal static IResult ToHttpResult<T>(CompositionResult<T> result, EdgeTransport transport, HttpContext context)
     {
         if (result.Failure is null) return Results.Ok(result.Value);
+        if (result.Failure.Failure == DownstreamFailure.None &&
+            result.Failure.StatusCode is StatusCodes.Status400BadRequest or StatusCodes.Status404NotFound)
+            return EdgeProblems.FromStatus(context, result.Failure.StatusCode);
         return transport.ProblemFor(
             new DownstreamResponse<T>(result.Failure.StatusCode, default, result.Failure.Failure), context);
     }

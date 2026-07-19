@@ -221,11 +221,58 @@ const agg = (path, schema, parameters = []) => ({
 })
 const intParam = (name) => ({ name, in: 'query', required: true, schema: { type: 'integer' } })
 const strPathParam = (name) => ({ name, in: 'path', required: true, schema: { type: 'string' } })
+// Partner compare is Edge-owned composition (Partner summary + Journal diaries).
+collected.set('PartnerDiaryCapability', { type: 'string', enum: ['available', 'not_shared', 'unavailable'] })
+collected.set('PartnerCompareDiaryItem', {
+  type: 'object',
+  required: ['id', 'localDate', 'title', 'content', 'tags'],
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    localDate: { type: 'string', format: 'date' },
+    title: { type: 'string' },
+    content: { type: 'string' },
+    tags: { type: 'array', items: { type: 'string' } },
+  },
+})
+collected.set('PartnerCompareDayResponse', {
+  type: 'object',
+  required: ['localDate', 'mine', 'partner'],
+  properties: {
+    localDate: { type: 'string', format: 'date' },
+    mine: { type: 'array', items: { $ref: '#/components/schemas/PartnerCompareDiaryItem' } },
+    partner: { type: 'array', items: { $ref: '#/components/schemas/PartnerCompareDiaryItem' } },
+  },
+})
+collected.set('PartnerCompareCapabilitiesResponse', {
+  type: 'object',
+  required: ['partnerDiaries'],
+  properties: { partnerDiaries: { $ref: '#/components/schemas/PartnerDiaryCapability' } },
+})
+collected.set('PartnerCompareResponse', {
+  type: 'object',
+  required: ['linkId', 'partnerDisplayName', 'partnerUserId', 'from', 'to', 'days', 'capabilities'],
+  properties: {
+    linkId: { type: 'string', format: 'uuid' },
+    partnerDisplayName: { type: 'string' },
+    partnerUserId: { type: 'string', format: 'uuid' },
+    from: { type: 'string', format: 'date' },
+    to: { type: 'string', format: 'date' },
+    days: { type: 'array', items: { $ref: '#/components/schemas/PartnerCompareDayResponse' } },
+    capabilities: { $ref: '#/components/schemas/PartnerCompareCapabilitiesResponse' },
+  },
+})
+
+const dateQuery = (name, required = false) => ({ name, in: 'query', required, schema: { type: 'string', format: 'date' } })
 Object.assign(paths,
   agg('/api/app/bootstrap', 'AppBootstrapResponse'),
   agg('/api/app/dashboard', 'DashboardResponse'),
   agg('/api/app/calendar', 'CalendarResponse', [intParam('year'), intParam('month')]),
   agg('/api/app/stocks/{symbol}/page', 'StockPageResponse', [strPathParam('symbol')]),
+  agg('/api/app/partners/{linkId}/compare', 'PartnerCompareResponse', [
+    { name: 'linkId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+    dateQuery('from'),
+    dateQuery('to'),
+  ]),
 )
 // Settings endpoints (typed forwarders, not MapProxy) — declared explicitly.
 Object.assign(paths, {

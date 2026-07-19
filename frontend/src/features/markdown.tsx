@@ -21,6 +21,7 @@ const components: Components = {
 
 export function MarkdownView({ content, className }: { content: string; className?: string }) {
   const source = content.trim()
+  // ponytail: empty-preview string is UI chrome; full markdown body is user content.
   if (!source) return <p className={className ? `${className} is-muted` : 'is-muted'}>Nothing to preview.</p>
   return (
     <div className={className}>

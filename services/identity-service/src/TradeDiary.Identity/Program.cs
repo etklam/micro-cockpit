@@ -245,6 +245,28 @@ app.MapPut("/internal/auth/settings", async (UserSettingsWrite input, ClaimsPrin
 .RequireAuthorization()
 .Produces<UserSettingsResponse>(200).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
 
+// Explicit Identity contract for display names. Callers must already know the user IDs
+// (e.g. from Partner links). Does not expose email or allow search.
+app.MapGet("/internal/users/display-names", async (string? ids, ClaimsPrincipal principal, NpgsqlDataSource db) =>
+{
+    if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out _)) return Results.Unauthorized();
+    var requested = ParseUserIds(ids);
+    if (requested.Count == 0) return Results.Ok(new CollectionResponse<DisplayNameItem>([]));
+    if (requested.Count > 50) return Results.Problem("too_many_ids", statusCode: 400);
+
+    await using var command = db.CreateCommand("""
+        SELECT id, display_name FROM identity.users
+        WHERE status = 'active' AND id = ANY($1)
+        """);
+    command.Parameters.AddWithValue(requested.ToArray());
+    await using var reader = await command.ExecuteReaderAsync();
+    var items = new List<DisplayNameItem>();
+    while (await reader.ReadAsync()) items.Add(new DisplayNameItem(reader.GetGuid(0), reader.GetString(1)));
+    return Results.Ok(new CollectionResponse<DisplayNameItem>(items));
+})
+.RequireAuthorization()
+.Produces<CollectionResponse<DisplayNameItem>>(200).ProducesProblem(400).ProducesProblem(401);
+
 app.Run();
 
 // Login/API-key readers omit appearance/locale (column 9 is credentials/scopes there). Defaults are fine for JWT.
@@ -391,6 +413,17 @@ static bool ContainsControlCharacters(string value)
     return false;
 }
 
+static List<Guid> ParseUserIds(string? ids)
+{
+    var result = new List<Guid>();
+    if (string.IsNullOrWhiteSpace(ids)) return result;
+    foreach (var part in ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+        if (Guid.TryParse(part, out var id) && !result.Contains(id)) result.Add(id);
+    }
+    return result;
+}
+
 static RSA LoadSigningKey(string? path)
 {
     var rsa = RSA.Create();
@@ -413,6 +446,8 @@ record ApiKeyTokenResponse(string AccessToken, DateTime ExpiresAt);
 record SsoProvidersResponse(string[] EnabledProviders);
 record UserSettingsResponse(string Email, string DisplayName, string Timezone, string BaseCurrency, string Appearance, string Locale, DateTime UpdatedAt);
 record UserSettingsWrite(string DisplayName, string Timezone, string BaseCurrency, string Appearance, string Locale);
+record DisplayNameItem(Guid UserId, string DisplayName);
+record CollectionResponse<T>(List<T> Items);
 
 // ponytail: shared OpenAPI security wiring — bearerAuth for user routes, serviceKey for internal admin/worker/events.
 // Duplicated per service intentionally: no shared kernel is allowed across services.

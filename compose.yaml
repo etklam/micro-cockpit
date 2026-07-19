@@ -118,9 +118,11 @@ services:
       ConnectionStrings__Journal: Host=postgres;Database=trade_diary;Username=journal_service;Password=${JOURNAL_DB_PASSWORD:?set JOURNAL_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
       Services__Reminder: http://reminder:8080
+      Services__Partner: http://partner:8080
       Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
     depends_on:
       identity: { condition: service_healthy }
+      partner: { condition: service_healthy }
 
   performance:
     <<: *dotnet
@@ -209,6 +211,7 @@ services:
       <<: *dotnet-env
       ConnectionStrings__Partner: Host=postgres;Database=trade_diary;Username=partner_service;Password=${PARTNER_DB_PASSWORD:?set PARTNER_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
+      Services__Identity: http://identity:8080
     depends_on: { identity: { condition: service_healthy } }
 
   content:

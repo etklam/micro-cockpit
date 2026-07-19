@@ -4,10 +4,11 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { priceAlertCreateErrorKind, type PriceAlert, type PriceAlertEvaluationPrice, type RotationItem, type WatchlistItem } from './features/api'
 import {
   useAddPriceAlertMutation, useAddWatchlistMutation, useArticleQuery, useArticlesQuery,
-  useCreateAgentMutation, useDeletePriceAlertMutation, useDismissPriceAlertMutation, usePartnersQuery,
+  useDeletePriceAlertMutation, useDismissPriceAlertMutation,
   usePriceAlertTriggersQuery, usePriceAlertsQuery, useRemoveWatchlistMutation, useResearchNoteQuery, useResearchTimelineQuery,
   useBootstrapQuery, useReactivatePriceAlertMutation, useRotationQuery, useRotationUniversesQuery, useSaveResearchNoteMutation, useWatchlistQuery,
 } from './features/queries'
+export { PartnersPage, PartnerComparePage } from './screens/partners'
 import { calculateTool, isToolId, type ToolId } from './features/toolsCalc'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
 import { PageSkeleton, SectionError, useCockpit } from './shell'
@@ -269,17 +270,6 @@ function RotationUnavailable({ retry, invalid }: { retry: () => void; invalid?: 
 
 function RotationTable({ rows, rankScope }: { rows: RotationItem[]; rankScope: string }) {
   return <Card flush as="section" className="rotation-table-card"><div className="rotation-table-scroll"><table className="rotation-table"><thead><tr><th>Rank</th><th>Symbol</th><th>Name / sector</th><th>Last</th><th>2W</th><th>1M</th><th>3M</th><th>2W percentile</th><th>MA status</th><th>Data status</th></tr></thead><tbody>{rows.map(item => <tr key={item.symbol}><td>{item.rank2w == null ? '—' : rankScope === 'sector' ? `#${item.rank2w} in ${item.rankGroup}` : `#${item.rank2w}`}</td><td><strong>{item.symbol}</strong></td><td>{item.label}<small>{item.sector ?? '—'}</small></td><td>{item.close == null ? '—' : item.close.toLocaleString()}</td><td>{rotationPercent(item.return2w)}</td><td>{rotationPercent(item.return1m)}</td><td>{rotationPercent(item.return3m)}</td><td>{rotationPercentile(item.percentile2w)}</td><td><span className="ma-stack">20 {maLabel(item.aboveMa20)} · 50 {maLabel(item.aboveMa50)} · 200 {maLabel(item.aboveMa200)}</span></td><td><Badge tone={item.status === 'ok' ? 'gain' : 'warn'}>{item.status}</Badge></td></tr>)}</tbody></table></div></Card>
-}
-
-export function PartnersPage() {
-  const q = usePartnersQuery(); const items = q.data?.items ?? []
-  const [agentName, setAgentName] = useState(''); const [key, setKey] = useState(''); const [error, setError] = useState('')
-  const createAgent = useCreateAgentMutation()
-  async function create(e: FormEvent) { e.preventDefault(); setError(''); setKey(''); try { const x = await createAgent.mutateAsync(agentName.trim()); setKey(x.apiKey); setAgentName('') } catch { setError('Could not create the agent.') } }
-  async function copyKey() { await navigator.clipboard.writeText(key) }
-  return <><PageHeader title="Partners" subtitle="Useful relationships and scoped integrations" />
-    <Card className="stack"><h2>Create AI agent</h2><p className="is-muted">The API key is shown once. Copy it now; the cockpit never stores the raw key.</p><form className="inline-form" onSubmit={create}><TextInput aria-label="Agent name" required value={agentName} onChange={e => setAgentName(e.target.value)} placeholder="Agent name" /><Button variant="primary" type="submit" loading={createAgent.isPending}>Create agent</Button></form>{error ? <p className="form-error" role="alert">{error}</p> : null}{key ? <div className="secret-once" role="status"><code>{key}</code><Button size="sm" onClick={copyKey}>Copy key</Button><Button size="sm" variant="ghost" onClick={() => setKey('')}>I saved it</Button></div> : null}</Card>
-    <ListState loading={q.isLoading} error={q.isError ? 'error' : undefined} empty={!items.length} retry={() => { void q.refetch() }}><div className="card-grid">{items.map(x => <Card key={x.id} className="stack"><div><strong>{x.partnerType === 'agent' ? 'AI agent' : 'Partner'}</strong> <Badge tone={x.status === 'accepted' ? 'gain' : 'muted'}>{x.status}</Badge></div><p className="is-muted">Partner ID: {x.partnerUserId}</p><span className="article-meta">Linked {new Date(x.createdAt).toLocaleDateString()}</span></Card>)}</div></ListState></>
 }
 
 export function ArticlesPage() { const q = useArticlesQuery(); const items = q.data?.items ?? []; return <><PageHeader title="Articles" subtitle="Research worth returning to" /><ListState loading={q.isLoading} error={q.isError ? 'error' : undefined} empty={!items.length} retry={() => { void q.refetch() }}><ul className="article-list">{items.map(x => <li key={x.id}><Link to={`/articles/${x.slug}`}><Card as="article" className="stack"><div className="article-meta">{x.publishedAt ? new Date(x.publishedAt).toLocaleDateString() : x.slug}</div><h2>{x.title}</h2><p className="is-muted">{x.body}</p></Card></Link></li>)}</ul></ListState></> }

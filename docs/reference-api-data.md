@@ -211,7 +211,12 @@ The raw `percentile2w` contract range is `0` through `1`; clients may format it 
 | DELETE | `/api/app/partners/{id}` |
 | POST | `/api/app/partners/{id}/accept` |
 | PUT | `/api/app/partners/{id}/share-policy` |
+| GET | `/api/app/partners/{id}/summary` |
 | GET | `/api/app/partners/{ownerId}/authorization` |
+| GET, POST | `/api/app/partners/invitations` |
+| DELETE | `/api/app/partners/invitations/{id}` |
+| POST | `/api/app/partners/invitations/redeem` |
+| GET | `/api/app/partners/{linkId}/compare` |
 | GET | `/api/content/posts` |
 | GET | `/api/content/posts/{slug}` |
 | POST | `/api/app/tools/position-sizing` |

@@ -9,6 +9,8 @@ record StoredResult(int StatusCode, string? Location, JsonElement Body);
 record QuickNoteResponse(Guid? DiaryId, bool Appended);
 record DiaryDaySummaryItem(DateOnly LocalDate, long DiaryCount, long TransactionCount);
 record CollectionResponse<T>(List<T> Items);
+/// <summary>Sanitized diary projection for partner compare. No transactions/reviews/internal IDs.</summary>
+public record PartnerDiaryItem(Guid Id, DateOnly LocalDate, string Title, string Content, IReadOnlyList<string> Tags);
 
 // ponytail: WithOpenApi parameter mutations are dropped by .NET 10 doc generation (hence its deprecation),
 // so the Idempotency-Key header is surfaced via a marker + operation transformer instead.

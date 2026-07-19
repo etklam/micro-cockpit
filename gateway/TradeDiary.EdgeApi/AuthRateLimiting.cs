@@ -43,6 +43,32 @@ internal static class AuthRateLimiting
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
+
+        // Partner invitation create/redeem — IP partition (same pattern as auth; rate limiter runs pre-auth).
+        options.AddPolicy(PartnerRateLimiting.InviteCreate, httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(PartitionKey(httpContext), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromHours(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+        options.AddPolicy(PartnerRateLimiting.InviteRedeem, httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(PartitionKey(httpContext), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromHours(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+        options.AddPolicy(PartnerRateLimiting.InviteRead, httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(PartitionKey(httpContext), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
     }
 
     // Endpoint metadata is applied by AuthBodyLimitMiddleware before model binding.

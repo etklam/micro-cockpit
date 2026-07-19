@@ -29,6 +29,7 @@ builder.Services.AddAuthorization(options =>
     }));
 });
 builder.Services.AddHttpClient("reminder", client => client.BaseAddress = new Uri(builder.Configuration["Services:Reminder"] ?? "http://127.0.0.1:5104"));
+builder.Services.AddHttpClient("partner", client => client.BaseAddress = new Uri(builder.Configuration["Services:Partner"] ?? "http://127.0.0.1:5109"));
 builder.Services.AddHostedService<OutboxPublisher>();
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
@@ -383,6 +384,53 @@ diary.MapDelete("/diaries/{diaryId:guid}/transactions/{id:guid}", async (Guid di
     return await command.ExecuteNonQueryAsync() == 0 ? Results.Problem("not_found", statusCode: 404) : Results.NoContent();
 })
 .Produces(204).ProducesProblem(401).ProducesProblem(404);
+
+// Partner-shared diary read. Journal owns the data; Partner owns authorization.
+// Returns only diary projection fields — never transactions, reviews, or internal metadata.
+diary.MapGet("/partner-diaries", async (
+    Guid ownerId,
+    DateOnly from,
+    DateOnly to,
+    HttpRequest request,
+    NpgsqlDataSource db,
+    IHttpClientFactory httpFactory) =>
+{
+    if (!JournalAccess.TryUser(request, out var viewerId)) return Results.Unauthorized();
+    if (to < from || to.DayNumber - from.DayNumber > 366) return Results.Problem("invalid_date_range", statusCode: 400);
+    if (ownerId == viewerId) return Results.Problem("not_found", statusCode: 404);
+
+    var allowed = await PartnerShare.IsDiarySharedAsync(httpFactory, request, ownerId);
+    if (allowed is null) return Results.Problem("partner_unavailable", statusCode: 503);
+    if (allowed is not true) return Results.Problem("not_found", statusCode: 404);
+
+    await using var command = db.CreateCommand("""
+        SELECT d.id, d.local_date, d.title, d.content,
+               coalesce((
+                 SELECT array_agg(t.tag ORDER BY t.tag)
+                 FROM journal.diary_tags t
+                 WHERE t.diary_id = d.id AND t.user_id = d.user_id
+               ), '{}'::text[]) AS tags
+        FROM journal.diaries d
+        WHERE d.user_id = $1 AND d.deleted_at IS NULL AND d.local_date BETWEEN $2 AND $3
+        ORDER BY d.local_date DESC, d.created_at DESC
+        """);
+    command.Parameters.AddWithValue(ownerId);
+    command.Parameters.AddWithValue(from);
+    command.Parameters.AddWithValue(to);
+    await using var reader = await command.ExecuteReaderAsync();
+    var items = new List<PartnerDiaryItem>();
+    while (await reader.ReadAsync())
+    {
+        items.Add(new PartnerDiaryItem(
+            reader.GetGuid(0),
+            reader.GetFieldValue<DateOnly>(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.GetFieldValue<string[]>(4)));
+    }
+    return Results.Ok(new CollectionResponse<PartnerDiaryItem>(items));
+})
+.Produces<CollectionResponse<PartnerDiaryItem>>(200).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404).ProducesProblem(503);
 
 app.Run();
 

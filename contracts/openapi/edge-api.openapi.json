@@ -6,241 +6,6 @@
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "paths": {
-    "/api/app/partners": {
-      "get": {
-        "tags": [
-          "TradeDiary.Partner"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CollectionResponseOfLink"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "operationId": "get_api_app_partners"
-      },
-      "post": {
-        "tags": [
-          "TradeDiary.Partner"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LinkWrite"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Link"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "409": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "operationId": "post_api_app_partners"
-      }
-    },
-    "/api/app/partners/{id}": {
-      "delete": {
-        "tags": [
-          "TradeDiary.Partner"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "operationId": "delete_api_app_partners_id"
-      }
-    },
-    "/api/app/partners/{id}/accept": {
-      "post": {
-        "tags": [
-          "TradeDiary.Partner"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "operationId": "post_api_app_partners_id_accept"
-      }
-    },
-    "/api/app/partners/{id}/share-policy": {
-      "put": {
-        "tags": [
-          "TradeDiary.Partner"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SharePolicy"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "operationId": "put_api_app_partners_id_share_policy"
-      }
-    },
-    "/api/app/partners/{ownerId}/authorization": {
-      "get": {
-        "tags": [
-          "TradeDiary.Partner"
-        ],
-        "parameters": [
-          {
-            "name": "ownerId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "resource",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthorizationResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "401": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "operationId": "get_api_app_partners_ownerId_authorization"
-      }
-    },
     "/api/app/tools/position-sizing": {
       "post": {
         "tags": [
@@ -1866,6 +1631,413 @@
         "operationId": "put_api_app_diaries_diaryId_review"
       }
     },
+    "/api/app/partners": {
+      "get": {
+        "tags": [
+          "TradeDiary.Partner"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionResponseOfPartnerLinkView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "get_api_app_partners"
+      },
+      "post": {
+        "tags": [
+          "TradeDiary.Partner"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Link"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "post_api_app_partners"
+      }
+    },
+    "/api/app/partners/{id}": {
+      "delete": {
+        "tags": [
+          "TradeDiary.Partner"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "delete_api_app_partners_id"
+      }
+    },
+    "/api/app/partners/{id}/accept": {
+      "post": {
+        "tags": [
+          "TradeDiary.Partner"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "post_api_app_partners_id_accept"
+      }
+    },
+    "/api/app/partners/{id}/share-policy": {
+      "put": {
+        "tags": [
+          "TradeDiary.Partner"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharePolicyWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "put_api_app_partners_id_share_policy"
+      }
+    },
+    "/api/app/partners/{ownerId}/authorization": {
+      "get": {
+        "tags": [
+          "TradeDiary.Partner"
+        ],
+        "parameters": [
+          {
+            "name": "ownerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "resource",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorizationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "get_api_app_partners_ownerId_authorization"
+      }
+    },
+    "/api/app/partners/{id}/summary": {
+      "get": {
+        "tags": [
+          "TradeDiary.Partner"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerLinkView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "get_api_app_partners_id_summary"
+      }
+    },
+    "/api/app/partners/invitations": {
+      "get": {
+        "tags": [
+          "TradeDiary.Partner"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionResponseOfInvitationListItem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "get_api_app_partners_invitations"
+      },
+      "post": {
+        "tags": [
+          "TradeDiary.Partner"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationCreatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "post_api_app_partners_invitations"
+      }
+    },
+    "/api/app/partners/invitations/{id}": {
+      "delete": {
+        "tags": [
+          "TradeDiary.Partner"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "delete_api_app_partners_invitations_id"
+      }
+    },
+    "/api/app/partners/invitations/redeem": {
+      "post": {
+        "tags": [
+          "TradeDiary.Partner"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemInvitation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedeemInvitationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "post_api_app_partners_invitations_redeem"
+      }
+    },
     "/api/app/stocks": {
       "get": {
         "tags": [
@@ -3363,6 +3535,76 @@
         }
       }
     },
+    "/api/app/partners/{linkId}/compare": {
+      "get": {
+        "operationId": "get_api_app_partners_linkId_compare",
+        "summary": "Edge aggregation: /api/app/partners/{linkId}/compare",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "linkId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerCompareResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "502": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "504": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
     "/api/app/settings": {
       "get": {
         "operationId": "get_api_app_settings",
@@ -3968,6 +4210,20 @@
           }
         }
       },
+      "CollectionResponseOfInvitationListItem": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvitationListItem"
+            }
+          }
+        }
+      },
       "CollectionResponseOfJobResponse": {
         "required": [
           "items"
@@ -3982,7 +4238,7 @@
           }
         }
       },
-      "CollectionResponseOfLink": {
+      "CollectionResponseOfPartnerLinkView": {
         "required": [
           "items"
         ],
@@ -3991,7 +4247,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Link"
+              "$ref": "#/components/schemas/PartnerLinkView"
             }
           }
         }
@@ -5055,6 +5311,53 @@
           }
         }
       },
+      "InvitationCreatedResponse": {
+        "required": [
+          "id",
+          "code",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InvitationListItem": {
+        "required": [
+          "id",
+          "status",
+          "expiresAt",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "JobAcceptedResponse": {
         "required": [
           "id",
@@ -5444,6 +5747,176 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "PartnerCompareCapabilitiesResponse": {
+        "type": "object",
+        "required": [
+          "partnerDiaries"
+        ],
+        "properties": {
+          "partnerDiaries": {
+            "$ref": "#/components/schemas/PartnerDiaryCapability"
+          }
+        }
+      },
+      "PartnerCompareDayResponse": {
+        "type": "object",
+        "required": [
+          "localDate",
+          "mine",
+          "partner"
+        ],
+        "properties": {
+          "localDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "mine": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerCompareDiaryItem"
+            }
+          },
+          "partner": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerCompareDiaryItem"
+            }
+          }
+        }
+      },
+      "PartnerCompareDiaryItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "localDate",
+          "title",
+          "content",
+          "tags"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "localDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PartnerCompareResponse": {
+        "type": "object",
+        "required": [
+          "linkId",
+          "partnerDisplayName",
+          "partnerUserId",
+          "from",
+          "to",
+          "days",
+          "capabilities"
+        ],
+        "properties": {
+          "linkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "partnerDisplayName": {
+            "type": "string"
+          },
+          "partnerUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerCompareDayResponse"
+            }
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/PartnerCompareCapabilitiesResponse"
+          }
+        }
+      },
+      "PartnerDiaryCapability": {
+        "type": "string",
+        "enum": [
+          "available",
+          "not_shared",
+          "unavailable"
+        ]
+      },
+      "PartnerLinkView": {
+        "required": [
+          "id",
+          "otherUserId",
+          "partnerType",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "initiatedByMe",
+          "myShareDiaries",
+          "partnerShareDiaries",
+          "partnerDisplayName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "otherUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "partnerType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "initiatedByMe": {
+            "type": "boolean"
+          },
+          "myShareDiaries": {
+            "type": "boolean"
+          },
+          "partnerShareDiaries": {
+            "type": "boolean"
+          },
+          "partnerDisplayName": {
+            "type": "string"
           }
         }
       },
@@ -5980,6 +6453,29 @@
           }
         }
       },
+      "RedeemInvitation": {
+        "required": [
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "RedeemInvitationResponse": {
+        "required": [
+          "linkId"
+        ],
+        "type": "object",
+        "properties": {
+          "linkId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "RegisterRequest": {
         "required": [
           "email",
@@ -6293,21 +6789,13 @@
           }
         }
       },
-      "SharePolicy": {
+      "SharePolicyWrite": {
         "required": [
-          "shareDiaries",
-          "shareTransactions",
-          "sharePerformance"
+          "shareDiaries"
         ],
         "type": "object",
         "properties": {
           "shareDiaries": {
-            "type": "boolean"
-          },
-          "shareTransactions": {
-            "type": "boolean"
-          },
-          "sharePerformance": {
             "type": "boolean"
           }
         }

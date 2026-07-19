@@ -100,6 +100,11 @@
       "id": "0020",
       "filename": "0020_identity_user_locale.sql",
       "sha256": "8b848e2285d7af9f78919c11a3a8cfc0d51db7594a87f4e7027731cfb30be3ff"
+    },
+    {
+      "id": "0021",
+      "filename": "0021_partner_invitations.sql",
+      "sha256": "6f65fa78366efe9ec947aa78fff7493e78e8ad67fd2d7484a5296679202e8364"
     }
   ]
 }

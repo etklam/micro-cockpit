@@ -36,6 +36,8 @@ export const queryKeys = {
     monitor: (universe: string, scope: string) => ['rotation', 'monitor', universe, scope] as const,
   },
   partners: ['partners'] as const,
+  partnerInvitations: ['partners', 'invitations'] as const,
+  partnerCompare: (linkId: string, from: string, to: string) => ['partners', 'compare', linkId, from, to] as const,
   articles: ['articles'] as const,
   article: (slug: string) => ['article', slug] as const,
   diaryReview: {
@@ -94,6 +96,59 @@ export const useRotationQuery = (universe: string, scope: string) => useQuery({
   placeholderData: previous => previous,
 })
 export const usePartnersQuery = () => useQuery({ queryKey: queryKeys.partners, queryFn: api.getPartners })
+export const usePartnerInvitationsQuery = () => useQuery({ queryKey: queryKeys.partnerInvitations, queryFn: api.getPartnerInvitations })
+export const usePartnerCompareQuery = (linkId: string, from: string, to: string) => useQuery({
+  queryKey: queryKeys.partnerCompare(linkId, from, to),
+  queryFn: () => api.getPartnerCompare(linkId, from || undefined, to || undefined),
+  enabled: !!linkId && !!from && !!to,
+})
+export function useCreatePartnerInvitationMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: api.createPartnerInvitation,
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.partnerInvitations }) },
+  })
+}
+export function useRevokePartnerInvitationMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.revokePartnerInvitation(id),
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.partnerInvitations }) },
+  })
+}
+export function useRedeemPartnerInvitationMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (code: string) => api.redeemPartnerInvitation(code),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.partners }),
+        client.invalidateQueries({ queryKey: queryKeys.partnerInvitations }),
+      ])
+    },
+  })
+}
+export function useAcceptPartnerMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.acceptPartner(id),
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.partners }) },
+  })
+}
+export function useRevokePartnerMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.revokePartner(id),
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.partners }) },
+  })
+}
+export function usePartnerShareDiariesMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, shareDiaries }: { id: string; shareDiaries: boolean }) => api.setPartnerShareDiaries(id, shareDiaries),
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.partners }) },
+  })
+}
 export const useArticlesQuery = () => useQuery({ queryKey: queryKeys.articles, queryFn: api.getArticles })
 export const useArticleQuery = (slug: string) => useQuery({ queryKey: queryKeys.article(slug), queryFn: () => api.getArticle(slug), enabled: !!slug })
 export const useDiaryReviewQuery = (diaryId: string) => useQuery({ queryKey: queryKeys.diaryReview.detail(diaryId), queryFn: () => api.getDiaryReview(diaryId), enabled: !!diaryId })

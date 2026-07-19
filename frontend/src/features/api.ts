@@ -138,6 +138,20 @@ export function priceAlertCreateErrorKind(error: unknown): PriceAlertCreateError
 export const getRotationUniverses = () => G.getApiAppRotationUniverses()
 export const getMarketRotation = (universe: string) => G.getApiAppRotationMonitor({ universe })
 export const getPartners = () => G.getApiAppPartners()
+export const getPartnerInvitations = () => G.getApiAppPartnersInvitations()
+export const createPartnerInvitation = () => G.postApiAppPartnersInvitations()
+export const revokePartnerInvitation = (id: string) => G.deleteApiAppPartnersInvitationsId(id)
+export const redeemPartnerInvitation = (code: string) => G.postApiAppPartnersInvitationsRedeem({ code })
+export const acceptPartner = (id: string) => G.postApiAppPartnersIdAccept(id)
+export const revokePartner = (id: string) => G.deleteApiAppPartnersId(id)
+export const setPartnerShareDiaries = (id: string, shareDiaries: boolean) =>
+  G.putApiAppPartnersIdSharePolicy(id, { shareDiaries })
+export const getPartnerCompare = (linkId: string, from?: string, to?: string) =>
+  G.getApiAppPartnersLinkIdCompare(linkId, { from, to })
+export type PartnerLink = G.PartnerLinkView
+export type PartnerInvitation = G.InvitationListItem
+export type PartnerCompare = G.PartnerCompareResponse
+export type PartnerDiaryCapability = G.PartnerDiaryCapability
 export const getArticles = () => G.getApiContentPosts()
 export const getArticle = (slug: string) => G.getApiContentPostsSlug(slug)
 export const createAgent = (name: string) => G.postApiAppAgents({

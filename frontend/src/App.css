@@ -1005,7 +1005,28 @@
   border-radius: var(--r-md);
   background: var(--warn-soft);
 }
+
 .secret-once code { flex: 1 1 260px; overflow-wrap: anywhere; user-select: all; }
+
+.partner-card__head { display: flex; justify-content: space-between; gap: var(--sp-2); align-items: center; }
+.partner-card__actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.partner-share { display: flex; gap: var(--sp-2); align-items: center; }
+.partner-compare-controls { margin-bottom: var(--sp-4); }
+.partner-compare-days { display: grid; gap: var(--sp-5); }
+.partner-compare-day__date { margin: 0 0 var(--sp-2); font-size: 1rem; }
+.partner-compare-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+}
+.partner-compare-col { display: grid; gap: var(--sp-3); align-content: start; }
+.partner-compare-col h3 { margin: 0; font-size: 0.95rem; color: var(--muted); }
+.partner-diary-entry { min-width: 0; }
+.partner-tags { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+@media (max-width: 800px) {
+  .partner-compare-columns { grid-template-columns: 1fr; }
+}
+
 
 /* --------------------------- Skeleton ----------------------------- */
 .page-skel { display: flex; flex-direction: column; gap: var(--sp-5); }

@@ -55,6 +55,7 @@ DisciplineEndpoints.Map(app);
 ReminderEndpoints.Map(app);
 ResearchEndpoints.Map(app);
 AdminEndpoints.Map(app);
+PartnerEndpoints.Map(app);
 CompositionEndpoints.Map(app);
 
 app.Run();

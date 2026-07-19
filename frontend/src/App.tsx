@@ -8,7 +8,7 @@ import { Icon } from './icons'
 import { cx } from './format'
 import './App.css'
 import { AlertsPage, CalendarPage, DiaryDetailPage, DiaryPage, DisciplinePage, TodayPage } from './pages'
-import { ArticleDetailPage, ArticlesPage, MorePage, PartnersPage, PriceAlertsPage, RotationPage, ToolsPage, WatchlistPage } from './latePages'
+import { ArticleDetailPage, ArticlesPage, MorePage, PartnerComparePage, PartnersPage, PriceAlertsPage, RotationPage, ToolsPage, WatchlistPage } from './latePages'
 import { SettingsPage } from './screens/settings'
 import { useBootstrapQuery } from './features/queries'
 import { reconcileAppearance, subscribeSystemAppearance, type Appearance, isAppearance } from './features/appearance'
@@ -62,6 +62,7 @@ export default function App() {
           <Route path="/price-alerts" element={<PriceAlertsPage />} />
           <Route path="/rotation" element={<RotationPage />} />
           <Route path="/partners" element={<PartnersPage />} />
+          <Route path="/partners/:partnerId/compare" element={<PartnerComparePage />} />
           <Route path="/articles" element={<ArticlesPage />} />
           <Route path="/articles/:slug" element={<ArticleDetailPage />} />
           <Route path="*" element={<NotFoundPage />} />

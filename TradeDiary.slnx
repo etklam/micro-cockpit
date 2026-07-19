@@ -70,6 +70,9 @@
   <Folder Name="/tests/TradeDiary.Journal.Tests/">
     <Project Path="tests/TradeDiary.Journal.Tests/TradeDiary.Journal.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/TradeDiary.Partner.Tests/">
+    <Project Path="tests/TradeDiary.Partner.Tests/TradeDiary.Partner.Tests.csproj" />
+  </Folder>
   <Folder Name="/tests/TradeDiary.Performance.Tests/">
     <Project Path="tests/TradeDiary.Performance.Tests/TradeDiary.Performance.Tests.csproj" />
   </Folder>
