@@ -430,6 +430,13 @@ public sealed class CockpitCompositionTests
         });
         using var client = factory.CreateClient();
 
+        foreach (var path in new[]
+                 {
+                     "/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2026-07-15&to=2026-07-15",
+                     "/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2026-06-16&to=2026-07-15"
+                 })
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(path)).StatusCode);
+
         using var ok = await client.GetAsync("/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2025-07-15&to=2026-07-15");
         Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
         var body = await ok.Content.ReadAsStringAsync();
@@ -443,6 +450,8 @@ public sealed class CockpitCompositionTests
         // DayNumber delta 366 (>365) is rejected for inclusive 366-day max.
         using var tooLarge = await client.GetAsync("/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2025-07-14&to=2026-07-15");
         Assert.Equal(HttpStatusCode.BadRequest, tooLarge.StatusCode);
+        using var inverted = await client.GetAsync("/api/app/partners/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/compare?from=2026-07-16&to=2026-07-15");
+        Assert.Equal(HttpStatusCode.BadRequest, inverted.StatusCode);
     }
 
     [Theory]

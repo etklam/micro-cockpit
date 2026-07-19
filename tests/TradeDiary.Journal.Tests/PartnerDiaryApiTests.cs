@@ -45,11 +45,19 @@ public sealed class PartnerDiaryApiTests
         Assert.Equal(HttpStatusCode.NotFound,
             (await ownerClient.GetAsync($"/internal/partner-diaries?ownerId={owner}&from=2026-07-01&to=2026-07-31")).StatusCode);
 
-        // Inclusive max 366 days: DayNumber delta 365 ok, 366 fails.
-        Assert.Equal(HttpStatusCode.OK,
-            (await partnerClient.GetAsync($"/internal/partner-diaries?ownerId={owner}&from=2025-07-10&to=2026-07-10")).StatusCode);
+        // Inclusive calendar-day boundaries: 1, 30, and 366 accepted; 367 and inverted rejected.
+        foreach (var (from, to) in new[]
+                 {
+                     ("2026-07-10", "2026-07-10"),
+                     ("2026-06-11", "2026-07-10"),
+                     ("2025-07-10", "2026-07-10")
+                 })
+            Assert.Equal(HttpStatusCode.OK,
+                (await partnerClient.GetAsync($"/internal/partner-diaries?ownerId={owner}&from={from}&to={to}")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest,
             (await partnerClient.GetAsync($"/internal/partner-diaries?ownerId={owner}&from=2025-07-09&to=2026-07-10")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await partnerClient.GetAsync($"/internal/partner-diaries?ownerId={owner}&from=2026-07-11&to=2026-07-10")).StatusCode);
 
         using var allowed = await partnerClient.GetAsync($"/internal/partner-diaries?ownerId={owner}&from=2026-07-01&to=2026-07-31");
         Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
