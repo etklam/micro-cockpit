@@ -14,6 +14,7 @@ internal static class SettingsEndpoints
                 value.BaseCurrency,
                 value.Appearance,
                 value.Locale,
+                value.AccentTheme,
                 value.UpdatedAt));
         });
 
@@ -30,6 +31,7 @@ internal static class SettingsEndpoints
                 value.BaseCurrency,
                 value.Appearance,
                 value.Locale,
+                value.AccentTheme,
                 value.UpdatedAt));
         });
     }

@@ -1,16 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { isAppearance, type Appearance } from '../features/appearance'
+import {
+  isAppearance,
+  normalizeAccent,
+  reconcileAccent,
+  reconcileAppearance,
+  THEME_PRESETS,
+  type ThemePresetId,
+} from '../features/appearance'
 import { useAppearance } from '../features/useAppearance'
 import { deviceTimezone, formatTimezoneLabel } from '../features/accountTime'
 import { useBootstrapQuery, useSaveSettingsMutation, useSettingsQuery } from '../features/queries'
 import { useAuth } from '../auth/AuthProvider'
 import { Button, Card, Field, PageHeader, SelectBox, TextInput } from '../ui'
-import { Icon, type IconName } from '../icons'
 import { PageSkeleton, SectionError } from '../shell'
 import { cx } from '../format'
 import { isLocale, useI18n, type Locale } from '../i18n'
+import type { MessageKey } from '../i18n'
 
 const COMMON_TIMEZONES = [
   'UTC',
@@ -39,7 +46,7 @@ export function SettingsPage() {
   const settings = useSettingsQuery()
   const bootstrap = useBootstrapQuery()
   const save = useSaveSettingsMutation()
-  const { preference: appearance, setAppearance } = useAppearance()
+  const { preference: appearance, accent, activePresetId, applyPreset } = useAppearance()
   const { locale, setLocale, t } = useI18n()
   const { logout } = useAuth()
   const navigate = useNavigate()
@@ -53,11 +60,10 @@ export function SettingsPage() {
   const [partialNotice, setPartialNotice] = useState('')
   const [saved, setSaved] = useState(false)
 
-  const appearanceOptions: { value: Appearance; label: string; hint: string; icon: IconName; swatch: string }[] = [
-    { value: 'system', label: t('settings.theme.system'), hint: t('settings.theme.systemHint'), icon: 'monitor', swatch: 'system' },
-    { value: 'dark', label: t('settings.theme.dark'), hint: t('settings.theme.darkHint'), icon: 'moon', swatch: 'dark' },
-    { value: 'light', label: t('settings.theme.light'), hint: t('settings.theme.lightHint'), icon: 'sun', swatch: 'light' },
-  ]
+  const presetLabel = (id: ThemePresetId): MessageKey =>
+    (`settings.theme.preset.${id}` as MessageKey)
+  const presetHint = (id: ThemePresetId): MessageKey =>
+    (`settings.theme.preset.${id}Hint` as MessageKey)
 
   const localeOptions: { value: Locale; label: string }[] = [
     { value: 'en', label: t('settings.language.en') },
@@ -95,7 +101,14 @@ export function SettingsPage() {
     if (!isLocale(locale)) { setFormError(t('settings.error.locale')); return }
 
     try {
-      const result = await save.mutateAsync({ displayName: name, timezone: tz, baseCurrency: ccy, appearance, locale })
+      const result = await save.mutateAsync({
+        displayName: name,
+        timezone: tz,
+        baseCurrency: ccy,
+        appearance,
+        locale,
+        accentTheme: accent,
+      })
       if (result.status === 'saved_session_stale') {
         setPartialNotice(t('settings.sessionStale'))
         await logout()
@@ -106,8 +119,9 @@ export function SettingsPage() {
       setDisplayName(result.settings.displayName)
       setTimezone(result.settings.timezone)
       setBaseCurrency(result.settings.baseCurrency)
-      if (isAppearance(result.settings.appearance)) void setAppearance(result.settings.appearance)
-      if (isLocale(result.settings.locale)) void setLocale(result.settings.locale)
+      if (isAppearance(result.settings.appearance)) reconcileAppearance(result.settings.appearance)
+      const serverAccent = normalizeAccent(result.settings.accentTheme)
+      if (serverAccent) reconcileAccent(serverAccent)
     } catch (error) {
       setFormError(error instanceof Error ? error.message : t('settings.error.save'))
     }
@@ -192,29 +206,29 @@ export function SettingsPage() {
 
           <section className="stack">
             <h2>{t('settings.appearance')}</h2>
-            <Field label={t('settings.theme')} hint={t('settings.themeHint')}>
-              <div className="theme-picker" role="radiogroup" aria-label={t('settings.theme')}>
-                {appearanceOptions.map(option => {
-                  const selected = appearance === option.value
+            <Field label={t('settings.theme.presetsLabel')} hint={t('settings.themeHint')}>
+              <div className="theme-picker theme-picker--presets" role="radiogroup" aria-label={t('settings.theme.presetsLabel')}>
+                {THEME_PRESETS.map(preset => {
+                  const selected = activePresetId === preset.id
                   return (
                     <button
-                      key={option.value}
+                      key={preset.id}
                       type="button"
                       role="radio"
                       aria-checked={selected}
                       className={cx('theme-picker__option', selected && 'is-selected')}
                       onClick={() => {
-                        void setAppearance(option.value)
+                        void applyPreset(preset)
                         setSaved(false)
                       }}
                     >
-                      <span className={cx('theme-picker__swatch', `theme-picker__swatch--${option.swatch}`)} aria-hidden="true" />
+                      <span
+                        className={cx('theme-picker__swatch', `theme-picker__swatch--preset-${preset.id}`)}
+                        aria-hidden="true"
+                      />
                       <span className="theme-picker__copy">
-                        <span className="theme-picker__label">
-                          <Icon name={option.icon} size={14} style={{ display: 'inline-block', verticalAlign: '-2px', marginRight: 6 }} />
-                          {option.label}
-                        </span>
-                        <span className="theme-picker__hint">{option.hint}</span>
+                        <span className="theme-picker__label">{t(presetLabel(preset.id))}</span>
+                        <span className="theme-picker__hint">{t(presetHint(preset.id))}</span>
                       </span>
                     </button>
                   )

@@ -122,8 +122,8 @@ Responses never include stack traces, SQL, internal URLs, credentials, or downst
 
 | Methods | Path | Notes |
 |---|---|---|
-| GET | `/api/app/bootstrap` | Current user, timezone, base currency, appearance, locale, role, account type, local date, product areas |
-| GET, PUT | `/api/app/settings` | Account settings (display name, timezone, base currency, appearance, locale); email read-only |
+| GET | `/api/app/bootstrap` | Current user, timezone, base currency, appearance, locale, accent theme, role, account type, local date, product areas |
+| GET, PUT | `/api/app/settings` | Account settings (display name, timezone, base currency, appearance, locale, accent theme); email read-only |
 | GET | `/api/app/dashboard` | Journal, performance, discipline, alert composition |
 | GET | `/api/app/calendar` | Query: `year`, `month` |
 | GET | `/api/app/stocks/{symbol}/page` | Required stock research plus optional market data |

@@ -13,7 +13,7 @@ import { server } from './setup'
 
 const bootstrap = {
   currentUser: { id: 'user-1', email: 'owner@example.com', displayName: 'Owner' },
-  timezone: 'Asia/Taipei', baseCurrency: 'HKD', appearance: 'system', locale: 'en', role: 'user', accountType: 'human', currentLocalDate: '2028-02-14',
+  timezone: 'Asia/Taipei', baseCurrency: 'HKD', appearance: 'system', accentTheme: 'green', locale: 'en', role: 'user', accountType: 'human', currentLocalDate: '2028-02-14',
   availableProductAreas: ['today', 'diary', 'calendar'],
 }
 

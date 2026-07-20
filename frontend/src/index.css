@@ -21,13 +21,13 @@ html[data-theme="dark"] {
   --muted:        oklch(0.72 0.010 80);
   --faint:        oklch(0.52 0.012 80);
 
-  /* ---- Brand / signal lamp (amber-iron, restrained) ---- */
-  --primary:          oklch(0.80 0.09 72);
-  --primary-hover:    oklch(0.86 0.08 72);
-  --primary-press:    oklch(0.70 0.10 70);
-  --primary-btn:      oklch(0.62 0.11 68);
-  --primary-btn-hover: oklch(0.68 0.10 70);
-  --on-primary:       oklch(0.16 0.01 70);
+  /* ---- Brand / chrome accent (default green; red via data-accent) ---- */
+  --primary:          oklch(0.78 0.12 155);
+  --primary-hover:    oklch(0.84 0.11 155);
+  --primary-press:    oklch(0.68 0.13 155);
+  --primary-btn:      oklch(0.62 0.13 155);
+  --primary-btn-hover: oklch(0.68 0.12 155);
+  --on-primary:       oklch(0.16 0.02 155);
   --primary-soft:     color-mix(in oklch, var(--primary) 12%, transparent);
   --primary-line:     color-mix(in oklch, var(--primary) 36%, transparent);
 
@@ -130,11 +130,11 @@ html[data-theme="light"] {
   --muted:        oklch(0.44 0.012 70);
   --faint:        oklch(0.58 0.01 70);
 
-  --primary:          oklch(0.50 0.11 65);
-  --primary-hover:    oklch(0.44 0.12 65);
-  --primary-press:    oklch(0.40 0.12 65);
-  --primary-btn:      oklch(0.48 0.12 65);
-  --primary-btn-hover: oklch(0.42 0.12 65);
+  --primary:          oklch(0.46 0.12 155);
+  --primary-hover:    oklch(0.40 0.13 155);
+  --primary-press:    oklch(0.36 0.13 155);
+  --primary-btn:      oklch(0.44 0.13 155);
+  --primary-btn-hover: oklch(0.38 0.13 155);
   --on-primary:       oklch(0.99 0 0);
   --primary-soft:     color-mix(in oklch, var(--primary) 10%, transparent);
   --primary-line:     color-mix(in oklch, var(--primary) 32%, transparent);
@@ -161,6 +161,57 @@ html[data-theme="light"] {
   --picker-filter: invert(0.2) saturate(0.9);
 
   color-scheme: light;
+}
+
+/* Chrome accent: red (gain/loss tokens untouched) */
+html[data-theme="dark"][data-accent="red"],
+html[data-accent="red"] {
+  --primary:          oklch(0.74 0.14 25);
+  --primary-hover:    oklch(0.80 0.13 25);
+  --primary-press:    oklch(0.64 0.15 25);
+  --primary-btn:      oklch(0.58 0.15 25);
+  --primary-btn-hover: oklch(0.64 0.14 25);
+  --on-primary:       oklch(0.99 0.01 25);
+  --primary-soft:     color-mix(in oklch, var(--primary) 12%, transparent);
+  --primary-line:     color-mix(in oklch, var(--primary) 36%, transparent);
+  --ring: 0 0 0 3px color-mix(in oklch, var(--primary) 34%, transparent);
+}
+
+html[data-theme="light"][data-accent="red"] {
+  --primary:          oklch(0.50 0.16 25);
+  --primary-hover:    oklch(0.44 0.16 25);
+  --primary-press:    oklch(0.40 0.16 25);
+  --primary-btn:      oklch(0.48 0.16 25);
+  --primary-btn-hover: oklch(0.42 0.16 25);
+  --on-primary:       oklch(0.99 0 0);
+  --primary-soft:     color-mix(in oklch, var(--primary) 10%, transparent);
+  --primary-line:     color-mix(in oklch, var(--primary) 32%, transparent);
+  --ring: 0 0 0 3px color-mix(in oklch, var(--primary) 24%, transparent);
+}
+
+/* Explicit green (default) — restate so order is stable with red */
+html[data-theme="dark"][data-accent="green"] {
+  --primary:          oklch(0.78 0.12 155);
+  --primary-hover:    oklch(0.84 0.11 155);
+  --primary-press:    oklch(0.68 0.13 155);
+  --primary-btn:      oklch(0.62 0.13 155);
+  --primary-btn-hover: oklch(0.68 0.12 155);
+  --on-primary:       oklch(0.16 0.02 155);
+  --primary-soft:     color-mix(in oklch, var(--primary) 12%, transparent);
+  --primary-line:     color-mix(in oklch, var(--primary) 36%, transparent);
+  --ring: 0 0 0 3px color-mix(in oklch, var(--primary) 34%, transparent);
+}
+
+html[data-theme="light"][data-accent="green"] {
+  --primary:          oklch(0.46 0.12 155);
+  --primary-hover:    oklch(0.40 0.13 155);
+  --primary-press:    oklch(0.36 0.13 155);
+  --primary-btn:      oklch(0.44 0.13 155);
+  --primary-btn-hover: oklch(0.38 0.13 155);
+  --on-primary:       oklch(0.99 0 0);
+  --primary-soft:     color-mix(in oklch, var(--primary) 10%, transparent);
+  --primary-line:     color-mix(in oklch, var(--primary) 32%, transparent);
+  --ring: 0 0 0 3px color-mix(in oklch, var(--primary) 24%, transparent);
 }
 
 /* ---------------- Reset ---------------- */

@@ -41,10 +41,12 @@ public sealed class SettingsTests : IAsyncLifetime
                 status_version integer NOT NULL DEFAULT 1,
                 appearance text NOT NULL DEFAULT 'system',
                 locale text NOT NULL DEFAULT 'en',
+                accent_theme text NOT NULL DEFAULT 'green',
                 updated_at timestamptz NOT NULL DEFAULT now(),
                 created_at timestamptz NOT NULL DEFAULT now(),
                 CONSTRAINT users_appearance_check CHECK (appearance IN ('system', 'light', 'dark')),
-                CONSTRAINT users_locale_check CHECK (locale IN ('en', 'zh-Hant'))
+                CONSTRAINT users_locale_check CHECK (locale IN ('en', 'zh-Hant')),
+                CONSTRAINT users_accent_theme_check CHECK (accent_theme IN ('green', 'red'))
             );
             CREATE TABLE identity.user_credentials (
                 user_id uuid PRIMARY KEY REFERENCES identity.users(id) ON DELETE CASCADE,
@@ -98,6 +100,7 @@ public sealed class SettingsTests : IAsyncLifetime
         Assert.Equal("owner@example.test", before!.Email);
         Assert.Equal("system", before.Appearance);
         Assert.Equal("en", before.Locale);
+        Assert.Equal("green", before.AccentTheme);
 
         using var put = await Authed(tokens.AccessToken).PutAsJsonAsync("/internal/auth/settings", new
         {
@@ -106,6 +109,7 @@ public sealed class SettingsTests : IAsyncLifetime
             baseCurrency = "jpy",
             appearance = "dark",
             locale = "zh-Hant",
+            accentTheme = "red",
         });
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
         var after = await put.Content.ReadFromJsonAsync<SettingsDto>();
@@ -114,11 +118,13 @@ public sealed class SettingsTests : IAsyncLifetime
         Assert.Equal("JPY", after.BaseCurrency);
         Assert.Equal("dark", after.Appearance);
         Assert.Equal("zh-Hant", after.Locale);
+        Assert.Equal("red", after.AccentTheme);
 
         using var me = await Authed(tokens.AccessToken).GetAsync("/internal/auth/me");
         var meBody = await me.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("dark", meBody.GetProperty("appearance").GetString());
         Assert.Equal("zh-Hant", meBody.GetProperty("locale").GetString());
+        Assert.Equal("red", meBody.GetProperty("accentTheme").GetString());
     }
 
     [Theory]
@@ -144,11 +150,22 @@ public sealed class SettingsTests : IAsyncLifetime
         Assert.Equal(locale, (await put.Content.ReadFromJsonAsync<SettingsDto>())!.Locale);
     }
 
+    [Theory]
+    [InlineData("green")]
+    [InlineData("red")]
+    public async Task Accepts_every_accent_theme_value(string accentTheme)
+    {
+        var tokens = await RegisterAndLoginAsync($"{accentTheme}@example.test");
+        using var put = await Authed(tokens.AccessToken).PutAsJsonAsync("/internal/auth/settings", Body(accentTheme: accentTheme));
+        Assert.Equal(HttpStatusCode.OK, put.StatusCode);
+        Assert.Equal(accentTheme, (await put.Content.ReadFromJsonAsync<SettingsDto>())!.AccentTheme);
+    }
+
     [Fact]
     public async Task Rejects_invalid_fields_without_mutating()
     {
         var tokens = await RegisterAndLoginAsync("stable@example.test");
-        await Authed(tokens.AccessToken).PutAsJsonAsync("/internal/auth/settings", Body(displayName: "Stable", timezone: "UTC", baseCurrency: "USD", appearance: "light", locale: "zh-Hant"));
+        await Authed(tokens.AccessToken).PutAsJsonAsync("/internal/auth/settings", Body(displayName: "Stable", timezone: "UTC", baseCurrency: "USD", appearance: "light", locale: "zh-Hant", accentTheme: "red"));
 
         foreach (var body in new object[]
         {
@@ -161,6 +178,10 @@ public sealed class SettingsTests : IAsyncLifetime
             Body(locale: "zh"),
             Body(locale: "zh-Hans"),
             Body(locale: "fr"),
+            Body(accentTheme: "amber"),
+            Body(accentTheme: "blue"),
+            Body(accentTheme: "violet"),
+            Body(accentTheme: "teal"),
         })
         {
             using var put = await Authed(tokens.AccessToken).PutAsJsonAsync("/internal/auth/settings", body);
@@ -173,6 +194,7 @@ public sealed class SettingsTests : IAsyncLifetime
         Assert.Equal("USD", settings.BaseCurrency);
         Assert.Equal("light", settings.Appearance);
         Assert.Equal("zh-Hant", settings.Locale);
+        Assert.Equal("red", settings.AccentTheme);
     }
 
     [Fact]
@@ -225,6 +247,7 @@ public sealed class SettingsTests : IAsyncLifetime
             baseCurrency = "cad",
             appearance = "system",
             locale = "en",
+            accentTheme = "green",
         });
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
 
@@ -264,7 +287,8 @@ public sealed class SettingsTests : IAsyncLifetime
         string timezone = "UTC",
         string baseCurrency = "USD",
         string appearance = "system",
-        string locale = "en") => new { displayName, timezone, baseCurrency, appearance, locale };
+        string locale = "en",
+        string accentTheme = "green") => new { displayName, timezone, baseCurrency, appearance, locale, accentTheme };
 
     private async Task SeedUserAsync(Guid id, string email, string status = "active", string accountType = "human")
     {
@@ -309,6 +333,6 @@ public sealed class SettingsTests : IAsyncLifetime
         return tokens!.AccessToken;
     }
 
-    private sealed record SettingsDto(string Email, string DisplayName, string Timezone, string BaseCurrency, string Appearance, string Locale, DateTime UpdatedAt);
+    private sealed record SettingsDto(string Email, string DisplayName, string Timezone, string BaseCurrency, string Appearance, string Locale, string AccentTheme, DateTime UpdatedAt);
     private sealed record AuthTokensDto(string AccessToken, DateTime ExpiresAt, string RefreshToken);
 }

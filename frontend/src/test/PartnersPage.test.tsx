@@ -16,7 +16,7 @@ const bootstrap = {
   currentUser: { id: '11111111-1111-1111-1111-111111111111', email: 'owner@example.com', displayName: 'Owner' },
   timezone: 'Asia/Taipei',
   baseCurrency: 'USD',
-  appearance: 'system',
+  appearance: 'system', accentTheme: 'green',
   locale: 'en',
   role: 'user',
   accountType: 'human',

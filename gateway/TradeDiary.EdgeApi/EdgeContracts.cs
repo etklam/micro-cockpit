@@ -18,6 +18,7 @@ public sealed record AppBootstrapResponse(
     string BaseCurrency,
     string Appearance,
     string Locale,
+    string AccentTheme,
     string Role,
     string AccountType,
     DateOnly CurrentLocalDate,
@@ -30,6 +31,7 @@ public sealed record UserSettingsResponse(
     string BaseCurrency,
     string Appearance,
     string Locale,
+    string AccentTheme,
     DateTime UpdatedAt);
 
 public sealed record UserSettingsWrite(
@@ -37,7 +39,8 @@ public sealed record UserSettingsWrite(
     string Timezone,
     string BaseCurrency,
     string Appearance,
-    string Locale);
+    string Locale,
+    string AccentTheme);
 
 public sealed record DashboardResponse(
     DateOnly LocalDate,
@@ -235,7 +238,8 @@ internal sealed record IdentityUserResponse(
     string Status,
     int StatusVersion,
     string Appearance = "system",
-    string Locale = "en");
+    string Locale = "en",
+    string AccentTheme = "green");
 
 internal sealed record IdentitySettingsResponse(
     string Email,
@@ -244,6 +248,7 @@ internal sealed record IdentitySettingsResponse(
     string BaseCurrency,
     string Appearance,
     string Locale,
+    string AccentTheme,
     DateTime UpdatedAt);
 
 internal sealed record IdentityTokensResponse(string AccessToken, DateTime ExpiresAt, string RefreshToken);

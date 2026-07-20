@@ -136,7 +136,7 @@ describe('authenticated locale from bootstrap', () => {
   it('renders Chinese nav from bootstrap locale and switches without reload', async () => {
     const bootstrap = {
       currentUser: { id: '11111111-1111-1111-1111-111111111111', email: 'owner@example.com', displayName: 'Owner' },
-      timezone: 'Asia/Taipei', baseCurrency: 'USD', appearance: 'system', locale: 'zh-Hant',
+      timezone: 'Asia/Taipei', baseCurrency: 'USD', appearance: 'system', accentTheme: 'green', locale: 'zh-Hant',
       role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
       availableProductAreas: ['today', 'diary', 'calendar'],
     }
@@ -150,13 +150,13 @@ describe('authenticated locale from bootstrap', () => {
       })),
       http.get('/api/app/settings', () => HttpResponse.json({
         email: 'owner@example.com', displayName: 'Owner', timezone: 'Asia/Taipei',
-        baseCurrency: 'USD', appearance: 'system', locale: 'zh-Hant', updatedAt: '2026-07-16T00:00:00Z',
+        baseCurrency: 'USD', appearance: 'system', accentTheme: 'green', locale: 'zh-Hant', updatedAt: '2026-07-16T00:00:00Z',
       })),
       http.put('/api/app/settings', async ({ request }) => {
         putBody = await request.json()
         return HttpResponse.json({
           email: 'owner@example.com', displayName: 'Owner', timezone: 'Asia/Taipei',
-          baseCurrency: 'USD', appearance: 'system', locale: (putBody as { locale: string }).locale, updatedAt: '2026-07-16T00:00:00Z',
+          baseCurrency: 'USD', appearance: 'system', accentTheme: 'green', locale: (putBody as { locale: string }).locale, updatedAt: '2026-07-16T00:00:00Z',
         })
       }),
       http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),

@@ -19,6 +19,7 @@ internal static class BootstrapEndpoints
                 value.BaseCurrency,
                 value.Appearance,
                 value.Locale,
+                value.AccentTheme,
                 value.Role,
                 value.AccountType,
                 CockpitComposition.ResolveLocalDate(value.Timezone, time.GetUtcNow()),

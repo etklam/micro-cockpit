@@ -83,6 +83,46 @@ export function ThemeToggle({ className }: { className?: string }) {
   )
 }
 
+const PRESET_LABEL: Record<string, 'settings.theme.preset.dark-green' | 'settings.theme.preset.dark-red' | 'settings.theme.preset.light-green' | 'settings.theme.preset.light-red'> = {
+  'dark-green': 'settings.theme.preset.dark-green',
+  'dark-red': 'settings.theme.preset.dark-red',
+  'light-green': 'settings.theme.preset.light-green',
+  'light-red': 'settings.theme.preset.light-red',
+}
+
+/** Compact four-preset chrome control for public/auth chrome. */
+export function ThemePresetPicker({ className, compact }: { className?: string; compact?: boolean }) {
+  const { activePresetId, presets, applyPreset } = useAppearance()
+  const { t } = useI18n()
+  return (
+    <div
+      className={cx('theme-preset-picker', compact && 'theme-preset-picker--compact', className)}
+      role="radiogroup"
+      aria-label={t('common.themePresets')}
+    >
+      {presets.map(preset => {
+        const selected = activePresetId === preset.id
+        return (
+          <button
+            key={preset.id}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={t(PRESET_LABEL[preset.id])}
+            title={t(PRESET_LABEL[preset.id])}
+            className={cx(
+              'theme-preset-picker__swatch',
+              `theme-preset-picker__swatch--${preset.id}`,
+              selected && 'is-selected',
+            )}
+            onClick={() => { void applyPreset(preset) }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
 /* ------------------------------- Card ------------------------------ */
 export function Card({ className, flush, as: Tag = 'div', ...rest }: { flush?: boolean; as?: 'div' | 'section' | 'article' } & ComponentPropsWithoutRef<'div'>) {
   const Comp = Tag as 'div'

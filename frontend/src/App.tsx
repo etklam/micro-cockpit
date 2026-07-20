@@ -1,9 +1,9 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthProvider'
 import { LoginPage } from './auth/LoginPage'
 import { RegisterPage } from './auth/RegisterPage'
-import { Brand, Button, ErrorBox, IconButton, ThemeToggle, useConfirm } from './ui'
+import { Brand, Button, ErrorBox, IconButton, ThemePresetPicker, ThemeToggle, useConfirm } from './ui'
 import { Icon } from './icons'
 import { cx } from './format'
 import './App.css'
@@ -11,7 +11,8 @@ import { AlertsPage, CalendarPage, DiaryDetailPage, DiaryPage, DisciplinePage, T
 import { ArticleDetailPage, ArticlesPage, MorePage, PartnerComparePage, PartnersPage, PriceAlertsPage, RotationPage, ToolsPage, WatchlistPage } from './latePages'
 import { SettingsPage } from './screens/settings'
 import { useBootstrapQuery } from './features/queries'
-import { reconcileAppearance, subscribeSystemAppearance, type Appearance, isAppearance } from './features/appearance'
+import { reconcileAccent, reconcileAppearance, subscribeSystemAppearance, type Appearance, isAppearance } from './features/appearance'
+import { TOOL_CATALOG } from './features/toolsCatalog'
 import { accountMonthYear } from './features/accountTime'
 import { MonthlyReviewPage, MonthlyReviewRedirect } from './MonthlyReviewPage'
 import { CockpitProvider, SectionError, type Page } from './shell'
@@ -88,23 +89,191 @@ function ToolsEntry() {
 
 function PublicShell({ children }: { children: ReactNode }) {
   const { t, locale, setLocale } = useI18n()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const [toolsFocus, setToolsFocus] = useState(0)
+  const toolsWrapRef = useRef<HTMLDivElement>(null)
+  const toolsBtnRef = useRef<HTMLButtonElement>(null)
+  const menuBtnRef = useRef<HTMLButtonElement>(null)
+  const menuFirstRef = useRef<HTMLAnchorElement>(null)
+  const itemRefs = useRef<Array<HTMLAnchorElement | null>>([])
+  const menuId = useId()
+  const toolsMenuId = useId()
+  const location = useLocation()
+
+  useEffect(() => {
+    setMenuOpen(false)
+    setToolsOpen(false)
+  }, [location.pathname, location.search])
+
+  useEffect(() => {
+    if (!toolsOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (toolsWrapRef.current && !toolsWrapRef.current.contains(e.target as Node)) setToolsOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [toolsOpen])
+
+  useEffect(() => {
+    if (!toolsOpen) return
+    itemRefs.current[toolsFocus]?.focus()
+  }, [toolsOpen, toolsFocus])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    menuFirstRef.current?.focus()
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false)
+        menuBtnRef.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [menuOpen])
+
+  function closeTools(restore = false) {
+    setToolsOpen(false)
+    if (restore) toolsBtnRef.current?.focus()
+  }
+
+  function onToolsKeyDown(e: ReactKeyboardEvent) {
+    if (!toolsOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        setToolsOpen(true)
+        setToolsFocus(0)
+      }
+      return
+    }
+    const last = TOOL_CATALOG.length - 1
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      closeTools(true)
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setToolsFocus(i => (i >= last ? 0 : i + 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setToolsFocus(i => (i <= 0 ? last : i - 1))
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      setToolsFocus(0)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      setToolsFocus(last)
+    }
+  }
+
+  const lang = (
+    <div className="lang-toggle" role="group" aria-label={t('settings.language')}>
+      <button type="button" className={locale === 'en' ? 'is-active' : undefined} onClick={() => { void setLocale('en') }}>EN</button>
+      <button type="button" className={locale === 'zh-Hant' ? 'is-active' : undefined} onClick={() => { void setLocale('zh-Hant') }}>繁</button>
+    </div>
+  )
+
+  const toolsDropdown = (
+    <div className="public-shell__tools" ref={toolsWrapRef} onKeyDown={onToolsKeyDown}>
+      <button
+        ref={toolsBtnRef}
+        type="button"
+        className={cx('public-shell__tools-btn', toolsOpen && 'is-open')}
+        aria-expanded={toolsOpen}
+        aria-controls={toolsMenuId}
+        aria-haspopup="menu"
+        onClick={() => {
+          setToolsOpen(v => {
+            const next = !v
+            if (next) setToolsFocus(0)
+            return next
+          })
+        }}
+      >
+        {t('landing.nav.toolsMenu')}
+      </button>
+      {toolsOpen ? (
+        <div id={toolsMenuId} className="public-shell__tools-menu" role="menu">
+          {TOOL_CATALOG.map((item, index) => (
+            <Link
+              key={item.id}
+              role="menuitem"
+              ref={el => { itemRefs.current[index] = el }}
+              to={item.href}
+              tabIndex={index === toolsFocus ? 0 : -1}
+              onClick={() => closeTools(false)}
+              onFocus={() => setToolsFocus(index)}
+            >
+              <Icon name={item.icon} size={16} />
+              <span className="public-shell__tools-copy">
+                <strong>{t(item.labelKey)}</strong>
+                <span>{t(item.bodyKey)}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+
   return (
     <div className="public-shell">
       <header className="public-shell__top">
         <Link to="/" className="public-shell__brand" aria-label={t('brand.name')}>
           <Brand />
         </Link>
-        <nav className="public-shell__nav" aria-label={t('landing.nav.label')}>
-          <Link to="/tools">{t('nav.tools')}</Link>
+        <nav className="public-shell__nav public-shell__nav--desktop" aria-label={t('landing.nav.label')}>
+          <a href="/#product">{t('landing.nav.product')}</a>
+          <a href="/#features">{t('landing.nav.features')}</a>
+          {toolsDropdown}
           <Link to="/login">{t('landing.cta.signIn')}</Link>
           <Link className="btn btn--primary btn--sm" to="/register"><span className="btn__label">{t('landing.cta.register')}</span></Link>
-          <div className="lang-toggle" role="group" aria-label="Language">
-            <button type="button" className={locale === 'en' ? 'is-active' : undefined} onClick={() => { void setLocale('en') }}>EN</button>
-            <button type="button" className={locale === 'zh-Hant' ? 'is-active' : undefined} onClick={() => { void setLocale('zh-Hant') }}>繁</button>
-          </div>
+          {lang}
+          <ThemePresetPicker compact />
           <ThemeToggle />
         </nav>
+        <div className="public-shell__mobile-actions">
+          <ThemeToggle />
+          <button
+            ref={menuBtnRef}
+            type="button"
+            className="public-shell__menu-btn"
+            aria-expanded={menuOpen}
+            aria-controls={menuId}
+            aria-label={menuOpen ? t('landing.nav.close') : t('landing.nav.menu')}
+            onClick={() => setMenuOpen(v => !v)}
+          >
+            <Icon name="layers" size={20} />
+          </button>
+        </div>
       </header>
+      {menuOpen ? (
+        <div id={menuId} className="public-shell__drawer">
+          <nav className="public-shell__drawer-nav" aria-label={t('landing.nav.label')}>
+            <a ref={menuFirstRef} href="/#product" onClick={() => setMenuOpen(false)}>{t('landing.nav.product')}</a>
+            <a href="/#features" onClick={() => setMenuOpen(false)}>{t('landing.nav.features')}</a>
+            <p className="public-shell__drawer-label">{t('landing.nav.toolsMenu')}</p>
+            {TOOL_CATALOG.map(item => (
+              <Link key={item.id} className="public-shell__drawer-tool" to={item.href} onClick={() => setMenuOpen(false)}>
+                <Icon name={item.icon} size={16} />
+                <span>
+                  <strong>{t(item.labelKey)}</strong>
+                  <span>{t(item.bodyKey)}</span>
+                </span>
+              </Link>
+            ))}
+            <hr className="public-shell__drawer-rule" />
+            <Link to="/login" onClick={() => setMenuOpen(false)}>{t('landing.cta.signIn')}</Link>
+            <Link className="btn btn--primary btn--sm" to="/register" onClick={() => setMenuOpen(false)}>
+              <span className="btn__label">{t('landing.cta.register')}</span>
+            </Link>
+            <div className="public-shell__drawer-row">{lang}</div>
+            <div className="public-shell__drawer-row">
+              <ThemePresetPicker />
+            </div>
+          </nav>
+        </div>
+      ) : null}
       <main className="public-shell__main" id="content">{children}</main>
     </div>
   )
@@ -130,6 +299,7 @@ function Shell({ children }: { children?: ReactNode }) {
     if (!bootstrap.data) return
     const appearance = isAppearance(bootstrap.data.appearance) ? bootstrap.data.appearance as Appearance : 'system'
     reconcileAppearance(appearance)
+    reconcileAccent(bootstrap.data.accentTheme)
     if (isLocale(bootstrap.data.locale)) reconcileLocale(bootstrap.data.locale)
     return subscribeSystemAppearance(() => appearance)
   }, [bootstrap.data])
@@ -197,6 +367,7 @@ function Sidebar({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: ()
           <span>{cockpit.baseCurrency} · {cockpit.timezone}</span>
         </div>
         <div className="sidebar__tools">
+          <ThemePresetPicker compact />
           <ThemeToggle />
           <Button variant="ghost" icon="logout" onClick={onSignOut} className="signout-btn">{t('common.signOut')}</Button>
         </div>
@@ -217,6 +388,7 @@ function MobileTop({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: 
       <Brand compact />
       <span className="mobile-top__meta">{cockpit.currentLocalDate}</span>
       <div className="mobile-top__actions">
+        <ThemePresetPicker compact />
         <ThemeToggle />
         <IconButton icon="logout" label={t('common.signOut')} onClick={onSignOut} />
       </div>

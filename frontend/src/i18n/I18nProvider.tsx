@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthProvider'
 import * as api from '../features/api'
 import { queryKeys } from '../features/queries'
+import { queueSettingsWrite, settingsFromBootstrap } from '../features/settingsWrites'
 import {
   applyDocumentLocale,
   isLocale,
@@ -103,16 +104,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     )
 
     if (state !== 'authenticated') return
-    const profile = client.getQueryData<api.Bootstrap>(queryKeys.bootstrap)
-    if (!profile) return
     try {
-      await api.putSettings({
-        displayName: profile.currentUser.displayName,
-        timezone: profile.timezone,
-        baseCurrency: profile.baseCurrency,
-        appearance: profile.appearance,
-        locale: localeNext,
-      })
+      await queueSettingsWrite(() => settingsFromBootstrap(client, { locale: localeNext }), client)
     } catch {
       // Local paint + mirror already applied; next bootstrap reconciles.
     }

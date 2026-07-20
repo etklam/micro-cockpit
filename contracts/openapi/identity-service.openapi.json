@@ -762,6 +762,10 @@
           "locale": {
             "type": "string",
             "default": "en"
+          },
+          "accentTheme": {
+            "type": "string",
+            "default": "green"
           }
         }
       },
@@ -939,6 +943,7 @@
           "baseCurrency",
           "appearance",
           "locale",
+          "accentTheme",
           "updatedAt"
         ],
         "type": "object",
@@ -961,6 +966,9 @@
           "locale": {
             "type": "string"
           },
+          "accentTheme": {
+            "type": "string"
+          },
           "updatedAt": {
             "type": "string",
             "format": "date-time"
@@ -973,7 +981,8 @@
           "timezone",
           "baseCurrency",
           "appearance",
-          "locale"
+          "locale",
+          "accentTheme"
         ],
         "type": "object",
         "properties": {
@@ -990,6 +999,9 @@
             "type": "string"
           },
           "locale": {
+            "type": "string"
+          },
+          "accentTheme": {
             "type": "string"
           }
         }

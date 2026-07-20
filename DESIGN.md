@@ -1,7 +1,7 @@
 # DESIGN.md — Micro Cockpit Design System
 
-> Calm. Precise. Restrained.  
-> A quiet instrument panel for post-session reflection — graphite and ink with a single signal lamp.
+> Calm. Precise. Restrained.
+> A quiet instrument panel for post-session reflection — graphite and ink with one restrained signal lamp.
 
 This document is the source of truth for visual and interaction design. Product boundaries live in [PRODUCT.md](./PRODUCT.md). Implementation tokens live in `frontend/src/index.css`.
 
@@ -24,7 +24,7 @@ It is **not** a brokerage, portfolio ledger, or terminal. Numbers serve reflecti
 | --- | --- |
 | **Calm** | Low light, soft elevation, no flashing state |
 | **Precise** | Tabular numbers, hairline structure, consistent spacing |
-| **Restrained** | One accent, sparse chrome, copy that never congratulates or scolds |
+| **Restrained** | One chrome accent at a time, sparse chrome, copy that never congratulates or scolds |
 
 ### Anti-references
 
@@ -41,7 +41,7 @@ Do not drift toward:
 ## 2. Design principles
 
 1. **Reflection and numbers, equal weight.** Prose gets a real reading measure (serif, ~65–70ch). Numbers get tabular precision and signed direction.
-2. **Quiet by default.** Surfaces are deep and calm. One amber-iron signal lamp does all accent work. Negative space is a material.
+2. **Quiet by default.** Surfaces are deep and calm. One chrome accent (red or green) does all brand work. Semantic gain/loss stay separate. Negative space is a material.
 3. **Instrument, not stage.** Density only where the task needs it. Familiar affordances. Consistent vocabulary screen to screen.
 4. **Honesty over performance.** Copy never gamifies. “You showed up today” is the ceiling of praise.
 5. **Reward opening it.** The daily discipline principle and the quick-note capture sit at the top of the day. Starting to write is the lowest-friction act on screen.
@@ -66,6 +66,9 @@ Today · Diary · Calendar · Discipline · More
 ### Core routes
 
 ```text
+/                         public landing (anonymous); redirects to /today when signed in
+/tools                    public + authenticated (same calculators; shell differs)
+/login  /register
 /today
 /diary  /diary/:diaryId
 /calendar/:year/:month
@@ -74,11 +77,22 @@ Today · Diary · Calendar · Discipline · More
 /more
 /review  /review/:year/:month
 /watchlist  /price-alerts  /rotation
-/partners  /articles  /articles/:slug  /tools
-/login
+/partners  /articles  /articles/:slug
+/settings
 ```
 
 Quick Note is an **action on Today**, not a separate route.
+
+### Public vs authenticated surfaces
+
+| Surface | Auth | Shell |
+| --- | --- | --- |
+| `/` landing | Anonymous only (signed-in → `/today`) | `PublicShell` — brand, Tools, Sign in, Register, locale, theme toggle |
+| `/tools` | **Both** | Anonymous → `PublicShell`; signed-in → app `Shell` (rail / bottom nav) |
+| `/login`, `/register` | Anonymous | Standalone auth cards |
+| Everything under the authenticated tree | Required | App `Shell` |
+
+Tools are intentionally dual-access: no account required to calculate; diary and account data remain behind auth.
 
 ---
 
@@ -140,11 +154,43 @@ Avoid stacking three equal “metric tiles” as the visual identity of a page. 
 
 ## 5. Color system
 
-Dark is the home theme; light is a true-neutral day desk. Preference is
-`system | light | dark` (Settings → Appearance), applied via `html[data-theme]`.
-All tokens are **OKLCH**. Source of truth: `frontend/src/index.css`.
+Two **independent axes** control chrome. All tokens are **OKLCH**. Source of truth: `frontend/src/index.css`.
 
-### Surfaces (iron graphite + whisper of brand hue 72)
+| Axis | Values | DOM | Meaning |
+| --- | --- | --- | --- |
+| **Scheme** | `light` · `dark` | `html[data-theme]` | Surfaces, ink, borders, shadows |
+| **Accent** | `red` · `green` | `html[data-accent]` (or equivalent) | Brand / chrome signal only (`--primary*`, `--ring`, focus, active nav) |
+
+Dark remains the home scheme; light is a true-neutral day desk (not cream, not violet wash). Surfaces stay nearly neutral graphite/stone. Accent is a **single signal lamp**, never wallpaper.
+
+### Four chrome presets
+
+Resolved scheme × accent yields four presets. Settings may expose them as a grid or as separate scheme + accent controls — product of the two axes is what matters.
+
+| Preset | Scheme | Accent |
+| --- | --- | --- |
+| Dark · green | `dark` | `green` |
+| Dark · red | `dark` | `red` |
+| Light · green | `light` | `green` |
+| Light · red | `light` | `red` |
+
+There is **no amber-iron brand requirement**. Amber/hue-72 is not a locked brand color; chrome accent is red or green only. Do not reintroduce violet/blue-purple or navy-gold costume as brand.
+
+### Preference & persistence (incl. legacy `system`)
+
+| Layer | Behavior |
+| --- | --- |
+| Preference | Account settings + local mirror (`td_appearance` today; extend or pair with accent key as needed) |
+| Legacy `system` | Still valid: **scheme only** follows OS `prefers-color-scheme`. It is **not** a fifth accent. Accent defaults to a fixed product default (prefer `green`) when unset. |
+| Explicit `light` / `dark` | Scheme fixed; accent independent |
+| Toggle | One-tap light/dark flips **scheme** only (same behavior as today: drops `system` for an explicit scheme). Does not flip accent or swap gain/loss. |
+| Boot | Apply mirrored preference before React paint (`bootAppearanceFromMirror`) to reduce flash |
+| Logout | Keep last mirrored scheme/accent on public/login surfaces (no account leak — chrome preference only) |
+| Server reconcile | Bootstrap / settings `appearance` wins when valid; invalid values ignored |
+
+Implementation may keep API field `appearance: system \| light \| dark` and store accent separately (client-only or future settings field). Documented contract for UI: two axes, four presets, legacy `system` scheme-follow.
+
+### Surfaces
 
 | Token | Role |
 | --- | --- |
@@ -163,27 +209,33 @@ All tokens are **OKLCH**. Source of truth: `frontend/src/index.css`.
 | `--muted` | Secondary labels, meta |
 | `--faint` | Tertiary, large decorative only |
 
-### Brand — the signal lamp
+### Brand — chrome accent tokens
 
-Amber-iron (hue **72**) is the **only** chromatic accent for chrome — restrained, never violet/blue-purple.
+Accent drives **only** brand chrome. Roles:
 
 | Token | Role |
 | --- | --- |
-| `--primary` | Links, focus, active nav, indicators |
-| `--primary-btn` | Filled primary actions |
+| `--primary` | Links, focus ink, active nav, indicators |
+| `--primary-hover` / `--primary-press` | Interactive variants |
+| `--primary-btn` / `--primary-btn-hover` | Filled primary actions |
 | `--primary-soft` | Soft fills (active nav wash, selected day) |
 | `--primary-line` | Focus borders, selected outlines |
 | `--on-primary` | Label on filled primary |
+| `--accent` | Alias of `--primary` where legacy class names need it |
+| `--ring` | Focus-visible outline (derived from primary) |
 
-Surfaces stay nearly neutral graphite. Violet appears on **signal**, not wallpaper.
+**Changing accent tokens:** override the `--primary*` family (and derived `--ring` / `--accent`) under each `html[data-theme][data-accent]` (or nested selector) block in `frontend/src/index.css`. Do **not** retarget `--gain` / `--loss` when swapping accent. Keep soft mixes via `color-mix` so both red and green stay restrained (never neon).
 
-### Semantic (restrained; never neon)
+### Semantic (independent of accent; restrained; never neon)
 
 | Token | Role |
 | --- | --- |
-| `--gain` / `--gain-soft` | Positive P/L |
+| `--gain` / `--gain-soft` | Positive P/L / constructive success |
 | `--loss` / `--loss-soft` | Negative P/L, destructive |
 | `--warn` / `--warn-soft` | Active reminders |
+| `--success*` / `--danger*` | Aliases of gain/loss for component vocabulary |
+
+**Independence rule:** chrome accent never redefines semantic direction. A **green accent** still uses `--loss` for negative P/L; a **red accent** still uses `--gain` for positive P/L. Primary buttons and nav may share a hue family with gain *or* loss depending on accent choice — that is chrome, not a rewrite of signed numbers.
 
 **Direction is never color alone.** Always pair with a sign (`+` / `−`), arrow, or label (see `signed()` / `pct()` in `format.ts`).
 
@@ -203,7 +255,7 @@ WCAG 2.2 AA minimum:
 
 - Body ink → bg ≥ 4.5:1 (shipped ~16:1)
 - Muted → bg ≥ 4.5:1 for essential text (≥ 7:1 shipped)
-- Primary button label → button ≥ 4.5:1
+- Primary button label → button ≥ 4.5:1 for **both** red and green accents in **both** schemes
 - Focus ring clearly visible on all interactive surfaces
 
 ---
@@ -329,15 +381,26 @@ Every interactive control supports:
 
 - rest · hover · active/press · focus-visible · disabled · loading (where async)
 
-Focus-visible uses `--ring` (amber soft outline). Never remove focus without a visible replacement.
+Focus-visible uses `--ring` (accent soft outline). Never remove focus without a visible replacement.
 
 ---
 
 ## 10. Page patterns
 
-### Login
+### Login / register
 
-Centered card on deep canvas. Soft radial signal glow — atmospheric, not decorative overload. Copy: plain, adult. No marketing hero.
+Centered card on deep canvas. Soft radial signal glow from the **current accent** — atmospheric, not decorative overload. Copy: plain, adult. No marketing hero. Foot links back to landing and tools.
+
+### Landing (public `/`)
+
+Anonymous marketing-light home. Not a dashboard. Structure (see `LandingPage.tsx` + `landing.*` i18n keys):
+
+1. **Hero** — eyebrow, title, lead, CTAs: Create account · Sign in · Try tools free
+2. **What it is for** — short body + four feature cards (diary, P/L calendar, discipline, monthly review)
+3. **Tools without signing in** — catalogue teaser grid linking to `/tools?tool=<id>` + “Open tools”
+4. **Foot CTA** — private-record invite + Create account · Sign in
+
+Chrome: `PublicShell` sticky top (brand · Tools · Sign in · Register · locale · theme toggle). No app rail, no diary chrome, no confetti.
 
 ### Today — writing desk
 
@@ -371,9 +434,36 @@ Discipline quote uses serif italic. P/L always signed. Diary status prefers “Y
 
 Serif principle lines. Add form is inline and quiet. Random/today principle is a gift, not a streak counter.
 
-### Alerts / tools / research
+### Alerts / research
 
 List density without terminal noise. Filters as plain fields. Tables use sticky headers, tabular numbers, restrained MA/status chips.
+
+### Tools (`/tools`)
+
+Shared calculator surface for public and authenticated users. Client-side pure math in `frontend/src/features/toolsCalc.ts` (same formulas as tool-service). Query `?tool=<ToolId>` selects the calculator; default `position-sizing`.
+
+#### Canonical tool catalogue
+
+Single ordered list of public calculators. Landing teaser, tools select, and `TOOL_IDS` must stay aligned.
+
+| `ToolId` | Purpose |
+| --- | --- |
+| `position-sizing` | Risk amount + share quantity from account, risk %, entry, stop |
+| `risk-reward` | Distance to stop/target + ratio |
+| `fire` | Nest-egg target + gap from expenses and withdrawal rate |
+| `relative-value` | Current vs historical ratio, deviation % |
+| `seasonality` | Average return + win rate from period returns |
+
+All five are **public** (no auth). There is no separate “auth-only tools” catalogue in v1; authenticated users get the same tools inside the app shell (and full diary elsewhere).
+
+#### Adding a tool
+
+1. Add `ToolId` + pure `calculateTool` branch in `toolsCalc.ts` (and unit coverage in `toolsCalc.test.ts`).
+2. Align Edge/tool-service contract if a server twin exists; regenerate OpenAPI client only when the public API changes.
+3. Extend `ToolsPage` field map + select option labels (i18n when strings are keyed).
+4. Extend landing `TOOLS` teaser + `landing.tool.*` message keys (`en` + `zh-Hant`).
+5. Keep default selection and `?tool=` validation on `isToolId`.
+6. Do not put account-bound diary data into public tools.
 
 ### Monthly review
 
@@ -424,21 +514,34 @@ Empty states explain what will appear and how to begin — never blame.
 
 | Concern | Location |
 | --- | --- |
-| Tokens + base | `frontend/src/index.css` |
+| Tokens + base (scheme × accent) | `frontend/src/index.css` |
 | Components + layout + pages | `frontend/src/App.css` |
 | Primitives | `frontend/src/ui.tsx` |
 | Icons / brand mark | `frontend/src/icons.tsx`, `ui.tsx` `Gauge` |
-| Shell + routes | `frontend/src/App.tsx` |
-| Page surfaces | `pages.tsx`, `latePages.tsx`, `MonthlyReviewPage.tsx` |
+| Shell, public shell, routes | `frontend/src/App.tsx` |
+| Landing | `frontend/src/LandingPage.tsx` |
+| Appearance preference / mirror | `frontend/src/features/appearance.ts`, `useAppearance.ts` |
+| Tool catalogue + pure calc | `frontend/src/features/toolsCalc.ts`, `latePages.tsx` `ToolsPage` |
+| Page surfaces | `pages.tsx`, `latePages.tsx`, `MonthlyReviewPage.tsx`, `screens/*` |
 | Formatting helpers | `frontend/src/format.ts` |
+| i18n (landing, settings, nav) | `frontend/src/i18n/messages/{en,zh-Hant}.ts` |
 | Fonts | Inter Variable + Newsreader Variable (`main.tsx`) |
 
 ### Engineering constraints
 
 - Plain CSS classes — no CSS-in-JS, no Tailwind, no component library
-- Dual theme via `html[data-theme="dark|light"]` + matching `color-scheme`
-- Frontend talks only to Edge API
+- Scheme via `html[data-theme="dark|light"]` + matching `color-scheme`; accent via a second root attribute (e.g. `data-accent="red|green"`)
+- Semantic gain/loss tokens never keyed off accent selection
+- Frontend talks only to Edge API (tools may run fully client-side)
 - Preserve existing class names used by tests and page markup unless intentionally migrated together
+
+### Changing accent tokens (checklist)
+
+1. Edit `--primary*` (and derived soft/line/ring) for each scheme × accent block in `index.css`.
+2. Verify primary button contrast AA in all four presets.
+3. Spot-check focus ring, active nav wash, login glow, links.
+4. Confirm P/L badges and calendar washes still use `--gain` / `--loss` only.
+5. Update this document only if roles or axes change — not for routine hue tweaks.
 
 ---
 
@@ -447,14 +550,18 @@ Empty states explain what will appear and how to begin — never blame.
 Before shipping UI changes:
 
 - [ ] Feels calm in low light for 30+ minutes of reading/writing
-- [ ] One accent only; surfaces stay graphite
+- [ ] One chrome accent at a time; surfaces stay graphite/stone
+- [ ] Red and green accents both pass primary-button and focus contrast
+- [ ] Gain/loss semantics unchanged when accent changes
+- [ ] Legacy `system` still follows OS scheme without inventing a fifth accent
+- [ ] Landing structure and tool catalogue stay aligned with `toolsCalc` / i18n
 - [ ] Diary prose is actually pleasant to read
 - [ ] Numbers are tabular and signed
 - [ ] Empty / error / loading states are honest and recoverable
 - [ ] Keyboard + focus-visible work end to end
 - [ ] Mobile safe areas and bottom nav don’t obscure primary actions
 - [ ] No confetti, streaks-as-pressure, or casino color
-- [ ] Diff does not reintroduce generic SaaS “metric tile wallpaper”
+- [ ] Diff does not reintroduce generic SaaS “metric tile wallpaper” or amber-as-mandatory-brand
 
 ---
 

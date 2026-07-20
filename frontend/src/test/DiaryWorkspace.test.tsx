@@ -21,7 +21,7 @@ const diaryB = {
 
 const bootstrap = {
   currentUser: { id: '11111111-1111-1111-1111-111111111111', email: 'owner@example.com', displayName: 'Owner' },
-  timezone: 'UTC', baseCurrency: 'USD', appearance: 'system', locale: 'en', role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
+  timezone: 'UTC', baseCurrency: 'USD', appearance: 'system', accentTheme: 'green', locale: 'en', role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
   availableProductAreas: ['today', 'diary', 'calendar'],
 }
 

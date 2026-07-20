@@ -1,7 +1,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as session from '../api'
 import * as api from './api'
-import { isAppearance, reconcileAppearance } from './appearance'
+import { isAppearance, reconcileAccent, reconcileAppearance } from './appearance'
+import { queueSettingsWrite } from './settingsWrites'
 import { isLocale, reconcileLocale } from '../i18n'
 
 export type DiaryListKeyFilters = {
@@ -304,7 +305,8 @@ export function useSaveSettingsMutation() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: async (body: api.UserSettingsWrite): Promise<SaveSettingsResult> => {
-      const settings = await api.putSettings(body)
+      const settings = await queueSettingsWrite(body, client)
+      if (!settings) throw new Error('settings_write_skipped')
       const refreshed = await session.refreshSession()
       if (!refreshed) {
         // Settings persisted in Identity; access token claims may be stale. Clear the
@@ -317,6 +319,7 @@ export function useSaveSettingsMutation() {
         }
       }
       if (isAppearance(settings.appearance)) reconcileAppearance(settings.appearance)
+      reconcileAccent(settings.accentTheme)
       if (isLocale(settings.locale)) reconcileLocale(settings.locale)
       await Promise.all([
         client.invalidateQueries({ queryKey: queryKeys.settings }),

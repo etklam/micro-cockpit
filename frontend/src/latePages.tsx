@@ -9,10 +9,12 @@ import {
   useBootstrapQuery, useReactivatePriceAlertMutation, useRotationQuery, useRotationUniversesQuery, useSaveResearchNoteMutation, useWatchlistQuery,
 } from './features/queries'
 export { PartnersPage, PartnerComparePage } from './screens/partners'
-import { calculateTool, isToolId, type ToolId } from './features/toolsCalc'
+import { calculateTool, type ToolId } from './features/toolsCalc'
+import { parseToolQuery, TOOL_CATALOG } from './features/toolsCatalog'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
 import { PageSkeleton, SectionError, useCockpit } from './shell'
 import type { Page } from './shell'
+import { useI18n, type MessageKey } from './i18n'
 
 const ListState = ({ loading, error, empty, retry, children }: { loading: boolean; error?: string; empty: boolean; retry: () => void; children: ReactNode }) =>
   loading ? <PageSkeleton rows={2} /> : error ? <SectionError onRetry={retry} /> : empty ? <EmptyBox title="Nothing here yet" hint="Add the first item when it becomes useful." /> : <>{children}</>
@@ -282,38 +284,49 @@ export function ArticleDetailPage() {
   return <><PageHeader title={article.data.title} subtitle={article.data.publishedAt ? new Date(article.data.publishedAt).toLocaleDateString() : undefined} /><Card as="article"><p className="prose">{article.data.body}</p></Card></>
 }
 
-const fields: Record<ToolId, { key: string; label: string; text?: boolean }[]> = {
-  'position-sizing': [{ key: 'accountValue', label: 'Account value' }, { key: 'riskPercent', label: 'Risk %' }, { key: 'entryPrice', label: 'Entry price' }, { key: 'stopPrice', label: 'Stop price' }],
-  'risk-reward': [{ key: 'entryPrice', label: 'Entry price' }, { key: 'stopPrice', label: 'Stop price' }, { key: 'targetPrice', label: 'Target price' }],
-  fire: [{ key: 'annualExpenses', label: 'Annual expenses' }, { key: 'withdrawalRatePercent', label: 'Withdrawal rate %' }, { key: 'investedAssets', label: 'Invested assets' }],
-  'relative-value': [{ key: 'assetPrice', label: 'Asset price' }, { key: 'benchmarkPrice', label: 'Benchmark price' }, { key: 'historicalRatio', label: 'Historical ratio' }],
-  seasonality: [{ key: 'returns', label: 'Returns (comma-separated)', text: true }],
+const fields: Record<ToolId, { key: string; labelKey: MessageKey; text?: boolean }[]> = {
+  'position-sizing': [{ key: 'accountValue', labelKey: 'tools.field.accountValue' }, { key: 'riskPercent', labelKey: 'tools.field.riskPercent' }, { key: 'entryPrice', labelKey: 'tools.field.entryPrice' }, { key: 'stopPrice', labelKey: 'tools.field.stopPrice' }],
+  'risk-reward': [{ key: 'entryPrice', labelKey: 'tools.field.entryPrice' }, { key: 'stopPrice', labelKey: 'tools.field.stopPrice' }, { key: 'targetPrice', labelKey: 'tools.field.targetPrice' }],
+  fire: [{ key: 'annualExpenses', labelKey: 'tools.field.annualExpenses' }, { key: 'withdrawalRatePercent', labelKey: 'tools.field.withdrawalRatePercent' }, { key: 'investedAssets', labelKey: 'tools.field.investedAssets' }],
+  'relative-value': [{ key: 'assetPrice', labelKey: 'tools.field.assetPrice' }, { key: 'benchmarkPrice', labelKey: 'tools.field.benchmarkPrice' }, { key: 'historicalRatio', labelKey: 'tools.field.historicalRatio' }],
+  seasonality: [{ key: 'returns', labelKey: 'tools.field.returns', text: true }],
+}
+
+const resultLabels: Record<string, MessageKey> = {
+  riskAmount: 'tools.result.riskAmount', quantity: 'tools.result.quantity', perUnitRisk: 'tools.result.perUnitRisk',
+  risk: 'tools.result.risk', reward: 'tools.result.reward', ratio: 'tools.result.ratio',
+  target: 'tools.result.target', gap: 'tools.result.gap', currentRatio: 'tools.result.currentRatio',
+  deviationPercent: 'tools.result.deviationPercent', observations: 'tools.result.observations',
+  averageReturn: 'tools.result.averageReturn', positiveRate: 'tools.result.positiveRate',
 }
 
 export function ToolsPage() {
+  const { t, format } = useI18n()
   const [searchParams, setSearchParams] = useSearchParams()
   const requested = searchParams.get('tool')
-  const initial = requested && isToolId(requested) ? requested : 'position-sizing'
+  const initial = parseToolQuery(requested)
   const [tool, setTool] = useState<ToolId>(initial)
   const [values, setValues] = useState<Record<string, string>>({})
   const [answer, setAnswer] = useState<Record<string, number> | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (requested && isToolId(requested) && requested !== tool) {
-      setTool(requested)
+    const next = parseToolQuery(requested)
+    if (requested !== next) setSearchParams({ tool: next }, { replace: true })
+    if (next !== tool) {
+      setTool(next)
       setValues({})
       setAnswer(null)
       setError('')
     }
-  }, [requested, tool])
+  }, [requested, setSearchParams, tool])
 
   function selectTool(next: ToolId) {
     setTool(next)
     setValues({})
     setAnswer(null)
     setError('')
-    setSearchParams(next === 'position-sizing' ? {} : { tool: next }, { replace: true })
+    setSearchParams({ tool: next }, { replace: true })
   }
 
   function submit(e: FormEvent) {
@@ -325,27 +338,25 @@ export function ToolsPage() {
         : Object.fromEntries(Object.entries(values).map(([k, v]) => [k, Number(v)]))
       setAnswer(calculateTool(tool, payload))
     } catch {
-      setError('Could not calculate this right now.')
+      setError(t('tools.error'))
     }
   }
 
   return (
     <>
-      <PageHeader title="Tools" subtitle="Fast checks before committing capital" />
+      <PageHeader title={t('tools.title')} subtitle={t('tools.subtitle')} />
       <Card>
         <form className="stack" onSubmit={submit}>
-          <Field label="Calculator">
+          <Field label={t('tools.calculator')}>
             <SelectBox value={tool} onChange={e => selectTool(e.target.value as ToolId)}>
-              <option value="position-sizing">Position size</option>
-              <option value="risk-reward">Risk / reward</option>
-              <option value="fire">Financial independence</option>
-              <option value="relative-value">Relative value</option>
-              <option value="seasonality">Seasonality</option>
+              {TOOL_CATALOG.map(item => (
+                <option key={item.id} value={item.id}>{t(item.labelKey)}</option>
+              ))}
             </SelectBox>
           </Field>
           <div className="form-row">
             {fields[tool].map(f => (
-              <Field key={f.key} label={f.label}>
+              <Field key={f.key} label={t(f.labelKey)}>
                 <TextInput
                   required
                   type={f.text ? 'text' : 'number'}
@@ -357,15 +368,15 @@ export function ToolsPage() {
             ))}
           </div>
           {error ? <p className="form-error" role="alert">{error}</p> : null}
-          <Button variant="primary" type="submit">Calculate</Button>
+          <Button variant="primary" type="submit">{t('tools.calculate')}</Button>
         </form>
       </Card>
       {answer ? (
         <Card aria-live="polite">
-          <h2>Result</h2>
+          <h2>{t('tools.result')}</h2>
           <div className="stat-row">
             {Object.entries(answer).map(([k, v]) => (
-              <Stat key={k} label={k.replace(/([A-Z])/g, ' $1')} value={Number(v).toLocaleString(undefined, { maximumFractionDigits: 4 })} />
+              <Stat key={k} label={resultLabels[k] ? t(resultLabels[k]) : k} value={format.number(Number(v), { maximumFractionDigits: 4 })} />
             ))}
           </div>
         </Card>

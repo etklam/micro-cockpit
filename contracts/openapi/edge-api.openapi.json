@@ -3840,6 +3840,7 @@
           "baseCurrency",
           "appearance",
           "locale",
+          "accentTheme",
           "role",
           "accountType",
           "currentLocalDate",
@@ -3876,6 +3877,9 @@
             "type": "string"
           },
           "locale": {
+            "type": "string"
+          },
+          "accentTheme": {
             "type": "string"
           },
           "role": {
@@ -7170,6 +7174,7 @@
           "baseCurrency",
           "appearance",
           "locale",
+          "accentTheme",
           "updatedAt"
         ],
         "type": "object",
@@ -7192,6 +7197,9 @@
           "locale": {
             "type": "string"
           },
+          "accentTheme": {
+            "type": "string"
+          },
           "updatedAt": {
             "type": "string",
             "format": "date-time"
@@ -7204,7 +7212,8 @@
           "timezone",
           "baseCurrency",
           "appearance",
-          "locale"
+          "locale",
+          "accentTheme"
         ],
         "type": "object",
         "properties": {
@@ -7221,6 +7230,9 @@
             "type": "string"
           },
           "locale": {
+            "type": "string"
+          },
+          "accentTheme": {
             "type": "string"
           }
         }

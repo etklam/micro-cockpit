@@ -11,7 +11,7 @@ import { server } from './setup'
 
 const bootstrap = {
   currentUser: { id: '11111111-1111-1111-1111-111111111111', email: 'owner@example.com', displayName: 'Owner' },
-  timezone: 'Asia/Taipei', baseCurrency: 'USD', appearance: 'system', locale: 'en', role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
+  timezone: 'Asia/Taipei', baseCurrency: 'USD', appearance: 'system', accentTheme: 'green', locale: 'en', role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
   availableProductAreas: ['today', 'diary', 'calendar'],
 }
 
@@ -45,8 +45,10 @@ test('public landing introduces the product and free tools', async () => {
   server.use(http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })))
   renderApp('/')
   expect(await screen.findByRole('heading', { name: 'A quiet cockpit for reflection.' })).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Try tools free' })).toHaveAttribute('href', '/tools')
-  expect(screen.getByRole('link', { name: 'Open tools' })).toHaveAttribute('href', '/tools')
+  expect(screen.getByRole('link', { name: 'Try tools free' })).toHaveAttribute('href', '/tools?tool=position-sizing')
+  expect(screen.getByRole('link', { name: 'Open tools' })).toHaveAttribute('href', '/tools?tool=position-sizing')
+  expect(screen.getByRole('heading', { name: 'How it works' })).toBeInTheDocument()
+  expect(screen.getByLabelText('Preview')).toBeInTheDocument()
 })
 
 test('tools page is usable without signing in', async () => {

@@ -110,6 +110,11 @@
       "id": "0022",
       "filename": "0022_partner_link_accepted_at.sql",
       "sha256": "2fca2d363ced500bec48e378d8b1f8d4b6df0d4588ab6ddd26c111c8fd957638"
+    },
+    {
+      "id": "0023",
+      "filename": "0023_identity_user_accent_theme.sql",
+      "sha256": "380ba7acab697466ae941874355785dcc8b753bf89d8acea9cf9ef6e63bd469c"
     }
   ]
 }

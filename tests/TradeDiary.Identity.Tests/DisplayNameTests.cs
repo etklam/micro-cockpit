@@ -40,6 +40,7 @@ public sealed class DisplayNameTests : IAsyncLifetime
                 status_version integer NOT NULL DEFAULT 1,
                 appearance text NOT NULL DEFAULT 'system',
                 locale text NOT NULL DEFAULT 'en',
+                accent_theme text NOT NULL DEFAULT 'green',
                 updated_at timestamptz NOT NULL DEFAULT now(),
                 created_at timestamptz NOT NULL DEFAULT now()
             );
