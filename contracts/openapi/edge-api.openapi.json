@@ -82,7 +82,7 @@
         "operationId": "post_api_app_tools_risk_reward"
       }
     },
-    "/api/app/tools/fire": {
+    "/api/app/tools/average-cost": {
       "post": {
         "tags": [
           "TradeDiary.Tool"
@@ -91,7 +91,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Fire"
+                "$ref": "#/components/schemas/AverageCost"
               }
             }
           },
@@ -103,7 +103,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FireResponse"
+                  "$ref": "#/components/schemas/AverageCostResponse"
                 }
               }
             }
@@ -117,10 +117,10 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "post_api_app_tools_fire"
+        "operationId": "post_api_app_tools_average_cost"
       }
     },
-    "/api/app/tools/relative-value": {
+    "/api/app/tools/profit-loss": {
       "post": {
         "tags": [
           "TradeDiary.Tool"
@@ -129,7 +129,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RelativeValue"
+                "$ref": "#/components/schemas/ProfitLoss"
               }
             }
           },
@@ -141,7 +141,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RelativeValueResponse"
+                  "$ref": "#/components/schemas/ProfitLossResponse"
                 }
               }
             }
@@ -155,45 +155,7 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "post_api_app_tools_relative_value"
-      }
-    },
-    "/api/app/tools/seasonality": {
-      "post": {
-        "tags": [
-          "TradeDiary.Tool"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Seasonality"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SeasonalityResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "operationId": "post_api_app_tools_seasonality"
+        "operationId": "post_api_app_tools_profit_loss"
       }
     },
     "/api/admin/posts": {
@@ -3944,6 +3906,92 @@
           }
         }
       },
+      "AverageCost": {
+        "required": [
+          "currentQuantity",
+          "currentAverageCost",
+          "addedQuantity",
+          "addedPrice"
+        ],
+        "type": "object",
+        "properties": {
+          "currentQuantity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "currentAverageCost": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "addedQuantity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "addedPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "AverageCostResponse": {
+        "required": [
+          "averageCost",
+          "totalQuantity",
+          "totalCost",
+          "averageCostChange"
+        ],
+        "type": "object",
+        "properties": {
+          "averageCost": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "totalQuantity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "totalCost": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "averageCostChange": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "BarsResponse": {
         "required": [
           "contractVersion",
@@ -5138,65 +5186,6 @@
           "close"
         ]
       },
-      "Fire": {
-        "required": [
-          "annualExpenses",
-          "withdrawalRatePercent",
-          "investedAssets"
-        ],
-        "type": "object",
-        "properties": {
-          "annualExpenses": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "withdrawalRatePercent": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "investedAssets": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          }
-        }
-      },
-      "FireResponse": {
-        "required": [
-          "target",
-          "gap"
-        ],
-        "type": "object",
-        "properties": {
-          "target": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "gap": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          }
-        }
-      },
       "HealthWrite": {
         "required": [
           "serviceName",
@@ -5906,13 +5895,15 @@
       },
       "PositionSizingResponse": {
         "required": [
-          "riskAmount",
           "quantity",
+          "plannedLoss",
+          "riskBudget",
+          "positionValue",
           "perUnitRisk"
         ],
         "type": "object",
         "properties": {
-          "riskAmount": {
+          "quantity": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -5920,7 +5911,23 @@
             ],
             "format": "double"
           },
-          "quantity": {
+          "plannedLoss": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "riskBudget": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "positionValue": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -6130,6 +6137,114 @@
                 "$ref": "#/components/schemas/EvaluationPrice"
               }
             ]
+          }
+        }
+      },
+      "ProfitLoss": {
+        "required": [
+          "side",
+          "entryPrice",
+          "exitPrice",
+          "quantity",
+          "entryFee",
+          "exitFee"
+        ],
+        "type": "object",
+        "properties": {
+          "side": {
+            "type": "string"
+          },
+          "entryPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "exitPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "quantity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "entryFee": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "exitFee": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "ProfitLossResponse": {
+        "required": [
+          "netPnl",
+          "returnPercent",
+          "grossPnl",
+          "totalFees",
+          "exitValue"
+        ],
+        "type": "object",
+        "properties": {
+          "netPnl": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "returnPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "grossPnl": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "totalFees": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "exitValue": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -6394,65 +6509,6 @@
           }
         }
       },
-      "RelativeValue": {
-        "required": [
-          "assetPrice",
-          "benchmarkPrice",
-          "historicalRatio"
-        ],
-        "type": "object",
-        "properties": {
-          "assetPrice": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "benchmarkPrice": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "historicalRatio": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          }
-        }
-      },
-      "RelativeValueResponse": {
-        "required": [
-          "currentRatio",
-          "deviationPercent"
-        ],
-        "type": "object",
-        "properties": {
-          "currentRatio": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "deviationPercent": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          }
-        }
-      },
       "RiskReward": {
         "required": [
           "entryPrice",
@@ -6489,28 +6545,13 @@
       },
       "RiskRewardResponse": {
         "required": [
-          "risk",
-          "reward",
-          "ratio"
+          "ratio",
+          "riskPerUnit",
+          "rewardPerUnit",
+          "breakevenWinRate"
         ],
         "type": "object",
         "properties": {
-          "risk": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "reward": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
           "ratio": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
@@ -6518,45 +6559,8 @@
               "string"
             ],
             "format": "double"
-          }
-        }
-      },
-      "Seasonality": {
-        "required": [
-          "returns"
-        ],
-        "type": "object",
-        "properties": {
-          "returns": {
-            "type": "array",
-            "items": {
-              "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-              "type": [
-                "number",
-                "string"
-              ],
-              "format": "double"
-            }
-          }
-        }
-      },
-      "SeasonalityResponse": {
-        "required": [
-          "observations",
-          "averageReturn",
-          "positiveRate"
-        ],
-        "type": "object",
-        "properties": {
-          "observations": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
           },
-          "averageReturn": {
+          "riskPerUnit": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -6564,7 +6568,15 @@
             ],
             "format": "double"
           },
-          "positiveRate": {
+          "rewardPerUnit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "breakevenWinRate": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",

@@ -55,12 +55,12 @@ test('tools page is usable without signing in', async () => {
   server.use(http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })))
   renderApp('/tools?tool=risk-reward')
   expect(await screen.findByRole('heading', { name: 'Tools' })).toBeInTheDocument()
-  expect(screen.getByLabelText('Calculator')).toHaveValue('risk-reward')
+  expect(screen.getByRole('heading', { name: 'Risk / reward' })).toBeInTheDocument()
   await userEvent.type(screen.getByLabelText('Entry price'), '100')
   await userEvent.type(screen.getByLabelText('Stop price'), '90')
   await userEvent.type(screen.getByLabelText('Target price'), '130')
-  await userEvent.click(screen.getByRole('button', { name: 'Calculate' }))
-  expect(await screen.findByText('3')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Check risk / reward' }))
+  expect(await screen.findByText('3×')).toBeInTheDocument()
 })
 
 test('restores a session and renders a deep calendar link', async () => {

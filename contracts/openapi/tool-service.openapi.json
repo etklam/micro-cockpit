@@ -134,7 +134,7 @@
         ]
       }
     },
-    "/internal/tools/fire": {
+    "/internal/tools/average-cost": {
       "post": {
         "tags": [
           "TradeDiary.Tool"
@@ -143,7 +143,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Fire"
+                "$ref": "#/components/schemas/AverageCost"
               }
             }
           },
@@ -155,7 +155,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FireResponse"
+                  "$ref": "#/components/schemas/AverageCostResponse"
                 }
               }
             }
@@ -178,7 +178,7 @@
         ]
       }
     },
-    "/internal/tools/relative-value": {
+    "/internal/tools/profit-loss": {
       "post": {
         "tags": [
           "TradeDiary.Tool"
@@ -187,7 +187,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RelativeValue"
+                "$ref": "#/components/schemas/ProfitLoss"
               }
             }
           },
@@ -199,51 +199,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RelativeValueResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/internal/tools/seasonality": {
-      "post": {
-        "tags": [
-          "TradeDiary.Tool"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Seasonality"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SeasonalityResponse"
+                  "$ref": "#/components/schemas/ProfitLossResponse"
                 }
               }
             }
@@ -269,15 +225,16 @@
   },
   "components": {
     "schemas": {
-      "Fire": {
+      "AverageCost": {
         "required": [
-          "annualExpenses",
-          "withdrawalRatePercent",
-          "investedAssets"
+          "currentQuantity",
+          "currentAverageCost",
+          "addedQuantity",
+          "addedPrice"
         ],
         "type": "object",
         "properties": {
-          "annualExpenses": {
+          "currentQuantity": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -285,7 +242,7 @@
             ],
             "format": "double"
           },
-          "withdrawalRatePercent": {
+          "currentAverageCost": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -293,7 +250,15 @@
             ],
             "format": "double"
           },
-          "investedAssets": {
+          "addedQuantity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "addedPrice": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -303,14 +268,16 @@
           }
         }
       },
-      "FireResponse": {
+      "AverageCostResponse": {
         "required": [
-          "target",
-          "gap"
+          "averageCost",
+          "totalQuantity",
+          "totalCost",
+          "averageCostChange"
         ],
         "type": "object",
         "properties": {
-          "target": {
+          "averageCost": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -318,7 +285,23 @@
             ],
             "format": "double"
           },
-          "gap": {
+          "totalQuantity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "totalCost": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "averageCostChange": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -373,13 +356,15 @@
       },
       "PositionSizingResponse": {
         "required": [
-          "riskAmount",
           "quantity",
+          "plannedLoss",
+          "riskBudget",
+          "positionValue",
           "perUnitRisk"
         ],
         "type": "object",
         "properties": {
-          "riskAmount": {
+          "quantity": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -387,7 +372,23 @@
             ],
             "format": "double"
           },
-          "quantity": {
+          "plannedLoss": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "riskBudget": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "positionValue": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -443,15 +444,21 @@
           }
         }
       },
-      "RelativeValue": {
+      "ProfitLoss": {
         "required": [
-          "assetPrice",
-          "benchmarkPrice",
-          "historicalRatio"
+          "side",
+          "entryPrice",
+          "exitPrice",
+          "quantity",
+          "entryFee",
+          "exitFee"
         ],
         "type": "object",
         "properties": {
-          "assetPrice": {
+          "side": {
+            "type": "string"
+          },
+          "entryPrice": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -459,7 +466,7 @@
             ],
             "format": "double"
           },
-          "benchmarkPrice": {
+          "exitPrice": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -467,7 +474,23 @@
             ],
             "format": "double"
           },
-          "historicalRatio": {
+          "quantity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "entryFee": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "exitFee": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -477,14 +500,17 @@
           }
         }
       },
-      "RelativeValueResponse": {
+      "ProfitLossResponse": {
         "required": [
-          "currentRatio",
-          "deviationPercent"
+          "netPnl",
+          "returnPercent",
+          "grossPnl",
+          "totalFees",
+          "exitValue"
         ],
         "type": "object",
         "properties": {
-          "currentRatio": {
+          "netPnl": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -492,7 +518,31 @@
             ],
             "format": "double"
           },
-          "deviationPercent": {
+          "returnPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "grossPnl": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "totalFees": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "exitValue": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -538,28 +588,13 @@
       },
       "RiskRewardResponse": {
         "required": [
-          "risk",
-          "reward",
-          "ratio"
+          "ratio",
+          "riskPerUnit",
+          "rewardPerUnit",
+          "breakevenWinRate"
         ],
         "type": "object",
         "properties": {
-          "risk": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "reward": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
           "ratio": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
@@ -567,45 +602,8 @@
               "string"
             ],
             "format": "double"
-          }
-        }
-      },
-      "Seasonality": {
-        "required": [
-          "returns"
-        ],
-        "type": "object",
-        "properties": {
-          "returns": {
-            "type": "array",
-            "items": {
-              "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-              "type": [
-                "number",
-                "string"
-              ],
-              "format": "double"
-            }
-          }
-        }
-      },
-      "SeasonalityResponse": {
-        "required": [
-          "observations",
-          "averageReturn",
-          "positiveRate"
-        ],
-        "type": "object",
-        "properties": {
-          "observations": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
           },
-          "averageReturn": {
+          "riskPerUnit": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -613,7 +611,15 @@
             ],
             "format": "double"
           },
-          "positiveRate": {
+          "rewardPerUnit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "breakevenWinRate": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",

@@ -42,7 +42,7 @@ The concurrent Journal idempotency harness now targets the public Edge routes. P
 | 9 Price Alert | PASS (repository + smoke) | Four conditions, worker, history, dismiss/reactivate, market-health fail-closed, UI. |
 | 10 Rotation | PASS (build + golden) | Universes, snapshots, breadth, state, ranking/percentile, insufficient-data semantics, monitor UI. |
 | 11 Partner and Agent | PASS (repository) | Human/agent links, per-side policies, scoped hashed API keys, short-lived agent JWTs, UI. |
-| 12 Content, Tools, Operations | PASS (repository) | Publishing, five stateless calculators, audit/jobs/health service, Edge contracts. |
+| 12 Content, Tools, Operations | PASS (repository) | Publishing, four focused stateless calculators, audit/jobs/health service, Edge contracts. |
 
 ## Completion checklist
 

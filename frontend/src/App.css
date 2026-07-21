@@ -155,6 +155,68 @@
 .form-error { color: var(--loss); font-size: var(--fs-sm); line-height: var(--lh-normal); }
 .form-hint { color: var(--muted); font-size: var(--fs-sm); }
 
+/* ------------------------- Investment tools ------------------------ */
+.tools-page { display: flex; flex-direction: column; gap: var(--sp-5); }
+.tools-page > .page-head { margin-bottom: calc(-1 * var(--sp-3)); }
+.tools-page__privacy { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.tools-catalog { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); }
+.tools-catalog__group { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.tools-catalog__group h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.tools-catalog__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); height: 100%; }
+.tools-catalog__card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  gap: var(--sp-2) var(--sp-3);
+  min-height: 148px;
+  padding: var(--sp-4);
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.tools-catalog__card:hover { border-color: var(--border-strong); background: color-mix(in oklch, var(--surface) 92%, var(--ink) 2%); }
+.tools-catalog__card:active { transform: translateY(.5px); }
+.tools-catalog__card.is-active { border-color: var(--primary-line); background: color-mix(in oklch, var(--primary-soft) 38%, var(--surface)); }
+.tools-catalog__card > svg { color: var(--primary); margin-top: 2px; }
+.tools-catalog__card > span { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.tools-catalog__card strong { font-size: var(--fs-base); }
+.tools-catalog__card small { color: var(--muted); font-size: var(--fs-sm); line-height: var(--lh-normal); }
+.tools-catalog__action { grid-column: 2; align-self: end; color: var(--primary); font-size: var(--fs-sm); font-weight: 650; }
+.tool-workspace { display: flex; flex-direction: column; gap: var(--sp-4); padding-top: var(--sp-2); }
+.tool-workspace__head { display: flex; align-items: flex-start; gap: var(--sp-3); }
+.tool-workspace__head h2 { margin: 0 0 4px; font-size: var(--fs-xl); }
+.tool-workspace__head p { margin: 0; color: var(--muted); }
+.tool-workspace__icon { display: inline-grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; color: var(--primary); background: var(--primary-soft); border: 1px solid var(--primary-line); border-radius: var(--r-md); }
+.tool-workspace__grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr); gap: var(--sp-4); align-items: stretch; }
+.tool-form-card form { display: flex; flex-direction: column; gap: var(--sp-5); height: 100%; }
+.tool-form-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); }
+.tool-form-card h3,
+.tool-result-card h3,
+.tool-formula h3 { margin: 0; font-size: var(--fs-md); }
+.tool-currency { width: 116px; }
+.tool-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
+.tool-form-actions { margin-top: auto; }
+.tool-result-card { display: flex; flex-direction: column; gap: var(--sp-4); min-height: 320px; }
+.tool-result-card .state-box { margin: auto 0; }
+.tool-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+.tool-result { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding: var(--sp-4); background: var(--surface-2); border: 1px solid var(--hairline); border-radius: var(--r-md); }
+.tool-result span { color: var(--muted); font-size: var(--fs-sm); }
+.tool-result strong { overflow-wrap: anywhere; font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
+.tool-result--primary { grid-column: 1 / -1; padding: var(--sp-5); background: color-mix(in oklch, var(--primary-soft) 40%, var(--surface-2)); border-color: var(--primary-line); }
+.tool-result--primary strong { font-size: clamp(1.8rem, 4vw, 2.6rem); line-height: 1; }
+.tool-formula { padding: var(--sp-4) var(--sp-5); }
+.tool-formula p { margin: var(--sp-2) 0 0; color: var(--muted); font-size: var(--fs-sm); line-height: var(--lh-relaxed); }
+
 /* Appearance instrument — Settings theme control */
 .theme-picker {
   display: grid;
@@ -1425,6 +1487,12 @@
   .review-evidence__filters { grid-template-columns: 1fr; }
   .form-actions { justify-content: stretch; }
   .form-actions .btn { flex: 1 1 auto; }
+  .tools-catalog { grid-template-columns: 1fr; }
+  .tools-catalog__grid { grid-template-columns: 1fr; }
+  .tools-catalog__card { min-height: 0; }
+  .tool-workspace__grid { grid-template-columns: 1fr; }
+  .tool-fields { grid-template-columns: 1fr; }
+  .tool-result-card { min-height: 260px; }
 }
 
 @media (max-width: 420px) {

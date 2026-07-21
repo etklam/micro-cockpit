@@ -1,76 +1,170 @@
-/** Pure client-side tool calculators — same formulas as tool-service. */
+/** Deterministic, client-side investment calculations used by the public Tools area. */
 
-export type ToolId = 'position-sizing' | 'risk-reward' | 'fire' | 'relative-value' | 'seasonality'
+export type ToolId = 'position-sizing' | 'risk-reward' | 'average-cost' | 'profit-loss'
 
-export const TOOL_IDS: ToolId[] = ['position-sizing', 'risk-reward', 'fire', 'relative-value', 'seasonality']
+export const TOOL_IDS: ToolId[] = ['position-sizing', 'risk-reward', 'average-cost', 'profit-loss']
 
 export function isToolId(value: string): value is ToolId {
   return (TOOL_IDS as string[]).includes(value)
 }
 
+export type ToolValidationCode =
+  | 'required'
+  | 'positive'
+  | 'nonnegative'
+  | 'riskPercent'
+  | 'oppositeSides'
+
+export type ToolValidationErrors = Record<string, ToolValidationCode>
+
 export class ToolInputError extends Error {
-  constructor() {
+  readonly errors: ToolValidationErrors
+
+  constructor(errors: ToolValidationErrors) {
     super('invalid_input')
     this.name = 'ToolInputError'
+    this.errors = errors
   }
 }
 
-function n(value: unknown): number {
-  const x = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(x)) throw new ToolInputError()
-  return x
+function readNumber(values: Record<string, unknown>, key: string, errors: ToolValidationErrors): number {
+  const raw = values[key]
+  if (raw === '' || raw == null) {
+    errors[key] = 'required'
+    return Number.NaN
+  }
+  const value = typeof raw === 'number' ? raw : Number(raw)
+  if (!Number.isFinite(value)) {
+    errors[key] = 'required'
+    return Number.NaN
+  }
+  return value
 }
 
-function round(value: number, digits: number): number {
-  const f = 10 ** digits
-  return Math.round(value * f) / f
+function positive(values: Record<string, unknown>, key: string, errors: ToolValidationErrors): number {
+  const value = readNumber(values, key, errors)
+  if (Number.isFinite(value) && value <= 0) errors[key] = 'positive'
+  return value
+}
+
+function nonnegative(values: Record<string, unknown>, key: string, errors: ToolValidationErrors): number {
+  const value = readNumber(values, key, errors)
+  if (Number.isFinite(value) && value < 0) errors[key] = 'nonnegative'
+  return value
+}
+
+function round(value: number, digits = 2): number {
+  const factor = 10 ** digits
+  return Math.round((value + Number.EPSILON) * factor) / factor
+}
+
+export function validateTool(tool: ToolId, values: Record<string, unknown>): ToolValidationErrors {
+  const errors: ToolValidationErrors = {}
+  switch (tool) {
+    case 'position-sizing': {
+      positive(values, 'accountValue', errors)
+      const riskPercent = positive(values, 'riskPercent', errors)
+      positive(values, 'entryPrice', errors)
+      positive(values, 'stopPrice', errors)
+      if (Number.isFinite(riskPercent) && riskPercent > 100) errors.riskPercent = 'riskPercent'
+      if (!errors.entryPrice && !errors.stopPrice && Number(values.entryPrice) === Number(values.stopPrice)) errors.stopPrice = 'oppositeSides'
+      break
+    }
+    case 'risk-reward': {
+      const entry = positive(values, 'entryPrice', errors)
+      const stop = positive(values, 'stopPrice', errors)
+      const target = positive(values, 'targetPrice', errors)
+      if (Number.isFinite(entry) && Number.isFinite(stop) && Number.isFinite(target)) {
+        const validLong = stop < entry && target > entry
+        const validShort = stop > entry && target < entry
+        if (!validLong && !validShort) errors.targetPrice = 'oppositeSides'
+      }
+      break
+    }
+    case 'average-cost':
+      positive(values, 'currentQuantity', errors)
+      positive(values, 'currentAverageCost', errors)
+      positive(values, 'addedQuantity', errors)
+      positive(values, 'addedPrice', errors)
+      break
+    case 'profit-loss':
+      positive(values, 'entryPrice', errors)
+      positive(values, 'exitPrice', errors)
+      positive(values, 'quantity', errors)
+      nonnegative(values, 'entryFee', errors)
+      nonnegative(values, 'exitFee', errors)
+      if (values.side !== 'long' && values.side !== 'short') errors.side = 'required'
+      break
+  }
+  return errors
 }
 
 export function calculateTool(tool: ToolId, values: Record<string, unknown>): Record<string, number> {
+  const errors = validateTool(tool, values)
+  if (Object.keys(errors).length) throw new ToolInputError(errors)
+
   switch (tool) {
     case 'position-sizing': {
-      const accountValue = n(values.accountValue)
-      const riskPercent = n(values.riskPercent)
-      const entryPrice = n(values.entryPrice)
-      const stopPrice = n(values.stopPrice)
-      if (accountValue <= 0 || riskPercent <= 0 || entryPrice <= 0 || stopPrice < 0 || entryPrice === stopPrice) throw new ToolInputError()
-      const riskAmount = accountValue * riskPercent / 100
-      const perUnitRisk = Math.abs(entryPrice - stopPrice)
-      return { riskAmount, quantity: Math.floor(riskAmount / perUnitRisk), perUnitRisk }
+      const accountValue = Number(values.accountValue)
+      const riskPercent = Number(values.riskPercent)
+      const entryPrice = Number(values.entryPrice)
+      const perUnitRisk = Math.abs(entryPrice - Number(values.stopPrice))
+      const riskBudget = accountValue * riskPercent / 100
+      const quantity = Math.floor(riskBudget / perUnitRisk)
+      return {
+        quantity,
+        plannedLoss: round(quantity * perUnitRisk),
+        riskBudget: round(riskBudget),
+        positionValue: round(quantity * entryPrice),
+        perUnitRisk: round(perUnitRisk, 6),
+      }
     }
     case 'risk-reward': {
-      const entryPrice = n(values.entryPrice)
-      const stopPrice = n(values.stopPrice)
-      const targetPrice = n(values.targetPrice)
-      if (entryPrice <= 0 || stopPrice < 0 || targetPrice <= 0 || entryPrice === stopPrice) throw new ToolInputError()
-      const risk = Math.abs(entryPrice - stopPrice)
-      const reward = Math.abs(targetPrice - entryPrice)
-      return { risk, reward, ratio: round(reward / risk, 4) }
+      const entry = Number(values.entryPrice)
+      const risk = Math.abs(entry - Number(values.stopPrice))
+      const reward = Math.abs(Number(values.targetPrice) - entry)
+      const ratio = reward / risk
+      return {
+        ratio: round(ratio, 4),
+        riskPerUnit: round(risk, 6),
+        rewardPerUnit: round(reward, 6),
+        breakevenWinRate: round(100 / (1 + ratio), 2),
+      }
     }
-    case 'fire': {
-      const annualExpenses = n(values.annualExpenses)
-      const withdrawalRatePercent = n(values.withdrawalRatePercent)
-      const investedAssets = n(values.investedAssets)
-      if (annualExpenses <= 0 || withdrawalRatePercent <= 0) throw new ToolInputError()
-      const target = round(annualExpenses / (withdrawalRatePercent / 100), 2)
-      return { target, gap: Math.max(0, round(target - investedAssets, 2)) }
+    case 'average-cost': {
+      const currentQuantity = Number(values.currentQuantity)
+      const currentAverageCost = Number(values.currentAverageCost)
+      const addedQuantity = Number(values.addedQuantity)
+      const addedPrice = Number(values.addedPrice)
+      const totalQuantity = currentQuantity + addedQuantity
+      const currentCost = currentQuantity * currentAverageCost
+      const addedCost = addedQuantity * addedPrice
+      const averageCost = (currentCost + addedCost) / totalQuantity
+      return {
+        averageCost: round(averageCost, 6),
+        totalQuantity: round(totalQuantity, 6),
+        totalCost: round(currentCost + addedCost),
+        averageCostChange: round((averageCost / currentAverageCost - 1) * 100, 2),
+      }
     }
-    case 'relative-value': {
-      const assetPrice = n(values.assetPrice)
-      const benchmarkPrice = n(values.benchmarkPrice)
-      const historicalRatio = n(values.historicalRatio)
-      if (assetPrice <= 0 || benchmarkPrice <= 0 || historicalRatio <= 0) throw new ToolInputError()
-      const currentRatio = round(assetPrice / benchmarkPrice, 6)
-      return { currentRatio, deviationPercent: round((currentRatio / historicalRatio - 1) * 100, 4) }
-    }
-    case 'seasonality': {
-      const returns = Array.isArray(values.returns)
-        ? values.returns.map(n)
-        : String(values.returns ?? '').split(',').map(s => s.trim()).filter(Boolean).map(n)
-      if (returns.length === 0 || returns.length > 120) throw new ToolInputError()
-      const averageReturn = round(returns.reduce((a, b) => a + b, 0) / returns.length, 4)
-      const positiveRate = round(returns.filter(v => v > 0).length / returns.length * 100, 2)
-      return { observations: returns.length, averageReturn, positiveRate }
+    case 'profit-loss': {
+      const entry = Number(values.entryPrice)
+      const exit = Number(values.exitPrice)
+      const quantity = Number(values.quantity)
+      const entryFee = Number(values.entryFee)
+      const exitFee = Number(values.exitFee)
+      const direction = values.side === 'short' ? -1 : 1
+      const grossPnl = (exit - entry) * quantity * direction
+      const totalFees = entryFee + exitFee
+      const netPnl = grossPnl - totalFees
+      const capitalAtRisk = entry * quantity + entryFee
+      return {
+        netPnl: round(netPnl),
+        returnPercent: round(netPnl / capitalAtRisk * 100, 2),
+        grossPnl: round(grossPnl),
+        totalFees: round(totalFees),
+        exitValue: round(exit * quantity),
+      }
     }
   }
 }

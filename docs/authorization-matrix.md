@@ -104,9 +104,8 @@ Cross-user resources remain concealed with `404`; authentication failures use th
 | Rotation | GET | `/internal/rotation/monitor` | `/api/app/rotation/monitor` | human user, admin | — | — | — | unknown resource `404` |
 | Tool | POST | `/internal/tools/position-sizing` | `/api/app/tools/position-sizing` | human user, admin | — | — | — | n/a; agents denied |
 | Tool | POST | `/internal/tools/risk-reward` | `/api/app/tools/risk-reward` | human user, admin | — | — | — | n/a; agents denied |
-| Tool | POST | `/internal/tools/fire` | `/api/app/tools/fire` | human user, admin | — | — | — | n/a; agents denied |
-| Tool | POST | `/internal/tools/relative-value` | `/api/app/tools/relative-value` | human user, admin | — | — | — | n/a; agents denied |
-| Tool | POST | `/internal/tools/seasonality` | `/api/app/tools/seasonality` | human user, admin | — | — | — | n/a; agents denied |
+| Tool | POST | `/internal/tools/average-cost` | `/api/app/tools/average-cost` | human user, admin | — | — | — | n/a; agents denied |
+| Tool | POST | `/internal/tools/profit-loss` | `/api/app/tools/profit-loss` | human user, admin | — | — | — | n/a; agents denied |
 
 ## Internal events, workers, content administration, and operations
 

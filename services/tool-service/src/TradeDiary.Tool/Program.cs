@@ -12,38 +12,74 @@ app.MapOpenApi("/openapi.json").AllowAnonymous();
 app.MapGet("/health/live",()=>Results.Ok(new{status="healthy"})).AllowAnonymous();
 app.MapGet("/health/ready",()=>Results.Ok(new{status="ready"})).AllowAnonymous();
 app.MapGet("/version",()=>Results.Ok(new{service="tool-service",version="0.1.0"})).AllowAnonymous();
-app.MapPost("/internal/tools/position-sizing",(PositionSizing x)=> x.AccountValue<=0||x.RiskPercent<=0||x.EntryPrice<=0||x.StopPrice<0||x.EntryPrice==x.StopPrice
+app.MapPost("/internal/tools/position-sizing",(PositionSizing x)=> x.AccountValue<=0||x.RiskPercent<=0||x.RiskPercent>100||x.EntryPrice<=0||x.StopPrice<=0||x.EntryPrice==x.StopPrice
   ? Results.Problem("invalid_input",statusCode:400)
-  : Results.Ok(new PositionSizingResponse(x.AccountValue*x.RiskPercent/100m,decimal.Floor((x.AccountValue*x.RiskPercent/100m)/Math.Abs(x.EntryPrice-x.StopPrice)),Math.Abs(x.EntryPrice-x.StopPrice))))
+  : Results.Ok(PositionSizingResponse.Calculate(x)))
 .Produces<PositionSizingResponse>(200).ProducesProblem(400);
-app.MapPost("/internal/tools/risk-reward",(RiskReward x)=> x.EntryPrice<=0||x.StopPrice<0||x.TargetPrice<=0||x.EntryPrice==x.StopPrice
+app.MapPost("/internal/tools/risk-reward",(RiskReward x)=> x.EntryPrice<=0||x.StopPrice<=0||x.TargetPrice<=0||!RiskReward.IsValid(x)
   ? Results.Problem("invalid_input",statusCode:400)
-  : Results.Ok(new RiskRewardResponse(Math.Abs(x.EntryPrice-x.StopPrice),Math.Abs(x.TargetPrice-x.EntryPrice),decimal.Round(Math.Abs(x.TargetPrice-x.EntryPrice)/Math.Abs(x.EntryPrice-x.StopPrice),4))))
+  : Results.Ok(RiskRewardResponse.Calculate(x)))
 .Produces<RiskRewardResponse>(200).ProducesProblem(400);
-app.MapPost("/internal/tools/fire",(Fire x)=> x.AnnualExpenses<=0||x.WithdrawalRatePercent<=0
+app.MapPost("/internal/tools/average-cost",(AverageCost x)=> x.CurrentQuantity<=0||x.CurrentAverageCost<=0||x.AddedQuantity<=0||x.AddedPrice<=0
   ? Results.Problem("invalid_input",statusCode:400)
-  : Results.Ok(new FireResponse(decimal.Round(x.AnnualExpenses/(x.WithdrawalRatePercent/100m),2),decimal.Max(0,decimal.Round(x.AnnualExpenses/(x.WithdrawalRatePercent/100m)-x.InvestedAssets,2)))))
-.Produces<FireResponse>(200).ProducesProblem(400);
-app.MapPost("/internal/tools/relative-value",(RelativeValue x)=>x.AssetPrice<=0||x.BenchmarkPrice<=0||x.HistoricalRatio<=0
+  : Results.Ok(AverageCostResponse.Calculate(x)))
+.Produces<AverageCostResponse>(200).ProducesProblem(400);
+app.MapPost("/internal/tools/profit-loss",(ProfitLoss x)=>x.Side is not ("long" or "short")||x.EntryPrice<=0||x.ExitPrice<=0||x.Quantity<=0||x.EntryFee<0||x.ExitFee<0
   ? Results.Problem("invalid_input",statusCode:400)
-  : Results.Ok(new RelativeValueResponse(decimal.Round(x.AssetPrice/x.BenchmarkPrice,6),decimal.Round(((x.AssetPrice/x.BenchmarkPrice)/x.HistoricalRatio-1)*100m,4))))
-.Produces<RelativeValueResponse>(200).ProducesProblem(400);
-app.MapPost("/internal/tools/seasonality",(Seasonality x)=>x.Returns is null||x.Returns.Count==0||x.Returns.Count>120
-  ? Results.Problem("invalid_input",statusCode:400)
-  : Results.Ok(new SeasonalityResponse(x.Returns.Count,decimal.Round(x.Returns.Average(),4),decimal.Round((decimal)x.Returns.Count(v=>v>0)/x.Returns.Count*100m,2))))
-.Produces<SeasonalityResponse>(200).ProducesProblem(400);
+  : Results.Ok(ProfitLossResponse.Calculate(x)))
+.Produces<ProfitLossResponse>(200).ProducesProblem(400);
 app.Run();
 
 record PositionSizing(decimal AccountValue,decimal RiskPercent,decimal EntryPrice,decimal StopPrice);
-record RiskReward(decimal EntryPrice,decimal StopPrice,decimal TargetPrice);
-record Fire(decimal AnnualExpenses,decimal WithdrawalRatePercent,decimal InvestedAssets);
-record RelativeValue(decimal AssetPrice,decimal BenchmarkPrice,decimal HistoricalRatio);
-record Seasonality(List<decimal> Returns);
-record PositionSizingResponse(decimal RiskAmount,decimal Quantity,decimal PerUnitRisk);
-record RiskRewardResponse(decimal Risk,decimal Reward,decimal Ratio);
-record FireResponse(decimal Target,decimal Gap);
-record RelativeValueResponse(decimal CurrentRatio,decimal DeviationPercent);
-record SeasonalityResponse(int Observations,decimal AverageReturn,decimal PositiveRate);
+record RiskReward(decimal EntryPrice,decimal StopPrice,decimal TargetPrice)
+{
+    public static bool IsValid(RiskReward x) =>
+        x.StopPrice < x.EntryPrice && x.TargetPrice > x.EntryPrice ||
+        x.StopPrice > x.EntryPrice && x.TargetPrice < x.EntryPrice;
+}
+record AverageCost(decimal CurrentQuantity,decimal CurrentAverageCost,decimal AddedQuantity,decimal AddedPrice);
+record ProfitLoss(string Side,decimal EntryPrice,decimal ExitPrice,decimal Quantity,decimal EntryFee,decimal ExitFee);
+record PositionSizingResponse(decimal Quantity,decimal PlannedLoss,decimal RiskBudget,decimal PositionValue,decimal PerUnitRisk)
+{
+    public static PositionSizingResponse Calculate(PositionSizing x)
+    {
+        var riskBudget=x.AccountValue*x.RiskPercent/100m;
+        var perUnitRisk=Math.Abs(x.EntryPrice-x.StopPrice);
+        var quantity=decimal.Floor(riskBudget/perUnitRisk);
+        return new(quantity,decimal.Round(quantity*perUnitRisk,2),decimal.Round(riskBudget,2),decimal.Round(quantity*x.EntryPrice,2),decimal.Round(perUnitRisk,6));
+    }
+}
+record RiskRewardResponse(decimal Ratio,decimal RiskPerUnit,decimal RewardPerUnit,decimal BreakevenWinRate)
+{
+    public static RiskRewardResponse Calculate(RiskReward x)
+    {
+        var risk=Math.Abs(x.EntryPrice-x.StopPrice);
+        var reward=Math.Abs(x.TargetPrice-x.EntryPrice);
+        var ratio=reward/risk;
+        return new(decimal.Round(ratio,4),decimal.Round(risk,6),decimal.Round(reward,6),decimal.Round(100m/(1m+ratio),2));
+    }
+}
+record AverageCostResponse(decimal AverageCost,decimal TotalQuantity,decimal TotalCost,decimal AverageCostChange)
+{
+    public static AverageCostResponse Calculate(AverageCost x)
+    {
+        var totalQuantity=x.CurrentQuantity+x.AddedQuantity;
+        var totalCost=x.CurrentQuantity*x.CurrentAverageCost+x.AddedQuantity*x.AddedPrice;
+        var average=totalCost/totalQuantity;
+        return new(decimal.Round(average,6),decimal.Round(totalQuantity,6),decimal.Round(totalCost,2),decimal.Round((average/x.CurrentAverageCost-1m)*100m,2));
+    }
+}
+record ProfitLossResponse(decimal NetPnl,decimal ReturnPercent,decimal GrossPnl,decimal TotalFees,decimal ExitValue)
+{
+    public static ProfitLossResponse Calculate(ProfitLoss x)
+    {
+        var direction=x.Side=="short"?-1m:1m;
+        var gross=(x.ExitPrice-x.EntryPrice)*x.Quantity*direction;
+        var fees=x.EntryFee+x.ExitFee;
+        var net=gross-fees;
+        return new(decimal.Round(net,2),decimal.Round(net/(x.EntryPrice*x.Quantity+x.EntryFee)*100m,2),decimal.Round(gross,2),decimal.Round(fees,2),decimal.Round(x.ExitPrice*x.Quantity,2));
+    }
+}
 
 // ponytail: shared OpenAPI security wiring — bearerAuth for user routes, serviceKey for internal admin/worker/events.
 sealed class SecuritySchemesTransformer : IOpenApiDocumentTransformer

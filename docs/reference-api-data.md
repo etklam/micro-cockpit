@@ -222,9 +222,8 @@ Human partner creation is **invitation-only** (no raw human `POST /api/app/partn
 | GET | `/api/content/posts/{slug}` |
 | POST | `/api/app/tools/position-sizing` |
 | POST | `/api/app/tools/risk-reward` |
-| POST | `/api/app/tools/fire` |
-| POST | `/api/app/tools/relative-value` |
-| POST | `/api/app/tools/seasonality` |
+| POST | `/api/app/tools/average-cost` |
+| POST | `/api/app/tools/profit-loss` |
 | POST | `/api/admin/posts` |
 | PUT, DELETE | `/api/admin/posts/{id}` |
 | GET | `/api/admin/operations/audit` |

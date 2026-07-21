@@ -39,7 +39,7 @@ public sealed class EdgeAuthorizationTests
     [InlineData("GET", "/api/app/diaries", "", HttpStatusCode.Forbidden)]
     [InlineData("POST", "/api/app/diaries", "diary:read", HttpStatusCode.Forbidden)]
     [InlineData("POST", "/api/app/diaries", "diary:write", HttpStatusCode.OK)]
-    [InlineData("POST", "/api/app/tools/fire", "research:read", HttpStatusCode.Forbidden)]
+    [InlineData("POST", "/api/app/tools/profit-loss", "research:read", HttpStatusCode.Forbidden)]
     public async Task Agent_scope_matrix_is_enforced(string method, string path, string scopes, HttpStatusCode expected)
     {
         using var factory = CreateFactory();

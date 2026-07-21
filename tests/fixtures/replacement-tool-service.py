@@ -7,11 +7,10 @@ import os
 
 ROUTES = {
     ("GET", "/health/live"), ("GET", "/health/ready"), ("GET", "/version"),
-    ("POST", "/internal/tools/fire"),
+    ("POST", "/internal/tools/average-cost"),
     ("POST", "/internal/tools/position-sizing"),
-    ("POST", "/internal/tools/relative-value"),
+    ("POST", "/internal/tools/profit-loss"),
     ("POST", "/internal/tools/risk-reward"),
-    ("POST", "/internal/tools/seasonality"),
 }
 
 

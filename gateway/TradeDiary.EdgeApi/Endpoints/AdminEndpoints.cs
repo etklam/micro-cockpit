@@ -4,9 +4,8 @@ internal static class AdminEndpoints
     {
         EdgeTransport.MapProxy(app, "/api/app/tools/position-sizing", "tool", "/internal/tools/position-sizing", [HttpMethods.Post]);
         EdgeTransport.MapProxy(app, "/api/app/tools/risk-reward", "tool", "/internal/tools/risk-reward", [HttpMethods.Post]);
-        EdgeTransport.MapProxy(app, "/api/app/tools/fire", "tool", "/internal/tools/fire", [HttpMethods.Post]);
-        EdgeTransport.MapProxy(app, "/api/app/tools/relative-value", "tool", "/internal/tools/relative-value", [HttpMethods.Post]);
-        EdgeTransport.MapProxy(app, "/api/app/tools/seasonality", "tool", "/internal/tools/seasonality", [HttpMethods.Post]);
+        EdgeTransport.MapProxy(app, "/api/app/tools/average-cost", "tool", "/internal/tools/average-cost", [HttpMethods.Post]);
+        EdgeTransport.MapProxy(app, "/api/app/tools/profit-loss", "tool", "/internal/tools/profit-loss", [HttpMethods.Post]);
         EdgeTransport.MapProxy(app, "/api/admin/posts", "content", "/internal/admin/posts", [HttpMethods.Post]).RequireAuthorization("admin");
         EdgeTransport.MapProxy(app, "/api/admin/posts/{id:guid}", "content", "/internal/admin/posts/{id}", [HttpMethods.Put, HttpMethods.Delete]).RequireAuthorization("admin");
         EdgeTransport.MapProxy(app, "/api/admin/operations/audit", "operations", "/internal/operations/audit", [HttpMethods.Get]).RequireAuthorization("admin");

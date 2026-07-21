@@ -29,6 +29,6 @@ describe('toolsCatalog', () => {
   it('falls back unknown query to default tool', () => {
     expect(parseToolQuery(null)).toBe('position-sizing')
     expect(parseToolQuery('nope')).toBe('position-sizing')
-    expect(parseToolQuery('fire')).toBe('fire')
+    expect(parseToolQuery('average-cost')).toBe('average-cost')
   })
 })

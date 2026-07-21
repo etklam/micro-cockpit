@@ -43,7 +43,6 @@ describe('public experience', () => {
     expect(screen.getByText('No brokerage execution or order routing')).toBeInTheDocument()
     expect(screen.getByText('Decision support, not investment advice')).toBeInTheDocument()
     for (const tool of TOOL_CATALOG) {
-      expect(screen.getAllByRole('link', { name: new RegExp(tool.id === 'fire' ? 'Financial independence' : '', 'i') }).length).toBeGreaterThanOrEqual(0)
       const link = screen.getAllByRole('link').find(a => a.getAttribute('href') === toolHref(tool.id))
       expect(link).toBeTruthy()
     }
@@ -103,7 +102,7 @@ describe('public experience', () => {
   it('falls back unknown tool query to position-sizing', async () => {
     renderPublic('/tools?tool=not-a-tool')
     expect(await screen.findByRole('heading', { name: 'Tools' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Calculator')).toHaveValue('position-sizing')
+    expect(screen.getByRole('heading', { name: 'Position size' })).toBeInTheDocument()
     expect(window.location.search).toBe('?tool=position-sizing')
   })
 

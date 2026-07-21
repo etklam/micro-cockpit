@@ -6,6 +6,8 @@ export type ApiKeyTokenRequest = { "apiKey": string }
 export type ApiKeyTokenResponse = { "accessToken": string; "expiresAt": string }
 export type AppBootstrapResponse = { "currentUser": { "id": string; "email": string; "displayName": string }; "timezone": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string; "role": string; "accountType": string; "currentLocalDate": string; "availableProductAreas": Array<string> }
 export type AuditResponse = { "id": string; "actorUserId": null | string; "action": string; "resourceType": string; "resourceId": null | string; "details": JsonElement; "occurredAt": string }
+export type AverageCost = { "currentQuantity": number; "currentAverageCost": number; "addedQuantity": number; "addedPrice": number }
+export type AverageCostResponse = { "averageCost": number; "totalQuantity": number; "totalCost": number; "averageCostChange": number }
 export type BarsResponse = { "contractVersion": number | string; "symbol": string; "items": Array<PublishedBarResponse> }
 export type CalculateResponse = { "universeId": string; "snapshotDate": string; "status": string; "formulaVersion": string }
 export type CalendarResponse = { "year": number; "month": number; "summary": MonthSummaryResponse | null; "days": Array<{ "date": string; "performance": PerformanceResponse | null; "diaryCount": number; "transactionCount": number; "alertCount": number | null }>; "capabilities": { "alerts": CapabilityStatus } }
@@ -44,8 +46,6 @@ export type DisciplineWrite = { "content": string }
 export type EdgeProblemDetails = { "code": string; "title": string; "status": number; "detail": string; "correlationId": string }
 export type EtfSnapshotResponse = { "symbol": string; "label": string; "sector": null | string; "close": number | null; "return2w": number | null; "return1m": number | null; "return3m": number | null; "rank2w": null | number | string; "rankGroup": string; "percentile2w": number | null; "aboveMa20": null | boolean; "aboveMa50": null | boolean; "aboveMa200": null | boolean; "status": string }
 export type EvaluationPrice = "open" | "close"
-export type Fire = { "annualExpenses": number; "withdrawalRatePercent": number; "investedAssets": number }
-export type FireResponse = { "target": number; "gap": number }
 export type HealthWrite = { "serviceName": string; "status": string }
 export type InvitationCreatedResponse = { "id": string; "code": string; "expiresAt": string }
 export type InvitationListItem = { "id": string; "status": string; "expiresAt": string; "createdAt": string }
@@ -71,12 +71,14 @@ export type PartnerLinkBrowserResponse = { "id": string; "partnerType": string; 
 export type PerformanceResponse = { "localDate": string; "pnlAmount": number; "capitalBase": number | null; "pnlPercent": number | null; "note": string }
 export type PerformanceWrite = { "pnlAmount": number; "capitalBase": number | null; "note": null | string }
 export type PositionSizing = { "accountValue": number; "riskPercent": number; "entryPrice": number; "stopPrice": number }
-export type PositionSizingResponse = { "riskAmount": number; "quantity": number; "perUnitRisk": number }
+export type PositionSizingResponse = { "quantity": number; "plannedLoss": number; "riskBudget": number; "positionValue": number; "perUnitRisk": number }
 export type PostResponse = { "id": string; "slug": string; "title": string; "body": string; "publishedAt": string }
 export type PostWrite = { "slug": string; "title": string; "body": null | string; "status": string }
 export type PriceAlertResponse = { "id": string; "symbol": string; "conditionType": string; "threshold": number; "lookbackDays": null | number | string; "direction": null | string; "evaluationPrice": EvaluationPrice; "status": PriceAlertStatus; "baselineClose": number | null; "lastEvaluatedDate": null | string; "createdAt": string; "updatedAt": string }
 export type PriceAlertStatus = "active" | "triggered" | "dismissed"
 export type PriceAlertWrite = { "symbol": string; "conditionType": string; "threshold": number; "lookbackDays": null | number | string; "direction": null | string; "evaluationPrice"?: null | EvaluationPrice }
+export type ProfitLoss = { "side": string; "entryPrice": number; "exitPrice": number; "quantity": number; "entryFee": number; "exitFee": number }
+export type ProfitLossResponse = { "netPnl": number; "returnPercent": number; "grossPnl": number; "totalFees": number; "exitValue": number }
 export type ProviderHealthResponse = { "provider": string; "lastSuccessAt": string; "healthy": boolean }
 export type ProvidersHealthResponse = { "contractVersion": number | string; "healthy": boolean; "items": Array<ProviderHealthResponse> }
 export type PublishedBarResponse = { "tradingDate": string; "open": number; "high": number; "low": number; "close": number; "volume": number; "provider": string; "publishedAt": string }
@@ -87,12 +89,8 @@ export type RedeemInvitation = { "code": string }
 export type RedeemInvitationResponse = { "linkId": string }
 export type RegisterRequest = { "email": string; "password": string; "displayName": string; "timezone": string; "baseCurrency": string }
 export type RegisterResponse = { "id": string; "email": string; "displayName": string; "timezone": string; "baseCurrency": string }
-export type RelativeValue = { "assetPrice": number; "benchmarkPrice": number; "historicalRatio": number }
-export type RelativeValueResponse = { "currentRatio": number; "deviationPercent": number }
 export type RiskReward = { "entryPrice": number; "stopPrice": number; "targetPrice": number }
-export type RiskRewardResponse = { "risk": number; "reward": number; "ratio": number }
-export type Seasonality = { "returns": Array<number> }
-export type SeasonalityResponse = { "observations": number | string; "averageReturn": number; "positiveRate": number }
+export type RiskRewardResponse = { "ratio": number; "riskPerUnit": number; "rewardPerUnit": number; "breakevenWinRate": number }
 export type SectorBreadthResponse = { "sector": string; "memberCount": number | string; "availableCount": number | string; "aboveMa20Percent": number | null; "aboveMa50Percent": number | null; "aboveMa200Percent": number | null; "status": string }
 export type SessionTokens = { "accessToken": string; "expiresAt": string }
 export type SharePolicyWrite = { "shareDiaries": boolean }
@@ -150,9 +148,8 @@ const withQuery = (query: Record<string, unknown>) => {
 
 export const postApiAppToolsPositionSizing = (body: PositionSizing, extra?: RequestInit) => request<PositionSizingResponse>("/api/app/tools/position-sizing", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAppToolsRiskReward = (body: RiskReward, extra?: RequestInit) => request<RiskRewardResponse>("/api/app/tools/risk-reward", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppToolsFire = (body: Fire, extra?: RequestInit) => request<FireResponse>("/api/app/tools/fire", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppToolsRelativeValue = (body: RelativeValue, extra?: RequestInit) => request<RelativeValueResponse>("/api/app/tools/relative-value", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppToolsSeasonality = (body: Seasonality, extra?: RequestInit) => request<SeasonalityResponse>("/api/app/tools/seasonality", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppToolsAverageCost = (body: AverageCost, extra?: RequestInit) => request<AverageCostResponse>("/api/app/tools/average-cost", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppToolsProfitLoss = (body: ProfitLoss, extra?: RequestInit) => request<ProfitLossResponse>("/api/app/tools/profit-loss", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAdminPosts = (body: PostWrite, extra?: RequestInit) => request<CreatedResponse>("/api/admin/posts", { method: "POST", body: JSON.stringify(body), ...extra })
 export const putApiAdminPostsId = (id: string, body: PostWrite, extra?: RequestInit) => request<unknown>(`/api/admin/posts/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const deleteApiAdminPostsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/admin/posts/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })

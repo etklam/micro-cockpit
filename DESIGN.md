@@ -444,24 +444,23 @@ Shared calculator surface for public and authenticated users. Client-side pure m
 
 #### Canonical tool catalogue
 
-Single ordered list of public calculators. Landing teaser, tools select, and `TOOL_IDS` must stay aligned.
+Single ordered list of public calculators. Landing teaser, catalogue navigation, and `TOOL_IDS` must stay aligned.
 
 | `ToolId` | Purpose |
 | --- | --- |
-| `position-sizing` | Risk amount + share quantity from account, risk %, entry, stop |
-| `risk-reward` | Distance to stop/target + ratio |
-| `fire` | Nest-egg target + gap from expenses and withdrawal rate |
-| `relative-value` | Current vs historical ratio, deviation % |
-| `seasonality` | Average return + win rate from period returns |
+| `position-sizing` | Whole-unit quantity and planned loss from account, risk %, entry, and stop |
+| `risk-reward` | Stop/target distances, reward-to-risk ratio, and breakeven win rate |
+| `average-cost` | Weighted cost basis after adding to an existing position |
+| `profit-loss` | Fee-aware long/short net P/L and return |
 
-All five are **public** (no auth). There is no separate “auth-only tools” catalogue in v1; authenticated users get the same tools inside the app shell (and full diary elsewhere).
+All four are **public** (no auth) and deterministic. There is no separate “auth-only tools” catalogue in v1; authenticated users get the same tools inside the app shell (and full diary elsewhere).
 
 #### Adding a tool
 
 1. Add `ToolId` + pure `calculateTool` branch in `toolsCalc.ts` (and unit coverage in `toolsCalc.test.ts`).
 2. Align Edge/tool-service contract if a server twin exists; regenerate OpenAPI client only when the public API changes.
-3. Extend `ToolsPage` field map + select option labels (i18n when strings are keyed).
-4. Extend landing `TOOLS` teaser + `landing.tool.*` message keys (`en` + `zh-Hant`).
+3. Extend `ToolsPage` field/result maps and catalogue metadata (i18n when strings are keyed).
+4. Extend landing catalogue message keys (`en` + `zh-Hant`).
 5. Keep default selection and `?tool=` validation on `isToolId`.
 6. Do not put account-bound diary data into public tools.
 
