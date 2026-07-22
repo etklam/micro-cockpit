@@ -12,6 +12,7 @@ import type {
 } from 'react'
 import { cx } from './format'
 import { Icon, type IconName } from './icons'
+import type { Accent, ColorScheme } from './features/appearance'
 import { useAppearance } from './features/useAppearance'
 import { useI18n } from './i18n'
 
@@ -83,44 +84,56 @@ export function ThemeToggle({ className }: { className?: string }) {
   )
 }
 
-const PRESET_LABEL: Record<string, 'settings.theme.preset.dark-green' | 'settings.theme.preset.dark-red' | 'settings.theme.preset.light-green' | 'settings.theme.preset.light-red'> = {
-  'dark-green': 'settings.theme.preset.dark-green',
-  'dark-red': 'settings.theme.preset.dark-red',
-  'light-green': 'settings.theme.preset.light-green',
-  'light-red': 'settings.theme.preset.light-red',
+type ThemeSwitchesProps = {
+  scheme: ColorScheme
+  accent: Accent
+  onSchemeChange: (scheme: ColorScheme) => void
+  onAccentChange: (accent: Accent) => void
+  className?: string
+  compact?: boolean
 }
 
-/** Compact four-preset chrome control for public/auth chrome. */
-export function ThemePresetPicker({ className, compact }: { className?: string; compact?: boolean }) {
-  const { activePresetId, presets, applyPreset } = useAppearance()
+/** Two independent binary controls: light/dark and green/red. */
+export function ThemeSwitches({ scheme, accent, onSchemeChange, onAccentChange, className, compact }: ThemeSwitchesProps) {
   const { t } = useI18n()
   return (
     <div
-      className={cx('theme-preset-picker', compact && 'theme-preset-picker--compact', className)}
-      role="radiogroup"
-      aria-label={t('common.themePresets')}
+      className={cx('theme-switches', compact && 'theme-switches--compact', className)}
+      role="group"
+      aria-label={t('common.themeControls')}
     >
-      {presets.map(preset => {
-        const selected = activePresetId === preset.id
-        return (
-          <button
-            key={preset.id}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            aria-label={t(PRESET_LABEL[preset.id])}
-            title={t(PRESET_LABEL[preset.id])}
-            className={cx(
-              'theme-preset-picker__swatch',
-              `theme-preset-picker__swatch--${preset.id}`,
-              selected && 'is-selected',
-            )}
-            onClick={() => { void applyPreset(preset) }}
-          />
-        )
-      })}
+      <span className="theme-switches__control">
+        <span className="theme-switches__value">{t('settings.theme.light')}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={scheme === 'dark'}
+          aria-label={t('settings.theme.modeSwitch')}
+          className="theme-switches__switch"
+          onClick={() => onSchemeChange(scheme === 'dark' ? 'light' : 'dark')}
+        ><span className="theme-switches__thumb" /></button>
+        <span className="theme-switches__value">{t('settings.theme.dark')}</span>
+      </span>
+      <span className="theme-switches__control">
+        <span className="theme-switches__value theme-switches__value--green">{t('settings.theme.green')}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={accent === 'red'}
+          aria-label={t('settings.theme.accentSwitch')}
+          className="theme-switches__switch theme-switches__switch--accent"
+          onClick={() => onAccentChange(accent === 'red' ? 'green' : 'red')}
+        ><span className="theme-switches__thumb" /></button>
+        <span className="theme-switches__value theme-switches__value--red">{t('settings.theme.red')}</span>
+      </span>
     </div>
   )
+}
+
+/** Theme controls connected to the shared appearance state for public/auth chrome. */
+export function ThemeControls({ className, compact }: { className?: string; compact?: boolean }) {
+  const { scheme, accent, setAppearance, setAccent } = useAppearance()
+  return <ThemeSwitches scheme={scheme} accent={accent} onSchemeChange={next => { void setAppearance(next) }} onAccentChange={next => { void setAccent(next) }} className={className} compact={compact} />
 }
 
 /* ------------------------------- Card ------------------------------ */

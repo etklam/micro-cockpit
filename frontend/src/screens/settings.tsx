@@ -6,18 +6,15 @@ import {
   normalizeAccent,
   reconcileAccent,
   reconcileAppearance,
-  THEME_PRESETS,
-  type ThemePresetId,
 } from '../features/appearance'
 import { useAppearance } from '../features/useAppearance'
 import { deviceTimezone, formatTimezoneLabel } from '../features/accountTime'
 import { useBootstrapQuery, useSaveSettingsMutation, useSettingsQuery } from '../features/queries'
 import { useAuth } from '../auth/AuthProvider'
-import { Button, Card, Field, PageHeader, SelectBox, TextInput } from '../ui'
+import { Button, Card, Field, PageHeader, SelectBox, TextInput, ThemeSwitches } from '../ui'
 import { PageSkeleton, SectionError } from '../shell'
 import { cx } from '../format'
 import { isLocale, useI18n, type Locale } from '../i18n'
-import type { MessageKey } from '../i18n'
 
 const COMMON_TIMEZONES = [
   'UTC',
@@ -46,7 +43,7 @@ export function SettingsPage() {
   const settings = useSettingsQuery()
   const bootstrap = useBootstrapQuery()
   const save = useSaveSettingsMutation()
-  const { preference: appearance, accent, activePresetId, applyPreset } = useAppearance()
+  const { preference: appearance, scheme, accent, setAppearance, setAccent } = useAppearance()
   const { locale, setLocale, t } = useI18n()
   const { logout } = useAuth()
   const navigate = useNavigate()
@@ -59,11 +56,6 @@ export function SettingsPage() {
   const [formError, setFormError] = useState('')
   const [partialNotice, setPartialNotice] = useState('')
   const [saved, setSaved] = useState(false)
-
-  const presetLabel = (id: ThemePresetId): MessageKey =>
-    (`settings.theme.preset.${id}` as MessageKey)
-  const presetHint = (id: ThemePresetId): MessageKey =>
-    (`settings.theme.preset.${id}Hint` as MessageKey)
 
   const localeOptions: { value: Locale; label: string }[] = [
     { value: 'en', label: t('settings.language.en') },
@@ -206,34 +198,13 @@ export function SettingsPage() {
 
           <section className="stack">
             <h2>{t('settings.appearance')}</h2>
-            <Field label={t('settings.theme.presetsLabel')} hint={t('settings.themeHint')}>
-              <div className="theme-picker theme-picker--presets" role="radiogroup" aria-label={t('settings.theme.presetsLabel')}>
-                {THEME_PRESETS.map(preset => {
-                  const selected = activePresetId === preset.id
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      className={cx('theme-picker__option', selected && 'is-selected')}
-                      onClick={() => {
-                        void applyPreset(preset)
-                        setSaved(false)
-                      }}
-                    >
-                      <span
-                        className={cx('theme-picker__swatch', `theme-picker__swatch--preset-${preset.id}`)}
-                        aria-hidden="true"
-                      />
-                      <span className="theme-picker__copy">
-                        <span className="theme-picker__label">{t(presetLabel(preset.id))}</span>
-                        <span className="theme-picker__hint">{t(presetHint(preset.id))}</span>
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
+            <Field label={t('settings.theme.controlsLabel')} hint={t('settings.themeHint')}>
+              <ThemeSwitches
+                scheme={scheme}
+                accent={accent}
+                onSchemeChange={next => { void setAppearance(next); setSaved(false) }}
+                onAccentChange={next => { void setAccent(next); setSaved(false) }}
+              />
             </Field>
           </section>
 

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Card, ThemePresetPicker } from './ui'
+import { Card, ThemeControls } from './ui'
 import { Icon } from './icons'
 import { useI18n } from './i18n'
 import { TOOL_CATALOG } from './features/toolsCatalog'
@@ -190,7 +190,7 @@ export function LandingPage() {
             <button type="button" className={locale === 'en' ? 'is-active' : undefined} onClick={() => { void setLocale('en') }}>EN</button>
             <button type="button" className={locale === 'zh-Hant' ? 'is-active' : undefined} onClick={() => { void setLocale('zh-Hant') }}>繁</button>
           </div>
-          <ThemePresetPicker />
+          <ThemeControls />
         </div>
         <p className="landing__footer-disclaimer">{t('landing.footer.disclaimer')}</p>
       </footer>

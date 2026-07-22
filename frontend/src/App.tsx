@@ -3,7 +3,7 @@ import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigat
 import { useAuth } from './auth/AuthProvider'
 import { LoginPage } from './auth/LoginPage'
 import { RegisterPage } from './auth/RegisterPage'
-import { Brand, Button, ErrorBox, IconButton, ThemePresetPicker, ThemeToggle, useConfirm } from './ui'
+import { Brand, Button, ErrorBox, IconButton, ThemeControls, ThemeToggle, useConfirm } from './ui'
 import { Icon } from './icons'
 import { cx } from './format'
 import './App.css'
@@ -229,8 +229,7 @@ function PublicShell({ children }: { children: ReactNode }) {
           <Link to="/login">{t('landing.cta.signIn')}</Link>
           <Link className="btn btn--primary btn--sm" to="/register"><span className="btn__label">{t('landing.cta.register')}</span></Link>
           {lang}
-          <ThemePresetPicker compact />
-          <ThemeToggle />
+          <ThemeControls compact />
         </nav>
         <div className="public-shell__mobile-actions">
           <ThemeToggle />
@@ -269,7 +268,7 @@ function PublicShell({ children }: { children: ReactNode }) {
             </Link>
             <div className="public-shell__drawer-row">{lang}</div>
             <div className="public-shell__drawer-row">
-              <ThemePresetPicker />
+              <ThemeControls />
             </div>
           </nav>
         </div>
@@ -367,8 +366,7 @@ function Sidebar({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: ()
           <span>{cockpit.baseCurrency} · {cockpit.timezone}</span>
         </div>
         <div className="sidebar__tools">
-          <ThemePresetPicker compact />
-          <ThemeToggle />
+          <ThemeControls compact />
           <Button variant="ghost" icon="logout" onClick={onSignOut} className="signout-btn">{t('common.signOut')}</Button>
         </div>
       </div>
@@ -388,8 +386,7 @@ function MobileTop({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: 
       <Brand compact />
       <span className="mobile-top__meta">{cockpit.currentLocalDate}</span>
       <div className="mobile-top__actions">
-        <ThemePresetPicker compact />
-        <ThemeToggle />
+        <ThemeControls compact />
         <IconButton icon="logout" label={t('common.signOut')} onClick={onSignOut} />
       </div>
     </header>

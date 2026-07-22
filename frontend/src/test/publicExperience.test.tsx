@@ -7,7 +7,6 @@ import { describe, expect, it } from 'vitest'
 import App from '../App'
 import { AuthProvider } from '../auth/AuthProvider'
 import { I18nProvider } from '../i18n'
-import { THEME_PRESETS } from '../features/appearance'
 import { TOOL_CATALOG, toolHref } from '../features/toolsCatalog'
 import { server } from './setup'
 
@@ -78,7 +77,7 @@ describe('public experience', () => {
     expect(toolsBtn).toHaveFocus()
   })
 
-  it('opens mobile menu with product, tools, language, and four themes', async () => {
+  it('opens mobile menu with product, tools, language, and independent theme switches', async () => {
     // Force mobile drawer path: open menu button is always in DOM for mobile actions CSS, but still in document
     renderPublic('/')
     await screen.findByRole('heading', { name: 'A quiet cockpit for reflection.' })
@@ -94,9 +93,17 @@ describe('public experience', () => {
     expect(within(drawerEl).getByText('Risk amount and share quantity from account, risk %, entry, and stop.')).toBeInTheDocument()
     expect(within(drawerEl).getByRole('link', { name: 'Sign in' })).toBeInTheDocument()
     expect(within(drawerEl).getByRole('link', { name: 'Create account' })).toBeInTheDocument()
-    const themeGroup = within(drawerEl).getByRole('radiogroup', { name: 'Theme presets' })
-    expect(within(themeGroup).getAllByRole('radio')).toHaveLength(THEME_PRESETS.length)
-    expect(THEME_PRESETS).toHaveLength(4)
+    const themeGroup = within(drawerEl).getByRole('group', { name: 'Theme controls' })
+    const switches = within(themeGroup).getAllByRole('switch')
+    expect(switches).toHaveLength(2)
+    const scheme = within(themeGroup).getByRole('switch', { name: 'Light or dark mode' })
+    const accent = within(themeGroup).getByRole('switch', { name: 'Green or red accent' })
+    const schemeBefore = scheme.getAttribute('aria-checked')
+    const accentBefore = accent.getAttribute('aria-checked')
+    await userEvent.click(scheme)
+    await userEvent.click(accent)
+    expect(scheme).toHaveAttribute('aria-checked', schemeBefore === 'true' ? 'false' : 'true')
+    expect(accent).toHaveAttribute('aria-checked', accentBefore === 'true' ? 'false' : 'true')
   })
 
   it('falls back unknown tool query to position-sizing', async () => {

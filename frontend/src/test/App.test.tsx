@@ -70,6 +70,33 @@ test('restores a session and renders a deep calendar link', async () => {
   expect(window.location.pathname).toBe('/calendar/2026/07')
 })
 
+test('settings exposes independent scheme and accent switches', async () => {
+  const writes: Array<{ appearance: string; accentTheme: string }> = []
+  server.use(...authenticatedHandlers(),
+    http.get('/api/app/settings', () => HttpResponse.json({
+      email: 'owner@example.com', displayName: 'Owner', timezone: 'Asia/Taipei',
+      baseCurrency: 'USD', appearance: 'system', accentTheme: 'green', locale: 'en', updatedAt: '2026-07-16T00:00:00Z',
+    })),
+    http.put('/api/app/settings', async ({ request }) => {
+      const body = await request.json() as { displayName: string; timezone: string; baseCurrency: string; appearance: string; accentTheme: string; locale: string }
+      writes.push(body)
+      return HttpResponse.json({ email: 'owner@example.com', ...body, updatedAt: '2026-07-16T00:00:00Z' })
+    }))
+  renderApp('/settings')
+  const appearanceHeading = await screen.findByRole('heading', { name: 'Appearance' })
+  const appearanceSection = appearanceHeading.closest('section')!
+  const controls = within(appearanceSection).getByRole('group', { name: 'Theme controls' })
+  expect(within(controls).queryAllByRole('radio')).toHaveLength(0)
+  expect(within(controls).getAllByRole('switch')).toHaveLength(2)
+
+  await userEvent.click(within(controls).getByRole('switch', { name: 'Light or dark mode' }))
+  await userEvent.click(within(controls).getByRole('switch', { name: 'Green or red accent' }))
+
+  await waitFor(() => expect(writes.at(-1)).toMatchObject({ appearance: 'light', accentTheme: 'red' }))
+  expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+  expect(document.documentElement).toHaveAttribute('data-accent', 'red')
+})
+
 test('loads a diary and its transactions from a direct detail link', async () => {
   server.use(...authenticatedHandlers(),
     http.get('/api/app/diaries/:id', () => HttpResponse.json({ id: 'diary-1', localDate: '2026-07-16', title: 'Direct entry', content: 'Notes', createdAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T00:00:00Z', tags: [] })),
