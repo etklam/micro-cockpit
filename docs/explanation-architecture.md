@@ -124,7 +124,7 @@ The trade-off is eventual consistency for event-driven cleanup and scheduled cal
 - Structured diary review is optional and does not infer process quality from P/L.
 - Rotation uses only backend calculations; the frontend does not calculate RSI, moving averages, ranks, percentiles, or signals.
 - Market Data accepts authenticated external ingestion jobs; it does not contain a fake or embedded external provider.
-- Tool Service calculators are stateless and do not create portfolio records.
+- Tool calculations are pure and create no portfolio records. Tool Service persists only user-scoped presets and reconstructable calculation snapshots, with server-recalculated output.
 
 ## Trade-offs summary
 

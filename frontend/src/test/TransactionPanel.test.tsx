@@ -61,6 +61,8 @@ function authenticatedHandlers(options?: {
     http.get('/api/app/diaries', () => HttpResponse.json({ items: [], nextCursor: null })),
     http.get('/api/app/diary-review-summary', () => HttpResponse.json({ reviewedCount: 0, averageDisciplineScore: null, averageExecutionScore: null, emotionCounts: {}, processAssessmentCounts: {}, topMistakeTags: [] })),
     http.get('/api/app/diary-review-items', () => HttpResponse.json({ items: [], nextCursor: null })),
+    http.get('/api/app/tool-presets', () => HttpResponse.json({ items: [] })),
+    http.get('/api/app/saved-calculations', () => HttpResponse.json({ items: [] })),
     http.get('/api/app/diaries/:id', () => HttpResponse.json({ id: diaryId, localDate: '2026-07-16', title: 'Direct entry', content: 'Notes', createdAt: '2026-07-16T00:00:00Z', updatedAt: '2026-07-16T00:00:00Z', tags: [] })),
     http.get('/api/app/diaries/:id/review', () => new HttpResponse(null, { status: 404 })),
     http.get('/api/app/diaries/:id/transactions', () => HttpResponse.json({ items })),
@@ -134,6 +136,58 @@ test('edit populates the transaction form from the selected trade', async () => 
   expect(screen.getByLabelText('Notes')).toHaveValue('Within plan')
   expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+})
+
+test('opens profit/loss from a trade with transparent editable prefill', async () => {
+  server.use(...authenticatedHandlers())
+  renderDiaryDetail()
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: 'P/L calculator' }))
+  expect(await screen.findByRole('heading', { name: 'Profit / loss' })).toBeInTheDocument()
+  expect(screen.getByText('Prefilled from AAPL trade. All values remain editable.')).toBeInTheDocument()
+  expect(screen.getByLabelText('Entry price')).toHaveValue(190.5)
+  expect(screen.getByLabelText('Quantity')).toHaveValue(2)
+  await user.clear(screen.getByLabelText('Entry price'))
+  await user.type(screen.getByLabelText('Entry price'), '200')
+  expect(screen.getByLabelText('Entry price')).toHaveValue(200)
+})
+
+test('position-size result returns as a reviewable trade draft without submitting it', async () => {
+  let created = false
+  server.use(...authenticatedHandlers({ items: [], onCreate: () => { created = true } }))
+  renderDiaryDetail()
+  const user = userEvent.setup()
+  await screen.findByText('No trades logged.')
+  await user.type(screen.getByLabelText('Symbol'), 'aapl')
+  await user.type(screen.getByLabelText('Price'), '100')
+  await user.click(screen.getByRole('button', { name: 'Position size' }))
+  expect(await screen.findByRole('heading', { name: 'Position size' })).toBeInTheDocument()
+  expect(screen.getByLabelText('Entry price')).toHaveValue(100)
+  await user.type(screen.getByLabelText('Account value'), '10000')
+  await user.type(screen.getByLabelText('Risk %'), '1')
+  await user.type(screen.getByLabelText('Stop price'), '95')
+  await user.click(screen.getByRole('button', { name: 'Calculate position size' }))
+  await user.click(screen.getByRole('button', { name: 'Create trade draft' }))
+  expect(await screen.findByRole('heading', { name: 'Direct entry' })).toBeInTheDocument()
+  expect(screen.getByLabelText('Symbol')).toHaveValue('AAPL')
+  expect(screen.getByLabelText('Qty')).toHaveValue(20)
+  expect(screen.getByLabelText('Price')).toHaveValue(100)
+  expect((screen.getByLabelText('Notes') as HTMLInputElement).value).toContain('Review all values before saving.')
+  expect(created).toBe(false)
+})
+
+test('calculation result opens an unpublished diary draft on the source date', async () => {
+  server.use(...authenticatedHandlers())
+  renderDiaryDetail()
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: 'P/L calculator' }))
+  await user.type(screen.getByLabelText('Exit or current price'), '200')
+  await user.click(screen.getByRole('button', { name: 'Calculate P/L' }))
+  await user.click(screen.getByRole('button', { name: 'Add to diary draft' }))
+  expect(await screen.findByRole('heading', { name: 'Diary' })).toBeInTheDocument()
+  expect(screen.getByDisplayValue('2026-07-16')).toBeInTheDocument()
+  expect(screen.getByDisplayValue('Profit / loss — AAPL')).toBeInTheDocument()
+  expect((screen.getByLabelText('Reflection') as HTMLTextAreaElement).value).toContain('Tool used: Profit / loss')
 })
 
 test('saving an edited trade calls update with the diary and transaction ids', async () => {

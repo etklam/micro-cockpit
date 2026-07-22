@@ -8,6 +8,7 @@ import {
   normalizeTags, parseDiaryFilters, type DiaryFilters,
 } from '../features/diaryFilters'
 import { accountDateTimeLocalToUtc, formatTimezoneLabel, nowAccountDateTimeLocal, utcToAccountDateTimeLocal } from '../features/accountTime'
+import { toolContextForPositionDraft, toolContextForRiskReward, toolContextForTrade, type DiaryDraft, type TradeDraft } from '../features/toolsWorkflow'
 import { MarkdownView, plainExcerpt } from '../features/markdown'
 import {
   useBootstrapQuery, useCreateTransactionMutation, useDeleteDiaryMutation, useDeleteTransactionMutation,
@@ -27,6 +28,7 @@ export function DiaryPage() {
   const { confirm } = useCockpit()
   const { t, locale, format } = useI18n()
   const navigate = useNavigate()
+  const location = useLocation()
   const [search, setSearch] = useSearchParams()
   const filters = useMemo(() => parseDiaryFilters(search), [search])
   const [keywordDraft, setKeywordDraft] = useState(filters.q)
@@ -83,6 +85,14 @@ export function DiaryPage() {
   useEffect(() => {
     if (accountToday && !editing && !date) setDate(accountToday)
   }, [accountToday, editing, date])
+  useEffect(() => {
+    const draft = (location.state as { diaryDraft?: DiaryDraft } | null)?.diaryDraft
+    if (!draft || editing || title || content) return
+    if (/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) setDate(draft.date)
+    setTitle(draft.title.slice(0, 160)); setContent(draft.content)
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+    document.getElementById('diary-form')?.scrollIntoView?.({ block: 'start' })
+  }, [content, editing, location.pathname, location.search, location.state, navigate, title])
   const reviewWindow = useMemo(() => {
     const to = accountToday ?? ''
     if (!to) return { from: '', to: '' }
@@ -356,7 +366,7 @@ export function DiaryDetailPage() {
         <Button variant="ghost" onClick={backToList}>{t('diary.back')}</Button>
         <Button variant="danger" loading={removeDiary.isPending} onClick={() => { void remove() }}>{t('diary.deleteEntry')}</Button>
       </div>
-      <TransactionPanel diaryId={diaryId} />
+      <TransactionPanel diaryId={diaryId} diaryDate={diary.data.localDate} />
     </Card>
     <DecisionReview diaryId={diaryId} />
   </>
@@ -424,10 +434,12 @@ function DiaryListSkeleton() {
 }
 
 /* -------------------------- Transactions --------------------------- */
-function TransactionPanel({ diaryId }: { diaryId: string }) {
+function TransactionPanel({ diaryId, diaryDate }: { diaryId: string; diaryDate: string }) {
   const { confirm } = useCockpit()
   const { t, locale } = useI18n()
   const bootstrap = useBootstrapQuery()
+  const navigate = useNavigate()
+  const location = useLocation()
   const timeZone = bootstrap.data?.timezone ?? ''
   const baseCurrency = bootstrap.data?.baseCurrency ?? 'USD'
   const { data, isLoading: loading, isError: error, refetch: reload } = useTransactionsQuery(diaryId)
@@ -446,6 +458,28 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
   const updateTransaction = useUpdateTransactionMutation(diaryId)
   const deleteTransaction = useDeleteTransactionMutation(diaryId)
   const saving = createTransaction.isPending || updateTransaction.isPending
+  const draftApplied = useRef(false)
+
+  useEffect(() => {
+    if (draftApplied.current) return
+    const draft = (location.state as { tradeDraft?: TradeDraft } | null)?.tradeDraft
+    if (!draft) return
+    draftApplied.current = true
+    setSymbol(draft.symbol); setSide(draft.side); setQty(draft.quantity); setPrice(draft.price); setCurrency(draft.currency); setNotes(draft.notes)
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+  }, [location.pathname, location.search, location.state, navigate])
+
+  function openPositionSizing() {
+    navigate('/tools?tool=position-sizing', { state: toolContextForPositionDraft({ symbol, side: side as 'buy' | 'sell', quantity: qty, price, currency, notes }, `/diary/${diaryId}`, diaryDate, diaryId) })
+  }
+
+  function openProfitLoss(trade: Transaction) {
+    navigate('/tools?tool=profit-loss', { state: toolContextForTrade(trade, `/diary/${diaryId}`, diaryDate) })
+  }
+
+  function openRiskReward(trade: Transaction) {
+    navigate('/tools?tool=risk-reward', { state: toolContextForRiskReward(trade, `/diary/${diaryId}`, diaryDate) })
+  }
 
   useEffect(() => {
     if (!timeZone || editingId) return
@@ -542,6 +576,7 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
         <TextInput aria-label={t('diary.trade.notes')} placeholder={t('diary.trade.notesOptional')} disabled={saving} value={notes} onChange={(e) => setNotes(e.target.value)} />
         {editingId ? <Button variant="ghost" disabled={saving} onClick={resetEdit}>{t('common.cancel')}</Button> : null}
         <Button variant="primary" type="submit" icon={editingId ? 'check' : 'plus'} loading={saving} className="trades__add">{editingId ? t('diary.trade.save') : t('diary.trade.add')}</Button>
+        {!editingId ? <Button variant="subtle" type="button" onClick={openPositionSizing}>{t('tools.workflow.positionSize')}</Button> : null}
       </form>
       {formError ? <p className="form-error" role="alert">{formError}</p> : null}
 
@@ -560,6 +595,8 @@ function TransactionPanel({ diaryId }: { diaryId: string }) {
               <span className="trade__qty num">{quantity(trade.quantity)} × {trade.price} {trade.currency}</span>
               {trade.notes ? <span className="trade__notes">{trade.notes}</span> : null}
               <div className="trade__actions">
+                <Button variant="subtle" onClick={() => openProfitLoss(trade)}>{t('tools.workflow.profitLoss')}</Button>
+                <Button variant="subtle" onClick={() => openRiskReward(trade)}>{t('tools.workflow.riskReward')}</Button>
                 <IconButton icon="edit" label={t('diary.trade.editLabel', { symbol: trade.symbol })} size={15} aria-pressed={editingId === trade.id} disabled={saving || deleteTransaction.isPending} onClick={() => startEdit(trade)} />
                 <IconButton icon="trash" label={t('diary.trade.deleteLabel')} size={15} className="icon-btn--danger" disabled={saving || deleteTransaction.isPending} onClick={() => remove(trade)} />
               </div>

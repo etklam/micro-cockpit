@@ -5,7 +5,7 @@ DECLARE object_record record;
 BEGIN
   FOREACH schema_name IN ARRAY ARRAY[
     'identity','journal','performance','discipline','reminder','market','market_data_public',
-    'price_alert','rotation','stock_research','partner','content','operations'
+    'price_alert','rotation','stock_research','partner','content','tool','operations'
   ] LOOP
     EXECUTE format('ALTER SCHEMA %I OWNER TO trade_diary_migrator', schema_name);
 
@@ -45,11 +45,11 @@ BEGIN
   FOREACH role_name IN ARRAY ARRAY[
     'identity_service','journal_service','performance_service','discipline_service',
     'reminder_service','market_data_service','price_alert_service','rotation_service',
-    'stock_research_service','partner_service','content_service','operations_service'
+    'stock_research_service','partner_service','content_service','tool_service','operations_service'
   ] LOOP
     FOREACH schema_name IN ARRAY ARRAY[
       'identity','journal','performance','discipline','reminder','market','market_data_public',
-      'price_alert','rotation','stock_research','partner','content','operations'
+      'price_alert','rotation','stock_research','partner','content','tool','operations'
     ] LOOP
       EXECUTE format('REVOKE ALL ON SCHEMA %I FROM %I', schema_name, role_name);
       EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA %I FROM %I', schema_name, role_name);
@@ -89,6 +89,9 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA partner TO partner_service;
 GRANT USAGE ON SCHEMA content TO content_service;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA content TO content_service;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA content TO content_service;
+GRANT USAGE ON SCHEMA tool TO tool_service;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA tool TO tool_service;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA tool TO tool_service;
 GRANT USAGE ON SCHEMA operations TO operations_service;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA operations TO operations_service;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA operations TO operations_service;
@@ -128,12 +131,14 @@ ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA partner GRANT S
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA partner GRANT USAGE,SELECT ON SEQUENCES TO partner_service;
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA content GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO content_service;
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA content GRANT USAGE,SELECT ON SEQUENCES TO content_service;
+ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA tool GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO tool_service;
+ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA tool GRANT USAGE,SELECT ON SEQUENCES TO tool_service;
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA operations GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO operations_service;
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA operations GRANT USAGE,SELECT ON SEQUENCES TO operations_service;
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA market GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO market_data_service;
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA market GRANT USAGE,SELECT ON SEQUENCES TO market_data_service;
 ALTER DEFAULT PRIVILEGES FOR ROLE trade_diary_migrator IN SCHEMA market_data_public GRANT SELECT ON TABLES TO market_data_service;
 
-REVOKE CREATE ON DATABASE trade_diary FROM identity_service,journal_service,performance_service,discipline_service,reminder_service,market_data_service,price_alert_service,rotation_service,stock_research_service,partner_service,content_service,operations_service;
-REVOKE ALL ON SCHEMA platform_migrations FROM identity_service,journal_service,performance_service,discipline_service,reminder_service,market_data_service,price_alert_service,rotation_service,stock_research_service,partner_service,content_service,operations_service;
-REVOKE ALL ON platform_migrations.schema_history FROM identity_service,journal_service,performance_service,discipline_service,reminder_service,market_data_service,price_alert_service,rotation_service,stock_research_service,partner_service,content_service,operations_service;
+REVOKE CREATE ON DATABASE trade_diary FROM identity_service,journal_service,performance_service,discipline_service,reminder_service,market_data_service,price_alert_service,rotation_service,stock_research_service,partner_service,content_service,tool_service,operations_service;
+REVOKE ALL ON SCHEMA platform_migrations FROM identity_service,journal_service,performance_service,discipline_service,reminder_service,market_data_service,price_alert_service,rotation_service,stock_research_service,partner_service,content_service,tool_service,operations_service;
+REVOKE ALL ON platform_migrations.schema_history FROM identity_service,journal_service,performance_service,discipline_service,reminder_service,market_data_service,price_alert_service,rotation_service,stock_research_service,partner_service,content_service,tool_service,operations_service;

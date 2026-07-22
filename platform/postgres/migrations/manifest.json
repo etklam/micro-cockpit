@@ -115,6 +115,11 @@
       "id": "0023",
       "filename": "0023_identity_user_accent_theme.sql",
       "sha256": "380ba7acab697466ae941874355785dcc8b753bf89d8acea9cf9ef6e63bd469c"
+    },
+    {
+      "id": "0024",
+      "filename": "0024_tool_workflows.sql",
+      "sha256": "094a2f289233deef13791a6e26ce1fe157265e2d2ef611fa68f1e3b16b1899d4"
     }
   ]
 }

@@ -23,6 +23,8 @@ const documentationEnvironment = {
   ConnectionStrings__Rotation: 'Host=127.0.0.1;Database=trade_diary;Username=rotation_service',
   ConnectionStrings__Partner: 'Host=127.0.0.1;Database=trade_diary;Username=partner_service',
   ConnectionStrings__Content: 'Host=127.0.0.1;Database=trade_diary;Username=content_service',
+  ConnectionStrings__Tool: 'Host=127.0.0.1;Database=trade_diary;Username=tool_service',
+  Services__Journal: 'http://127.0.0.1:5101',
   ConnectionStrings__Operations: 'Host=127.0.0.1;Database=trade_diary;Username=operations_service',
   Auth__LocalRegistrationKey: 'TEST-ONLY-NOT-A-SECRET',
   Internal__ServiceKey: 'TEST-ONLY-NOT-A-SECRET',

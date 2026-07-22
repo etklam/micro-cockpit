@@ -51,7 +51,7 @@ export const queryKeys = {
   },
 }
 
-export const useBootstrapQuery = () => useQuery({ queryKey: queryKeys.bootstrap, queryFn: api.getBootstrap, staleTime: 60_000 })
+export const useBootstrapQuery = (enabled = true) => useQuery({ queryKey: queryKeys.bootstrap, queryFn: api.getBootstrap, staleTime: 60_000, enabled })
 export const useSettingsQuery = () => useQuery({ queryKey: queryKeys.settings, queryFn: api.getSettings })
 export const useDashboardQuery = () => useQuery({ queryKey: queryKeys.dashboard, queryFn: api.getDashboard })
 export const useDiariesInfiniteQuery = (filters: DiaryListKeyFilters) => useInfiniteQuery({

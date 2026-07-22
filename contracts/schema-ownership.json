@@ -13,6 +13,6 @@
     "partner-service": { "owns": ["partner"], "reads": [] },
     "content-service": { "owns": ["content"], "reads": [] },
     "operations-service": { "owns": ["operations"], "reads": [] },
-    "tool-service": { "owns": [], "reads": [] }
+    "tool-service": { "owns": ["tool"], "reads": [] }
   }
 }

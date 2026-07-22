@@ -57,7 +57,7 @@ Backend services have no host ports in Compose. The `backend` Docker network is 
 | `rotation` | ETF universes, rotation snapshots, breadth, market state | `rotation` | Identity metadata, published market view |
 | `partner` | Human/agent links and per-side sharing policy | `partner` | Identity metadata |
 | `content` | Public educational posts and admin publishing | `content` | Identity metadata |
-| `tool` | Stateless financial calculators | none | Identity metadata |
+| `tool` | Financial calculators, user presets, saved calculation snapshots | `tool` | Identity metadata, Journal API for optional source validation |
 | `operations` | Audit events, job requests, service-health history | `operations` | Identity metadata; service-key writes |
 | `edge` | Public API, session cookie boundary, BFF composition | none | All application services |
 | `frontend` | Browser application | none | Edge only |

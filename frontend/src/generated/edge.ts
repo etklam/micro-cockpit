@@ -74,6 +74,7 @@ export type PositionSizing = { "accountValue": number; "riskPercent": number; "e
 export type PositionSizingResponse = { "quantity": number; "plannedLoss": number; "riskBudget": number; "positionValue": number; "perUnitRisk": number }
 export type PostResponse = { "id": string; "slug": string; "title": string; "body": string; "publishedAt": string }
 export type PostWrite = { "slug": string; "title": string; "body": null | string; "status": string }
+export type PresetWrite = { "name": string; "toolType": string; "inputs": JsonElement; "currency": null | string }
 export type PriceAlertResponse = { "id": string; "symbol": string; "conditionType": string; "threshold": number; "lookbackDays": null | number | string; "direction": null | string; "evaluationPrice": EvaluationPrice; "status": PriceAlertStatus; "baselineClose": number | null; "lastEvaluatedDate": null | string; "createdAt": string; "updatedAt": string }
 export type PriceAlertStatus = "active" | "triggered" | "dismissed"
 export type PriceAlertWrite = { "symbol": string; "conditionType": string; "threshold": number; "lookbackDays": null | number | string; "direction": null | string; "evaluationPrice"?: null | EvaluationPrice }
@@ -91,6 +92,7 @@ export type RegisterRequest = { "email": string; "password": string; "displayNam
 export type RegisterResponse = { "id": string; "email": string; "displayName": string; "timezone": string; "baseCurrency": string }
 export type RiskReward = { "entryPrice": number; "stopPrice": number; "targetPrice": number }
 export type RiskRewardResponse = { "ratio": number; "riskPerUnit": number; "rewardPerUnit": number; "breakevenWinRate": number }
+export type SavedCalculationWrite = { "toolType": string; "inputs": JsonElement; "currency": string; "symbol": null | string; "sourceDiaryId": null | string; "sourceTransactionId": null | string; "note": null | string }
 export type SectorBreadthResponse = { "sector": string; "memberCount": number | string; "availableCount": number | string; "aboveMa20Percent": number | null; "aboveMa50Percent": number | null; "aboveMa200Percent": number | null; "status": string }
 export type SessionTokens = { "accessToken": string; "expiresAt": string }
 export type SharePolicyWrite = { "shareDiaries": boolean }
@@ -150,6 +152,14 @@ export const postApiAppToolsPositionSizing = (body: PositionSizing, extra?: Requ
 export const postApiAppToolsRiskReward = (body: RiskReward, extra?: RequestInit) => request<RiskRewardResponse>("/api/app/tools/risk-reward", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAppToolsAverageCost = (body: AverageCost, extra?: RequestInit) => request<AverageCostResponse>("/api/app/tools/average-cost", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAppToolsProfitLoss = (body: ProfitLoss, extra?: RequestInit) => request<ProfitLossResponse>("/api/app/tools/profit-loss", { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppToolPresets = (extra?: RequestInit) => request<unknown>("/api/app/tool-presets", { method: "GET", ...extra })
+export const postApiAppToolPresets = (body: PresetWrite, extra?: RequestInit) => request<unknown>("/api/app/tool-presets", { method: "POST", body: JSON.stringify(body), ...extra })
+export const putApiAppToolPresetsId = (id: string, body: PresetWrite, extra?: RequestInit) => request<unknown>(`/api/app/tool-presets/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const deleteApiAppToolPresetsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/tool-presets/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const postApiAppToolPresetsIdUse = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/tool-presets/${encodeURIComponent(String(id))}/use`, { method: "POST", ...extra })
+export const getApiAppSavedCalculations = (query: { "limit"?: number | string }, extra?: RequestInit) => request<unknown>("/api/app/saved-calculations" + withQuery(query), { method: "GET", ...extra })
+export const postApiAppSavedCalculations = (body: SavedCalculationWrite, extra?: RequestInit) => request<unknown>("/api/app/saved-calculations", { method: "POST", body: JSON.stringify(body), ...extra })
+export const deleteApiAppSavedCalculationsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/saved-calculations/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const postApiAdminPosts = (body: PostWrite, extra?: RequestInit) => request<CreatedResponse>("/api/admin/posts", { method: "POST", body: JSON.stringify(body), ...extra })
 export const putApiAdminPostsId = (id: string, body: PostWrite, extra?: RequestInit) => request<unknown>(`/api/admin/posts/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const deleteApiAdminPostsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/admin/posts/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
@@ -179,6 +189,7 @@ export const putApiAppDiariesId = (id: string, body: DiaryWrite, extra?: Request
 export const deleteApiAppDiariesId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const getApiAppDiariesDiaryIdTransactions = (diaryId: string, extra?: RequestInit) => request<CollectionResponseOfTransactionResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions`, { method: "GET", ...extra })
 export const postApiAppDiariesDiaryIdTransactions = (diaryId: string, body: TransactionWrite, extra?: RequestInit) => request<TransactionResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions`, { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: string, extra?: RequestInit) => request<TransactionResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions/${encodeURIComponent(String(id))}`, { method: "GET", ...extra })
 export const putApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: string, body: TransactionWrite, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const deleteApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const deleteApiAppDiariesDiaryIdReview = (diaryId: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/review`, { method: "DELETE", ...extra })

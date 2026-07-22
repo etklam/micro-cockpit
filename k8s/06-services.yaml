@@ -737,6 +737,13 @@ spec:
               value: http://+:8080
             - name: Auth__MetadataAddress
               value: "http://identity:8080/.well-known/openid-configuration"
+            - name: ConnectionStrings__Tool
+              valueFrom:
+                secretKeyRef:
+                  name: service-connection-strings
+                  key: TOOL_CONNECTION_STRING
+            - name: Services__Journal
+              value: "http://journal:8080"
           readinessProbe:
             httpGet:
               path: /health/ready

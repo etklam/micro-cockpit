@@ -1,74 +1,105 @@
 # Micro Cockpit
 
-Diary-first investment decision journal with a React application, a typed Edge BFF, independently buildable .NET services, and schema-isolated PostgreSQL ownership.
+Micro Cockpit is a diary-first investment decision journal. It helps a user record decisions, trades, reviews, daily performance, research, alerts, and reusable investment calculations without pretending to be a brokerage or portfolio accounting system.
 
-## Documentation
+## System at a glance
 
-| Read this | When you need to |
-|---|---|
-| [Run Micro Cockpit locally](docs/tutorial-getting-started.md) | Start the complete stack and exercise the first diary workflow |
-| [Develop and verify changes](docs/how-to-development.md) | Run local development loops, tests, contract generation, and migrations |
-| [System reference](docs/reference-system.md) | Look up processes, repository layout, routes, configuration, and health endpoints |
-| [API and data reference](docs/reference-api-data.md) | Look up public routes, authentication, ProblemDetails, composition, ownership, and null rules |
-| [Architecture](docs/explanation-architecture.md) | Understand the Edge boundary, session model, schema isolation, migration runner, and trade-offs |
-| [K3s deployment guide](docs/deploy-k3s.md) | Stand up a single-node K3s cluster from a bare server: cert-manager, ExternalDNS, deploy host, Secrets, baseline, first release |
+```mermaid
+flowchart LR
+    Browser[React browser app] -->|/api/*| Edge[ASP.NET Edge BFF]
+    Edge --> Identity[Identity]
+    Edge --> Journal[Journal]
+    Edge --> Product[Performance, discipline, reminder,
+research, market, alerts, rotation, partner, tools]
+    Identity --> DB[(PostgreSQL)]
+    Journal --> DB
+    Product --> DB
+    Migrator[Deployment migration runner] --> DB
+```
 
-Operational procedures remain in [Operations](docs/operations.md), [Database migrations](docs/database-migrations.md), and [Rollback](docs/rollback.md). Product boundaries are in [PRODUCT.md](PRODUCT.md), UI direction is in [DESIGN.md](DESIGN.md), and service ownership is summarized in [SERVICE_CATALOG.md](SERVICE_CATALOG.md).
+The browser talks only to Edge. Edge validates JWTs, owns the refresh-cookie boundary, proxies simple operations, and composes screen-shaped responses. Backend services own isolated PostgreSQL schemas and do not write across service boundaries.
 
-## Run the production-like stack
+## Main modules
 
-All required secrets live in `.env` (git-ignored). Copy the template and edit every value
-before exposing the stack — Compose fails fast if any of the 16 variables is unset.
+| Area | Responsibility | Starting point |
+|---|---|---|
+| Frontend shell | Routing, authentication gates, responsive navigation, providers | [`frontend/src/main.tsx`](frontend/src/main.tsx), [`frontend/src/App.tsx`](frontend/src/App.tsx) |
+| Diary and trades | Diary CRUD, transaction records, reviews, quick notes | [`frontend/src/screens/diary.tsx`](frontend/src/screens/diary.tsx), [`services/journal-service`](services/journal-service) |
+| Tools | Pure calculators, contextual prefills, presets, saved results, trade and diary drafts | [`frontend/src/screens/tools`](frontend/src/screens/tools), [`services/tool-service`](services/tool-service) |
+| Research and market | Stock notes, watchlists, timelines, daily bars, price alerts, rotation | [`services/stock-research-service`](services/stock-research-service), [`services/market-data-service`](services/market-data-service) |
+| Identity and settings | Users, credentials, sessions, locale, timezone, currency, theme preferences | [`services/identity-service`](services/identity-service), [`frontend/src/auth`](frontend/src/auth) |
+| Edge API | Browser API, downstream transport policy, composition, errors | [`gateway/TradeDiary.EdgeApi`](gateway/TradeDiary.EdgeApi) |
+| Persistence | Shared PostgreSQL instance with schema and role isolation | [`platform/postgres`](platform/postgres) |
+
+There is no holdings, cost-basis, brokerage, or portfolio ledger. A transaction is a diary record, not an authoritative position.
+
+## Technology
+
+- React 19, TypeScript 6, React Router, TanStack Query, Vite, Vitest, MSW
+- ASP.NET Core minimal APIs on .NET 10
+- PostgreSQL 17 with Npgsql
+- Generated OpenAPI contracts and generated frontend client
+- Docker Compose for local operation and Kubernetes manifests for deployment
+
+## Run locally
+
+Production-like stack:
 
 ```sh
-cp .env.example .env      # then edit .env and replace every change-me-* value
-docker compose up -d --build
+cp .env.example .env
+# Replace every change-me-* value in .env.
+docker compose up -d --build --wait --wait-timeout 300
 docker compose ps
 ```
 
-Open <http://localhost:8080>. The Edge API is at <http://localhost:5099>; PostgreSQL is bound
-to localhost on `5433`. Backend services have no host ports — only Frontend and Edge are public.
+Open <http://localhost:8080>. Edge is available at <http://localhost:5099>. PostgreSQL is bound to localhost on port `5433`; backend services are private to the Docker network.
 
-Public registration is disabled by default. For local browser signup, set
-`ALLOW_PUBLIC_REGISTRATION=true` in `.env`, restart Identity, then open `/register`.
-When public registration remains false, gated registration requires
-`X-Registration-Key: <LOCAL_REGISTRATION_KEY>` on `POST /api/auth/register` only
-(Edge does not forward that header to any other route).
+Public registration is off by default. For local browser registration, set `ALLOW_PUBLIC_REGISTRATION=true` in `.env` and restart Identity. Otherwise registration requires `X-Registration-Key` on `POST /api/auth/register`.
+
+Frontend development against the composed backend:
 
 ```sh
-docker compose logs -f edge
-docker compose down        # stops containers, keeps the data volume
-```
-
-## Operations
-
-Backup, restore, reset, and signing-key handling (full commands in [docs/operations.md](docs/operations.md)):
-
-- **Backup** — `pg_dump -Fc` of the `trade_diary` database (all schemas) to a file.
-- **Restore** — `pg_restore --clean --if-exists` into the target database; verify application tables.
-- **Destructive reset** — `docker compose down -v` removes the data volume; the next `up` re-runs migrations on an empty database.
-- **Signing key backup** — Identity's RSA private key lives in the `identity-keys` volume (`/keys/signing-key.pem`). Back it up; losing it invalidates all outstanding refresh tokens and forces re-login. The JWT `kid` is derived from the public key, so it is stable across restarts and only changes on key rotation.
-- **Database migrations** — Versioned, checksummed, forward-only migration and baseline procedures are in [docs/database-migrations.md](docs/database-migrations.md).
-
-The system uses one shared PostgreSQL database and one deployment-time migration runner with an immutable ordered ledger. Services retain ownership of their schema design through migration metadata; runtime services never execute migrations, and the runner contains no shared business/domain code.
-
-## Run for development
-
-```sh
-docker compose up -d --build --wait --wait-timeout 300
 docker compose stop frontend
 npm --prefix frontend ci
 npm --prefix frontend run dev -- --host 127.0.0.1
 ```
 
-This runs Vite against the composed Edge API on port `5099`. For backend service iteration, contract generation, focused tests, and the complete CI-equivalent command set, follow [Develop and verify changes](docs/how-to-development.md).
+See [Getting started](docs/tutorial-getting-started.md) and [Development workflow](docs/how-to-development.md) for the complete setup.
 
-Internal APIs accept only Identity-issued Bearer JWTs or explicitly service-key protected machine calls; user ID headers are not trusted. Edge exposes `/health/live`, `/health/ready`, `/version`, and typed `/api/app/*` contracts.
+## Test and contract checks
 
-## Boundaries
+```sh
+dotnet test TradeDiary.slnx
+npm --prefix frontend test
+npm --prefix frontend run lint
+npm --prefix frontend run build
+npm --prefix frontend run api:verify
+python3 scripts/validate-migrations.py
+bash tests/verify-migration-safety.sh
+```
 
-- The frontend calls only the Edge API.
-- Each backend capability is an independently buildable service.
-- No holdings, cost-basis, brokerage, or portfolio accounting engine.
-- Compose keeps backend traffic on a private Docker network; only Frontend and
-  Edge are publicly bound.
+Some backend integration tests use Testcontainers and therefore require Docker.
+
+## Configuration notes
+
+- Secrets belong in `.env` or Kubernetes Secrets and must not be committed.
+- The browser access token is memory-only. The rotating refresh token is an HttpOnly `td_refresh` cookie scoped to `/api/auth`.
+- Runtime services never execute migrations. Deployment runs role bootstrap, the checksummed migration runner, and role finalization before services start.
+- `VITE_API_URL` overrides the frontend Edge base URL. The default is same-origin.
+- Generated files under `contracts/openapi/` and `frontend/src/generated/` must be regenerated through `npm --prefix frontend run api:generate`, never edited by hand.
+
+## Developer documentation
+
+| Document | Use it for |
+|---|---|
+| [Documentation index](docs/README.md) | Find architecture, module, API, database, and flow docs |
+| [Architecture overview](docs/architecture/overview.md) | Understand boundaries, dependencies, strengths, and debt |
+| [Frontend architecture](docs/architecture/frontend.md) | Follow routes, providers, queries, UI, and feature modules |
+| [Backend architecture](docs/architecture/backend.md) | Understand Edge, services, workers, and service ownership |
+| [Core data flows](docs/flows/core-flows.md) | See auth, requests, mutations, API errors, and theme flows |
+| [Tools module](docs/modules/tools.md) | Understand calculations, context, persistence, and draft actions |
+| [Diary and trades](docs/modules/diary-trades.md) | Understand diary, transaction, review, and quick-note lifecycles |
+| [Application API](docs/api/application-api.md) | Map browser routes to Edge and backend services |
+| [Database schema](docs/database/schema.md) | Review entities, constraints, ownership, and migrations |
+
+Operational procedures remain in [Operations](docs/operations.md), [Database migrations](docs/database-migrations.md), [K3s deployment](docs/deploy-k3s.md), and [Rollback](docs/rollback.md). Product boundaries are in [PRODUCT.md](PRODUCT.md), UI direction is in [DESIGN.md](DESIGN.md), and ADRs are under [`docs/adr`](docs/adr).

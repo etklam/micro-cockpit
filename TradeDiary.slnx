@@ -91,4 +91,7 @@
   <Folder Name="/tests/TradeDiary.EdgeApi.Tests/">
     <Project Path="tests/TradeDiary.EdgeApi.Tests/TradeDiary.EdgeApi.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/TradeDiary.Tool.Tests/">
+    <Project Path="tests/TradeDiary.Tool.Tests/TradeDiary.Tool.Tests.csproj" />
+  </Folder>
 </Solution>

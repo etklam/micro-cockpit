@@ -327,6 +327,13 @@ diary.MapGet("/diaries/{diaryId:guid}/transactions", async (Guid diaryId, HttpRe
 })
 .Produces<CollectionResponse<TransactionResponse>>(200).ProducesProblem(401).ProducesProblem(404);
 
+diary.MapGet("/diaries/{diaryId:guid}/transactions/{id:guid}", async (Guid diaryId, Guid id, HttpRequest request, NpgsqlDataSource db) =>
+{
+    if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
+    await using var command=db.CreateCommand("SELECT id,diary_id,symbol,side,quantity,price,currency,traded_at,notes,created_at,updated_at FROM journal.transactions WHERE id=$1 AND diary_id=$2 AND user_id=$3 AND deleted_at IS NULL");command.Parameters.AddWithValue(id);command.Parameters.AddWithValue(diaryId);command.Parameters.AddWithValue(userId);await using var reader=await command.ExecuteReaderAsync();return await reader.ReadAsync()?Results.Ok(JournalAccess.ReadTransaction(reader)):Results.NotFound();
+})
+.Produces<TransactionResponse>(200).ProducesProblem(401).ProducesProblem(404);
+
 diary.MapPost("/diaries/{diaryId:guid}/transactions", async (Guid diaryId, TransactionWrite input, HttpRequest request, NpgsqlDataSource db) =>
 {
     if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();

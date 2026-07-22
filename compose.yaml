@@ -51,6 +51,7 @@ services:
       STOCK_RESEARCH_DB_PASSWORD: ${STOCK_RESEARCH_DB_PASSWORD:?set STOCK_RESEARCH_DB_PASSWORD}
       PARTNER_DB_PASSWORD: ${PARTNER_DB_PASSWORD:?set PARTNER_DB_PASSWORD}
       CONTENT_DB_PASSWORD: ${CONTENT_DB_PASSWORD:?set CONTENT_DB_PASSWORD}
+      TOOL_DB_PASSWORD: ${TOOL_DB_PASSWORD:?set TOOL_DB_PASSWORD}
       OPERATIONS_DB_PASSWORD: ${OPERATIONS_DB_PASSWORD:?set OPERATIONS_DB_PASSWORD}
     entrypoint: ["/roles/apply.sh"]
     command: ["bootstrap"]
@@ -228,8 +229,10 @@ services:
     build: { context: ., dockerfile: services/tool-service/src/TradeDiary.Tool/Dockerfile }
     environment:
       <<: *dotnet-env
+      ConnectionStrings__Tool: Host=postgres;Database=trade_diary;Username=tool_service;Password=${TOOL_DB_PASSWORD:?set TOOL_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
-    depends_on: { identity: { condition: service_healthy } }
+      Services__Journal: http://journal:8080
+    depends_on: { identity: { condition: service_healthy }, journal: { condition: service_healthy } }
 
   operations:
     <<: *dotnet

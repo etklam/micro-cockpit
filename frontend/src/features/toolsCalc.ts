@@ -58,6 +58,10 @@ function round(value: number, digits = 2): number {
   return Math.round((value + Number.EPSILON) * factor) / factor
 }
 
+/**
+ * Validates raw, editable form values without coercing or mutating the caller's state.
+ * The returned field codes are presentation-independent and are translated by ToolsPage.
+ */
 export function validateTool(tool: ToolId, values: Record<string, unknown>): ToolValidationErrors {
   const errors: ToolValidationErrors = {}
   switch (tool) {
@@ -99,6 +103,11 @@ export function validateTool(tool: ToolId, values: Record<string, unknown>): Too
   return errors
 }
 
+/**
+ * Runs a deterministic calculator after full validation.
+ * Throws ToolInputError for invalid inputs; callers must not treat this client result as
+ * authoritative persistence because Tool service recalculates saved snapshots separately.
+ */
 export function calculateTool(tool: ToolId, values: Record<string, unknown>): Record<string, number> {
   const errors = validateTool(tool, values)
   if (Object.keys(errors).length) throw new ToolInputError(errors)

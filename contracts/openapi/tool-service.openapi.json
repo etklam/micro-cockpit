@@ -221,6 +221,225 @@
           }
         ]
       }
+    },
+    "/internal/tool-presets": {
+      "get": {
+        "tags": [
+          "TradeDiary.Tool"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "TradeDiary.Tool"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresetWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/tool-presets/{id}": {
+      "put": {
+        "tags": [
+          "TradeDiary.Tool"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresetWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "TradeDiary.Tool"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/tool-presets/{id}/use": {
+      "post": {
+        "tags": [
+          "TradeDiary.Tool"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/saved-calculations": {
+      "get": {
+        "tags": [
+          "TradeDiary.Tool"
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "TradeDiary.Tool"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedCalculationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/saved-calculations/{id}": {
+      "delete": {
+        "tags": [
+          "TradeDiary.Tool"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -311,6 +530,7 @@
           }
         }
       },
+      "JsonElement": {},
       "PositionSizing": {
         "required": [
           "accountValue",
@@ -403,6 +623,32 @@
               "string"
             ],
             "format": "double"
+          }
+        }
+      },
+      "PresetWrite": {
+        "required": [
+          "name",
+          "toolType",
+          "inputs",
+          "currency"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "toolType": {
+            "type": "string"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "currency": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -626,6 +872,55 @@
               "string"
             ],
             "format": "double"
+          }
+        }
+      },
+      "SavedCalculationWrite": {
+        "required": [
+          "toolType",
+          "inputs",
+          "currency",
+          "symbol",
+          "sourceDiaryId",
+          "sourceTransactionId",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "toolType": {
+            "type": "string"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceDiaryId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "sourceTransactionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       }
