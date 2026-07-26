@@ -16,6 +16,7 @@ internal static class BootstrapEndpoints
             return Results.Ok(new AppBootstrapResponse(
                 new CurrentUserResponse(value.Id, value.Email, value.DisplayName),
                 value.Timezone,
+                value.JournalDayRollover,
                 value.BaseCurrency,
                 value.Appearance,
                 value.Locale,

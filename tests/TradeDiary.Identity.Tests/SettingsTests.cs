@@ -34,6 +34,7 @@ public sealed class SettingsTests : IAsyncLifetime
                 email text NOT NULL UNIQUE,
                 display_name text NOT NULL,
                 timezone text NOT NULL DEFAULT 'Asia/Taipei',
+                journal_day_rollover time NOT NULL DEFAULT '00:00',
                 base_currency char(3) NOT NULL DEFAULT 'USD',
                 role text NOT NULL DEFAULT 'user',
                 account_type text NOT NULL DEFAULT 'human',
@@ -101,11 +102,13 @@ public sealed class SettingsTests : IAsyncLifetime
         Assert.Equal("system", before.Appearance);
         Assert.Equal("en", before.Locale);
         Assert.Equal("green", before.AccentTheme);
+        Assert.Equal("00:00", before.JournalDayRollover);
 
         using var put = await Authed(tokens.AccessToken).PutAsJsonAsync("/internal/auth/settings", new
         {
             displayName = "  Owner Renamed  ",
             timezone = "Asia/Tokyo",
+            journalDayRollover = "06:30",
             baseCurrency = "jpy",
             appearance = "dark",
             locale = "zh-Hant",
@@ -115,6 +118,7 @@ public sealed class SettingsTests : IAsyncLifetime
         var after = await put.Content.ReadFromJsonAsync<SettingsDto>();
         Assert.Equal("Owner Renamed", after!.DisplayName);
         Assert.Equal("Asia/Tokyo", after.Timezone);
+        Assert.Equal("06:30", after.JournalDayRollover);
         Assert.Equal("JPY", after.BaseCurrency);
         Assert.Equal("dark", after.Appearance);
         Assert.Equal("zh-Hant", after.Locale);
@@ -125,6 +129,7 @@ public sealed class SettingsTests : IAsyncLifetime
         Assert.Equal("dark", meBody.GetProperty("appearance").GetString());
         Assert.Equal("zh-Hant", meBody.GetProperty("locale").GetString());
         Assert.Equal("red", meBody.GetProperty("accentTheme").GetString());
+        Assert.Equal("06:30", meBody.GetProperty("journalDayRollover").GetString());
     }
 
     [Theory]
@@ -172,6 +177,8 @@ public sealed class SettingsTests : IAsyncLifetime
             Body(displayName: ""),
             Body(displayName: new string('x', 101)),
             Body(timezone: "Not/AZone"),
+            Body(journalDayRollover: "24:00"),
+            Body(journalDayRollover: "6:30"),
             Body(baseCurrency: "US"),
             Body(baseCurrency: "US1"),
             Body(appearance: "dim"),
@@ -244,6 +251,7 @@ public sealed class SettingsTests : IAsyncLifetime
         {
             displayName = "Claims",
             timezone = "America/New_York",
+            journalDayRollover = "05:15",
             baseCurrency = "cad",
             appearance = "system",
             locale = "en",
@@ -256,6 +264,7 @@ public sealed class SettingsTests : IAsyncLifetime
         var rotated = await refresh.Content.ReadFromJsonAsync<AuthTokensDto>();
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(rotated!.AccessToken);
         Assert.Equal("America/New_York", jwt.Claims.First(c => c.Type == "timezone").Value);
+        Assert.Equal("05:15", jwt.Claims.First(c => c.Type == "journal_day_rollover").Value);
         Assert.Equal("CAD", jwt.Claims.First(c => c.Type == "base_currency").Value);
     }
 
@@ -285,10 +294,11 @@ public sealed class SettingsTests : IAsyncLifetime
     private static object Body(
         string displayName = "User",
         string timezone = "UTC",
+        string journalDayRollover = "00:00",
         string baseCurrency = "USD",
         string appearance = "system",
         string locale = "en",
-        string accentTheme = "green") => new { displayName, timezone, baseCurrency, appearance, locale, accentTheme };
+        string accentTheme = "green") => new { displayName, timezone, journalDayRollover, baseCurrency, appearance, locale, accentTheme };
 
     private async Task SeedUserAsync(Guid id, string email, string status = "active", string accountType = "human")
     {
@@ -333,6 +343,6 @@ public sealed class SettingsTests : IAsyncLifetime
         return tokens!.AccessToken;
     }
 
-    private sealed record SettingsDto(string Email, string DisplayName, string Timezone, string BaseCurrency, string Appearance, string Locale, string AccentTheme, DateTime UpdatedAt);
+    private sealed record SettingsDto(string Email, string DisplayName, string Timezone, string JournalDayRollover, string BaseCurrency, string Appearance, string Locale, string AccentTheme, DateTime UpdatedAt);
     private sealed record AuthTokensDto(string AccessToken, DateTime ExpiresAt, string RefreshToken);
 }

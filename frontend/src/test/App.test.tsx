@@ -11,7 +11,7 @@ import { server } from './setup'
 
 const bootstrap = {
   currentUser: { id: '11111111-1111-1111-1111-111111111111', email: 'owner@example.com', displayName: 'Owner' },
-  timezone: 'Asia/Taipei', baseCurrency: 'USD', appearance: 'system', accentTheme: 'green', locale: 'en', role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
+  timezone: 'Asia/Taipei', journalDayRollover: '00:00', baseCurrency: 'USD', appearance: 'system', accentTheme: 'green', locale: 'en', role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
   availableProductAreas: ['today', 'diary', 'calendar'],
 }
 
@@ -28,6 +28,7 @@ function authenticatedHandlers() {
       return HttpResponse.json({ year: Number(url.searchParams.get('year')), month: Number(url.searchParams.get('month')), summary: null, days: [], capabilities: { alerts: 'unavailable' } })
     }),
     http.get('/api/app/diaries', () => HttpResponse.json({ items: [], nextCursor: null })),
+    http.get('/api/app/market-observations/today', () => new HttpResponse(null, { status: 404 })),
     http.get('/api/app/diary-review-summary', () => HttpResponse.json({ reviewedCount: 0, averageDisciplineScore: null, averageExecutionScore: null, emotionCounts: {}, processAssessmentCounts: {}, topMistakeTags: [] })),
     http.get('/api/app/diary-review-items', () => HttpResponse.json({ items: [], nextCursor: null })),
     http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
@@ -74,11 +75,11 @@ test('settings exposes independent scheme and accent switches', async () => {
   const writes: Array<{ appearance: string; accentTheme: string }> = []
   server.use(...authenticatedHandlers(),
     http.get('/api/app/settings', () => HttpResponse.json({
-      email: 'owner@example.com', displayName: 'Owner', timezone: 'Asia/Taipei',
+      email: 'owner@example.com', displayName: 'Owner', timezone: 'Asia/Taipei', journalDayRollover: '00:00',
       baseCurrency: 'USD', appearance: 'system', accentTheme: 'green', locale: 'en', updatedAt: '2026-07-16T00:00:00Z',
     })),
     http.put('/api/app/settings', async ({ request }) => {
-      const body = await request.json() as { displayName: string; timezone: string; baseCurrency: string; appearance: string; accentTheme: string; locale: string }
+      const body = await request.json() as { displayName: string; timezone: string; journalDayRollover: string; baseCurrency: string; appearance: string; accentTheme: string; locale: string }
       writes.push(body)
       return HttpResponse.json({ email: 'owner@example.com', ...body, updatedAt: '2026-07-16T00:00:00Z' })
     }))
@@ -95,6 +96,67 @@ test('settings exposes independent scheme and accent switches', async () => {
   await waitFor(() => expect(writes.at(-1)).toMatchObject({ appearance: 'light', accentTheme: 'red' }))
   expect(document.documentElement).toHaveAttribute('data-theme', 'light')
   expect(document.documentElement).toHaveAttribute('data-accent', 'red')
+})
+
+test('settings exposes the Journal Day rollover', async () => {
+  server.use(...authenticatedHandlers())
+  server.use(http.get('/api/app/settings', () => HttpResponse.json({
+    email: 'owner@example.com', displayName: 'Owner', timezone: 'Asia/Taipei', journalDayRollover: '00:00',
+    baseCurrency: 'USD', appearance: 'system', accentTheme: 'green', locale: 'en', updatedAt: '2026-07-16T00:00:00Z',
+  })))
+
+  renderApp('/settings')
+  const rolloverLabel = await screen.findByText('Journal Day rollover')
+  const rollover = rolloverLabel.closest('label')?.querySelector('input')
+  if (!rollover) throw new Error('rollover input missing')
+  expect(rollover).toHaveValue('00:00')
+})
+
+test('mobile Today captures and edits observation updates with an honesty reminder', async () => {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+  window.dispatchEvent(new Event('resize'))
+  let updates = [{ id: 'update-1', content: 'Opening breadth was weak', recordedAt: '2026-07-16T13:30:00Z', updatedAt: '2026-07-16T13:30:00Z' }]
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/market-observations/today', () => HttpResponse.json({
+      id: 'observation-1', journalDay: '2026-07-16', timezone: 'Asia/Taipei', rollover: '00:00', updates,
+    })),
+    http.post('/api/app/quick-observations', async ({ request }) => {
+      const body = await request.json() as { content: string }
+      updates = [...updates, { id: 'update-2', content: body.content, recordedAt: '2026-07-16T14:00:00Z', updatedAt: '2026-07-16T14:00:00Z' }]
+      return HttpResponse.json({ marketObservationId: 'observation-1', observationUpdateId: 'update-2', journalDay: '2026-07-16', recordedAt: '2026-07-16T14:00:00Z', appended: true })
+    }),
+    http.put('/api/app/observation-updates/:id', async ({ request }) => {
+      const body = await request.json() as { content: string }
+      updates = updates.map(update => update.id === 'update-1' ? { ...update, content: body.content, updatedAt: '2026-07-16T15:00:00Z' } : update)
+      return HttpResponse.json({ ...updates[0], honestyReminderRequired: true })
+    }))
+
+  renderApp('/today')
+  expect(await screen.findByText('Opening breadth was weak')).toBeInTheDocument()
+  expect(screen.getByText('21:30')).toBeInTheDocument()
+  await userEvent.type(screen.getByLabelText('What did you notice today?'), 'Buyers returned near the close')
+  await userEvent.click(screen.getByRole('button', { name: 'Save observation' }))
+  expect(await screen.findByText('Buyers returned near the close')).toBeInTheDocument()
+
+  await userEvent.click(screen.getAllByRole('button', { name: 'Edit observation' })[0])
+  expect(screen.getByText(/Editing the past can weaken your self-review/)).toBeInTheDocument()
+  const editor = screen.getByLabelText('Edit observation text')
+  await userEvent.clear(editor)
+  await userEvent.type(editor, 'Opening breadth improved')
+  await userEvent.click(screen.getByRole('button', { name: 'Save edit' }))
+  expect(await screen.findByText('Opening breadth improved')).toBeInTheDocument()
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 })
+  window.dispatchEvent(new Event('resize'))
+})
+
+test('quick observation remains available when dashboard composition fails', async () => {
+  server.use(...authenticatedHandlers())
+  server.use(http.get('/api/app/dashboard', () => new HttpResponse(null, { status: 503 })))
+  renderApp('/today')
+  expect(await screen.findByLabelText('What did you notice today?')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Save observation' })).toBeDisabled()
+  expect(await screen.findByText('Couldn’t reach the cockpit.')).toBeInTheDocument()
 })
 
 test('loads a diary and its transactions from a direct detail link', async () => {

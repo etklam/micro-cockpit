@@ -54,8 +54,8 @@ public sealed class CockpitCompositionTests
     {
         using var factory = CreateFactory((service, path) => service == "identity"
             ? path.Contains("/settings", StringComparison.Ordinal)
-                ? Json(HttpStatusCode.OK, "{\"email\":\"owner@example.com\",\"displayName\":\"Owner\",\"timezone\":\"Asia/Taipei\",\"baseCurrency\":\"USD\",\"appearance\":\"dark\",\"locale\":\"zh-Hant\",\"accentTheme\":\"red\",\"updatedAt\":\"2026-07-18T00:00:00Z\"}")
-                : Json(HttpStatusCode.OK, "{\"id\":\"33333333-3333-3333-3333-333333333333\",\"email\":\"owner@example.com\",\"displayName\":\"Owner\",\"timezone\":\"Asia/Taipei\",\"baseCurrency\":\"USD\",\"role\":\"user\",\"accountType\":\"human\",\"status\":\"active\",\"statusVersion\":1,\"appearance\":\"dark\",\"locale\":\"zh-Hant\",\"accentTheme\":\"red\"}")
+                ? Json(HttpStatusCode.OK, "{\"email\":\"owner@example.com\",\"displayName\":\"Owner\",\"timezone\":\"Asia/Taipei\",\"journalDayRollover\":\"06:00\",\"baseCurrency\":\"USD\",\"appearance\":\"dark\",\"locale\":\"zh-Hant\",\"accentTheme\":\"red\",\"updatedAt\":\"2026-07-18T00:00:00Z\"}")
+                : Json(HttpStatusCode.OK, "{\"id\":\"33333333-3333-3333-3333-333333333333\",\"email\":\"owner@example.com\",\"displayName\":\"Owner\",\"timezone\":\"Asia/Taipei\",\"journalDayRollover\":\"06:00\",\"baseCurrency\":\"USD\",\"role\":\"user\",\"accountType\":\"human\",\"status\":\"active\",\"statusVersion\":1,\"appearance\":\"dark\",\"locale\":\"zh-Hant\",\"accentTheme\":\"red\"}")
             : Json(HttpStatusCode.OK, "{}"));
         using var response = await factory.CreateClient().GetAsync("/api/app/bootstrap");
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -65,6 +65,7 @@ public sealed class CockpitCompositionTests
         Assert.Equal("dark", document.RootElement.GetProperty("appearance").GetString());
         Assert.Equal("zh-Hant", document.RootElement.GetProperty("locale").GetString());
         Assert.Equal("red", document.RootElement.GetProperty("accentTheme").GetString());
+        Assert.Equal("06:00", document.RootElement.GetProperty("journalDayRollover").GetString());
         Assert.False(document.RootElement.TryGetProperty("accessToken", out _));
         Assert.False(document.RootElement.TryGetProperty("serviceUrl", out _));
     }
@@ -77,7 +78,7 @@ public sealed class CockpitCompositionTests
         {
             if (service == "identity") paths.Add(path.Split('?')[0]);
             if (service == "identity" && path.StartsWith("/internal/auth/settings", StringComparison.Ordinal))
-                return Json(HttpStatusCode.OK, "{\"email\":\"owner@example.com\",\"displayName\":\"Owner\",\"timezone\":\"UTC\",\"baseCurrency\":\"USD\",\"appearance\":\"light\",\"locale\":\"en\",\"accentTheme\":\"green\",\"updatedAt\":\"2026-07-18T00:00:00Z\"}");
+                return Json(HttpStatusCode.OK, "{\"email\":\"owner@example.com\",\"displayName\":\"Owner\",\"timezone\":\"UTC\",\"journalDayRollover\":\"06:00\",\"baseCurrency\":\"USD\",\"appearance\":\"light\",\"locale\":\"en\",\"accentTheme\":\"green\",\"updatedAt\":\"2026-07-18T00:00:00Z\"}");
             return Json(HttpStatusCode.OK, "{}");
         });
 
@@ -85,13 +86,14 @@ public sealed class CockpitCompositionTests
         using var get = await client.GetAsync("/api/app/settings");
         Assert.Equal(HttpStatusCode.OK, get.StatusCode);
         using var put = await client.PutAsync("/api/app/settings", new StringContent(
-            "{\"displayName\":\"Owner\",\"timezone\":\"UTC\",\"baseCurrency\":\"USD\",\"appearance\":\"light\",\"locale\":\"en\",\"accentTheme\":\"green\"}",
+            "{\"displayName\":\"Owner\",\"timezone\":\"UTC\",\"journalDayRollover\":\"06:00\",\"baseCurrency\":\"USD\",\"appearance\":\"light\",\"locale\":\"en\",\"accentTheme\":\"green\"}",
             Encoding.UTF8, "application/json"));
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
         using var body = JsonDocument.Parse(await put.Content.ReadAsStringAsync());
         Assert.Equal("light", body.RootElement.GetProperty("appearance").GetString());
         Assert.Equal("en", body.RootElement.GetProperty("locale").GetString());
         Assert.Equal("green", body.RootElement.GetProperty("accentTheme").GetString());
+        Assert.Equal("06:00", body.RootElement.GetProperty("journalDayRollover").GetString());
         Assert.Contains("/internal/auth/settings", paths);
     }
 

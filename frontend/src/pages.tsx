@@ -6,8 +6,8 @@ import { useIdempotencyKey } from './features/api'
 import {
   useAlertsQuery, useBootstrapQuery, useCalendarQuery, useCreateAlertMutation, useCreateDisciplineMutation,
   useDashboardQuery, useDeleteAlertMutation, useDeleteDisciplineMutation, useDiaryPickerQuery, useDiaryQuery,
-  useDismissAlertMutation, useQuickNoteMutation, useSavePerformanceMutation,
-  useDisciplinesQuery,
+  useDismissAlertMutation, useQuickObservationMutation, useSavePerformanceMutation,
+  useDisciplinesQuery, useTodayObservationQuery, useUpdateObservationMutation,
 } from './features/queries'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
 import { Icon } from './icons'
@@ -38,22 +38,36 @@ const WEEKDAYS = [
 /* =============================== TODAY ============================== */
 export function TodayPage() {
   const { go } = useCockpit()
-  const { t, format } = useI18n()
+  const { t, format, locale } = useI18n()
   const { data, isLoading: loading, isError: error, refetch: reload } = useDashboardQuery()
+  const observation = useTodayObservationQuery()
   const [note, setNote] = useState('')
   const [saved, setSaved] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
   const idem = useIdempotencyKey()
-  const saveQuickNote = useQuickNoteMutation()
+  const saveQuickObservation = useQuickObservationMutation()
+  const updateObservation = useUpdateObservationMutation()
+  const observationTime = useMemo(() => new Intl.DateTimeFormat(locale, {
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: observation.data?.timezone ?? 'UTC',
+  }), [locale, observation.data?.timezone])
 
   async function saveNote() {
-    if (!note.trim() || !data) return
+    if (!note.trim()) return
     try {
-      await saveQuickNote.mutateAsync({ date: data.localDate, content: note.trim(), key: idem.key() })
+      await saveQuickObservation.mutateAsync({ content: note.trim(), key: idem.key() })
       setNote('')
       idem.reset()
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } finally { /* Mutation state drives the button. */ }
+  }
+
+  async function saveEdit() {
+    if (!editingId || !editContent.trim()) return
+    await updateObservation.mutateAsync({ id: editingId, content: editContent.trim() })
+    setEditingId(null)
+    setEditContent('')
   }
 
   const hour = new Date().getHours()
@@ -65,23 +79,14 @@ export function TodayPage() {
         ? t('today.greeting.afternoon')
         : t('today.greeting.evening')
 
-  if (loading || !data) {
-    return (
-      <>
-        <PageHeader title={greeting} />
-        <PageSkeleton />
-      </>
-    )
-  }
-
-  const perf = data.performance
-  const cap = data.capabilities
+  const perf = data?.performance
+  const cap = data?.capabilities
 
   return (
     <>
-      <PageHeader title={greeting} subtitle={formatLongDate(data.localDate)} />
+      <PageHeader title={greeting} subtitle={data ? formatLongDate(data.localDate) : undefined} />
 
-      {cap?.alerts === 'available' && data.pendingAlerts && data.pendingAlerts > 0 ? (
+      {data && cap?.alerts === 'available' && data.pendingAlerts && data.pendingAlerts > 0 ? (
         <button className="reminder-banner" onClick={() => go('alerts')}>
           <Icon name="bell" size={16} />
           <span>{t('today.reminders', { count: data.pendingAlerts })}</span>
@@ -100,75 +105,111 @@ export function TodayPage() {
           <span className={cx('quick-note__status', saved && 'is-ok')}>
             {saved ? <><Icon name="check" size={14} /> {t('common.saved')}</> : t('today.quickNote.hint')}
           </span>
-          <Button variant="primary" icon="plus" loading={saveQuickNote.isPending} onClick={saveNote} disabled={!note.trim()}>
+          <Button variant="primary" icon="plus" loading={saveQuickObservation.isPending} onClick={saveNote} disabled={!note.trim()}>
             {t('today.quickNote.save')}
           </Button>
         </div>
       </Card>
 
-      <div className="card-grid">
-        <Card className="panel" as="section">
-          <span className="panel__label">{t('today.diary.label')}</span>
-          <div className="panel__body">
-            <p className="panel__title">{data.diary.writtenToday ? t('today.diary.written') : t('today.diary.empty')}</p>
-            <p className="panel__sub">{t('today.diary.count', { count: data.diary.count })}</p>
+      {observation.data?.updates.length ? (
+        <section className="recent" aria-labelledby="observation-updates-h">
+          <div className="recent__head">
+            <h2 id="observation-updates-h">{t('today.observations.title')}</h2>
           </div>
-          <PanelLink onClick={() => go('diary')}>{data.diary.writtenToday ? t('today.diary.keepWriting') : t('today.diary.open')}</PanelLink>
-        </Card>
-
-        <Card className="panel" as="section">
-          <span className="panel__label">{t('today.pnl.label')}</span>
-          <div className="panel__body">
-            <span className={cx('pnl-value', 'num', `is-${pnlTone(perf?.pnlAmount)}`)}>
-              {perf ? signed(perf.pnlAmount) : format.empty}
-            </span>
-            {perf?.pnlPercent != null ? (
-              <span className={cx('pnl-sub', 'num', `is-${pnlTone(perf.pnlAmount)}`)}>{pct(perf.pnlPercent)}</span>
-            ) : (
-              <span className="pnl-sub is-muted">{t('today.pnl.none')}</span>
-            )}
-          </div>
-          <PanelLink onClick={() => go('calendar')}>{t('today.pnl.openCalendar')}</PanelLink>
-        </Card>
-
-        <Card className="panel" as="section">
-          <span className="panel__label">{t('today.discipline.label')}</span>
-          <div className="panel__body">
-            {data.discipline ? (
-              <blockquote className="panel__quote">{data.discipline.content}</blockquote>
-            ) : cap?.discipline === 'empty' ? (
-              <p className="panel__sub">{t('today.discipline.empty')}</p>
-            ) : (
-              <p className="panel__sub is-muted">{t('common.unavailable')}</p>
-            )}
-          </div>
-          <PanelLink onClick={() => go('discipline')}>{t('today.discipline.manage')}</PanelLink>
-        </Card>
-      </div>
-
-      <section className="recent" aria-labelledby="recent-h">
-        <div className="recent__head">
-          <h2 id="recent-h">{t('today.recent.title')}</h2>
-          <Button variant="ghost" size="sm" icon="arrow" onClick={() => go('diary')}>{t('today.recent.all')}</Button>
-        </div>
-        {(data.recentDiaries ?? []).length === 0 ? (
-          <EmptyBox icon="diary" title={t('today.recent.emptyTitle')} hint={t('today.recent.emptyHint')} />
-        ) : (
-          <ul className="recent__list">
-            {(data.recentDiaries ?? []).map((d) => (
-              <li key={d.id}>
-                <button className="recent__item" onClick={() => go('diary')}>
-                  <span className="recent__date">{d.localDate}</span>
-                  <span className="recent__title">{d.title}</span>
-                  <span className="recent__arrow"><Icon name="right" size={16} /></span>
-                </button>
+          <ol className="timeline">
+            {observation.data.updates.map(update => (
+              <li key={update.id}>
+                {editingId === update.id ? (
+                  <div className="stack">
+                    <p className="form-hint" role="note">{t('today.observations.honestyReminder')}</p>
+                    <Field label={t('today.observations.editLabel')}>
+                      <TextArea value={editContent} onChange={event => setEditContent(event.target.value)} />
+                    </Field>
+                    <div className="form-actions">
+                      <Button variant="primary" size="sm" loading={updateObservation.isPending} disabled={!editContent.trim()} onClick={saveEdit}>{t('today.observations.saveEdit')}</Button>
+                      <Button variant="ghost" size="sm" onClick={() => { setEditingId(null); setEditContent('') }}>{t('common.cancel')}</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <time dateTime={update.recordedAt}>{observationTime.format(new Date(update.recordedAt))}</time>
+                    <p>{update.content}</p>
+                    <Button variant="ghost" size="sm" onClick={() => { setEditingId(update.id); setEditContent(update.content) }}>{t('today.observations.edit')}</Button>
+                  </>
+                )}
               </li>
             ))}
-          </ul>
-        )}
-      </section>
+          </ol>
+        </section>
+      ) : null}
 
-      {error ? <SectionError onRetry={reload} /> : null}
+      {data ? (
+        <>
+          <div className="card-grid">
+            <Card className="panel" as="section">
+              <span className="panel__label">{t('today.diary.label')}</span>
+              <div className="panel__body">
+                <p className="panel__title">{data.diary.writtenToday ? t('today.diary.written') : t('today.diary.empty')}</p>
+                <p className="panel__sub">{t('today.diary.count', { count: data.diary.count })}</p>
+              </div>
+              <PanelLink onClick={() => go('diary')}>{data.diary.writtenToday ? t('today.diary.keepWriting') : t('today.diary.open')}</PanelLink>
+            </Card>
+
+            <Card className="panel" as="section">
+              <span className="panel__label">{t('today.pnl.label')}</span>
+              <div className="panel__body">
+                <span className={cx('pnl-value', 'num', `is-${pnlTone(perf?.pnlAmount)}`)}>
+                  {perf ? signed(perf.pnlAmount) : format.empty}
+                </span>
+                {perf?.pnlPercent != null ? (
+                  <span className={cx('pnl-sub', 'num', `is-${pnlTone(perf.pnlAmount)}`)}>{pct(perf.pnlPercent)}</span>
+                ) : (
+                  <span className="pnl-sub is-muted">{t('today.pnl.none')}</span>
+                )}
+              </div>
+              <PanelLink onClick={() => go('calendar')}>{t('today.pnl.openCalendar')}</PanelLink>
+            </Card>
+
+            <Card className="panel" as="section">
+              <span className="panel__label">{t('today.discipline.label')}</span>
+              <div className="panel__body">
+                {data.discipline ? (
+                  <blockquote className="panel__quote">{data.discipline.content}</blockquote>
+                ) : cap?.discipline === 'empty' ? (
+                  <p className="panel__sub">{t('today.discipline.empty')}</p>
+                ) : (
+                  <p className="panel__sub is-muted">{t('common.unavailable')}</p>
+                )}
+              </div>
+              <PanelLink onClick={() => go('discipline')}>{t('today.discipline.manage')}</PanelLink>
+            </Card>
+          </div>
+
+          <section className="recent" aria-labelledby="recent-h">
+            <div className="recent__head">
+              <h2 id="recent-h">{t('today.recent.title')}</h2>
+              <Button variant="ghost" size="sm" icon="arrow" onClick={() => go('diary')}>{t('today.recent.all')}</Button>
+            </div>
+            {(data.recentDiaries ?? []).length === 0 ? (
+              <EmptyBox icon="diary" title={t('today.recent.emptyTitle')} hint={t('today.recent.emptyHint')} />
+            ) : (
+              <ul className="recent__list">
+                {(data.recentDiaries ?? []).map((d) => (
+                  <li key={d.id}>
+                    <button className="recent__item" onClick={() => go('diary')}>
+                      <span className="recent__date">{d.localDate}</span>
+                      <span className="recent__title">{d.title}</span>
+                      <span className="recent__arrow"><Icon name="right" size={16} /></span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      ) : loading ? <PageSkeleton rows={3} /> : null}
+
+      {error || observation.isError ? <SectionError onRetry={() => { void reload(); void observation.refetch() }} /> : null}
     </>
   )
 }

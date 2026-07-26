@@ -119,15 +119,15 @@ app.MapPost("/internal/auth/login", async (LoginRequest input, NpgsqlDataSource 
     if (email.Length is < 3 or > 254)
         return Results.Unauthorized();
     await using var command = db.CreateCommand("""
-        SELECT u.id,u.email,u.display_name,u.timezone,u.base_currency,u.role,u.account_type,u.status,u.status_version,
+        SELECT u.id,u.email,u.display_name,u.timezone,u.journal_day_rollover,u.base_currency,u.role,u.account_type,u.status,u.status_version,
                c.password_salt,c.password_hash,c.iterations
         FROM identity.users u JOIN identity.user_credentials c ON c.user_id=u.id WHERE u.email=$1
         """);
     command.Parameters.AddWithValue(email);
     await using var reader = await command.ExecuteReaderAsync();
     if (!await reader.ReadAsync()) return Results.Unauthorized();
-    var candidate = Rfc2898DeriveBytes.Pbkdf2(input.Password, (byte[])reader[9], reader.GetInt32(11), HashAlgorithmName.SHA256, 32);
-    if (!CryptographicOperations.FixedTimeEquals(candidate, (byte[])reader[10]) || reader.GetString(7) != "active") return Results.Unauthorized();
+    var candidate = Rfc2898DeriveBytes.Pbkdf2(input.Password, (byte[])reader[10], reader.GetInt32(12), HashAlgorithmName.SHA256, 32);
+    if (!CryptographicOperations.FixedTimeEquals(candidate, (byte[])reader[11]) || reader.GetString(8) != "active") return Results.Unauthorized();
     var user = ReadUser(reader);
     await reader.CloseAsync();
     return Results.Ok(await refreshTokens.IssueAsync(user, Guid.NewGuid()));
@@ -173,11 +173,11 @@ app.MapPost("/internal/auth/api-key/token", async (ApiKeyTokenRequest input, Npg
 {
     byte[] raw; try { raw = Convert.FromBase64String(input.ApiKey); } catch { return Results.Unauthorized(); }
     await using var command = db.CreateCommand("""
-        SELECT u.id,u.email,u.display_name,u.timezone,u.base_currency,u.role,u.account_type,u.status,u.status_version,k.scopes
+        SELECT u.id,u.email,u.display_name,u.timezone,u.journal_day_rollover,u.base_currency,u.role,u.account_type,u.status,u.status_version,k.scopes
         FROM identity.api_keys k JOIN identity.users u ON u.id=k.user_id
         WHERE k.key_hash=$1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at>now()) AND u.status='active'
         """); command.Parameters.AddWithValue(SHA256.HashData(raw)); await using var reader = await command.ExecuteReaderAsync(); if (!await reader.ReadAsync()) return Results.Unauthorized();
-    var user = ReadUser(reader); var scopes = reader.GetFieldValue<string[]>(9); return Results.Ok(new ApiKeyTokenResponse(IdentityAccessTokenIssuer.Create(user, signingKey, issuer, audience, scopes), DateTime.UtcNow.AddMinutes(15)));
+    var user = ReadUser(reader); var scopes = reader.GetFieldValue<string[]>(10); return Results.Ok(new ApiKeyTokenResponse(IdentityAccessTokenIssuer.Create(user, signingKey, issuer, audience, scopes), DateTime.UtcNow.AddMinutes(15)));
 })
 .AllowAnonymous()
 .Produces<ApiKeyTokenResponse>(200).ProducesProblem(401);
@@ -195,7 +195,7 @@ app.MapGet("/internal/auth/me", async (ClaimsPrincipal principal, NpgsqlDataSour
 {
     if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var userId)) return Results.Unauthorized();
     await using var command = db.CreateCommand("""
-        SELECT id,email,display_name,timezone,base_currency,role,account_type,status,status_version,appearance,locale,accent_theme
+        SELECT id,email,display_name,timezone,journal_day_rollover,base_currency,role,account_type,status,status_version,appearance,locale,accent_theme
         FROM identity.users WHERE id=$1 AND status='active'
         """);
     command.Parameters.AddWithValue(userId);
@@ -209,7 +209,7 @@ app.MapGet("/internal/auth/settings", async (ClaimsPrincipal principal, NpgsqlDa
 {
     if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var userId)) return Results.Unauthorized();
     await using var command = db.CreateCommand("""
-        SELECT email, display_name, timezone, base_currency, appearance, locale, accent_theme, updated_at
+        SELECT email, display_name, timezone, journal_day_rollover, base_currency, appearance, locale, accent_theme, updated_at
         FROM identity.users WHERE id=$1 AND status='active'
         """);
     command.Parameters.AddWithValue(userId);
@@ -223,18 +223,19 @@ app.MapGet("/internal/auth/settings", async (ClaimsPrincipal principal, NpgsqlDa
 app.MapPut("/internal/auth/settings", async (UserSettingsWrite input, ClaimsPrincipal principal, NpgsqlDataSource db) =>
 {
     if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var userId)) return Results.Unauthorized();
-    if (!TryNormalizeSettings(input, out var displayName, out var timezone, out var baseCurrency, out var appearance, out var locale, out var accentTheme, out var problem))
+    if (!TryNormalizeSettings(input, out var displayName, out var timezone, out var journalDayRollover, out var baseCurrency, out var appearance, out var locale, out var accentTheme, out var problem))
         return Results.Problem(problem, statusCode: 400);
 
     await using var command = db.CreateCommand("""
         UPDATE identity.users
-        SET display_name=$2, timezone=$3, base_currency=$4, appearance=$5, locale=$6, accent_theme=$7, updated_at=now()
+        SET display_name=$2, timezone=$3, journal_day_rollover=$4, base_currency=$5, appearance=$6, locale=$7, accent_theme=$8, updated_at=now()
         WHERE id=$1 AND status='active' AND account_type <> 'agent'
-        RETURNING email, display_name, timezone, base_currency, appearance, locale, accent_theme, updated_at
+        RETURNING email, display_name, timezone, journal_day_rollover, base_currency, appearance, locale, accent_theme, updated_at
         """);
     command.Parameters.AddWithValue(userId);
     command.Parameters.AddWithValue(displayName);
     command.Parameters.AddWithValue(timezone);
+    command.Parameters.AddWithValue(journalDayRollover);
     command.Parameters.AddWithValue(baseCurrency);
     command.Parameters.AddWithValue(appearance);
     command.Parameters.AddWithValue(locale);
@@ -278,27 +279,29 @@ app.Run();
 
 // Login/API-key readers omit appearance/locale/accent (column 9 is credentials/scopes there). Defaults are fine for JWT.
 static AuthUser ReadUser(NpgsqlDataReader reader) => new(
-    reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
-    reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetInt32(8));
+    reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetFieldValue<TimeOnly>(4).ToString("HH:mm"),
+    reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetInt32(9));
 
 static AuthUser ReadUserWithAppearance(NpgsqlDataReader reader) => new(
-    reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
-    reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetInt32(8), reader.GetString(9), reader.GetString(10), reader.GetString(11));
+    reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetFieldValue<TimeOnly>(4).ToString("HH:mm"),
+    reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetInt32(9), reader.GetString(10), reader.GetString(11), reader.GetString(12));
 
 static UserSettingsResponse ReadSettings(NpgsqlDataReader reader) => new(
     reader.GetString(0),
     reader.GetString(1),
     reader.GetString(2),
-    reader.GetString(3).Trim(),
-    reader.GetString(4),
+    reader.GetFieldValue<TimeOnly>(3).ToString("HH:mm"),
+    reader.GetString(4).Trim(),
     reader.GetString(5),
     reader.GetString(6),
-    DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc));
+    reader.GetString(7),
+    DateTime.SpecifyKind(reader.GetDateTime(8), DateTimeKind.Utc));
 
 static bool TryNormalizeSettings(
     UserSettingsWrite input,
     out string displayName,
     out string timezone,
+    out TimeOnly journalDayRollover,
     out string baseCurrency,
     out string appearance,
     out string locale,
@@ -307,13 +310,14 @@ static bool TryNormalizeSettings(
 {
     displayName = string.Empty;
     timezone = string.Empty;
+    journalDayRollover = default;
     baseCurrency = string.Empty;
     appearance = string.Empty;
     locale = string.Empty;
     accentTheme = string.Empty;
     problem = "invalid_settings";
 
-    if (input.DisplayName is null || input.Timezone is null || input.BaseCurrency is null || input.Appearance is null || input.Locale is null || input.AccentTheme is null)
+    if (input.DisplayName is null || input.Timezone is null || input.JournalDayRollover is null || input.BaseCurrency is null || input.Appearance is null || input.Locale is null || input.AccentTheme is null)
         return false;
 
     displayName = input.DisplayName.Trim();
@@ -331,6 +335,12 @@ static bool TryNormalizeSettings(
         return false;
     }
     timezone = tz.Id;
+
+    if (!TimeOnly.TryParseExact(input.JournalDayRollover, "HH:mm", out journalDayRollover))
+    {
+        problem = "invalid_rollover";
+        return false;
+    }
 
     var currency = input.BaseCurrency.Trim().ToUpperInvariant();
     if (currency.Length != 3 || !currency.All(static c => c is >= 'A' and <= 'Z'))
@@ -455,14 +465,14 @@ record LoginRequest(string Email, string Password);
 record RefreshRequest(string RefreshToken);
 record AgentRequest(string Name, string DisplayName, string Timezone, string BaseCurrency, List<string> Scopes, DateTime? ExpiresAt);
 record ApiKeyTokenRequest(string ApiKey);
-record AuthUser(Guid Id, string Email, string DisplayName, string Timezone, string BaseCurrency, string Role, string AccountType, string Status, int StatusVersion, string Appearance = "system", string Locale = "en", string AccentTheme = "green");
+record AuthUser(Guid Id, string Email, string DisplayName, string Timezone, string JournalDayRollover, string BaseCurrency, string Role, string AccountType, string Status, int StatusVersion, string Appearance = "system", string Locale = "en", string AccentTheme = "green");
 record AuthTokens(string AccessToken, DateTime ExpiresAt, string RefreshToken);
 record RegisterResponse(Guid Id, string Email, string DisplayName, string Timezone, string BaseCurrency);
 record AgentResponse(Guid UserId, Guid KeyId, string ApiKey, List<string> Scopes);
 record ApiKeyTokenResponse(string AccessToken, DateTime ExpiresAt);
 record SsoProvidersResponse(string[] EnabledProviders);
-record UserSettingsResponse(string Email, string DisplayName, string Timezone, string BaseCurrency, string Appearance, string Locale, string AccentTheme, DateTime UpdatedAt);
-record UserSettingsWrite(string DisplayName, string Timezone, string BaseCurrency, string Appearance, string Locale, string AccentTheme);
+record UserSettingsResponse(string Email, string DisplayName, string Timezone, string JournalDayRollover, string BaseCurrency, string Appearance, string Locale, string AccentTheme, DateTime UpdatedAt);
+record UserSettingsWrite(string DisplayName, string Timezone, string JournalDayRollover, string BaseCurrency, string Appearance, string Locale, string AccentTheme);
 record DisplayNameItem(Guid UserId, string? DisplayName);
 record CollectionResponse<T>(List<T> Items);
 

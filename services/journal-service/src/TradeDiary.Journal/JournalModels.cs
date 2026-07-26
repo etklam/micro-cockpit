@@ -7,6 +7,12 @@ record TransactionWrite(string Symbol, string Side, decimal Quantity, decimal Pr
 record TransactionResponse(Guid Id, Guid DiaryId, string Symbol, string Side, decimal Quantity, decimal Price, string Currency, DateTime TradedAt, string Notes, DateTime CreatedAt, DateTime UpdatedAt);
 record StoredResult(int StatusCode, string? Location, JsonElement Body);
 record QuickNoteResponse(Guid? DiaryId, bool Appended);
+record QuickObservationWrite(string Content);
+record QuickObservationResponse(Guid MarketObservationId, Guid ObservationUpdateId, DateOnly JournalDay, DateTime RecordedAt, bool Appended);
+record ObservationUpdateWrite(string Content);
+record ObservationUpdateResponse(Guid Id, string Content, DateTime RecordedAt, DateTime UpdatedAt);
+record ObservationUpdateEditResponse(Guid Id, string Content, DateTime RecordedAt, DateTime UpdatedAt, bool HonestyReminderRequired);
+record MarketObservationResponse(Guid Id, DateOnly JournalDay, string Timezone, string Rollover, IReadOnlyList<ObservationUpdateResponse> Updates);
 record DiaryDaySummaryItem(DateOnly LocalDate, long DiaryCount, long TransactionCount);
 record CollectionResponse<T>(List<T> Items);
 /// <summary>Sanitized diary projection for partner compare. No transactions/reviews/internal IDs.</summary>

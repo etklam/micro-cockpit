@@ -18,6 +18,7 @@ export const queryKeys = {
   bootstrap: ['bootstrap'] as const,
   settings: ['settings'] as const,
   dashboard: ['dashboard'] as const,
+  todayObservation: ['market-observations', 'today'] as const,
   diaries: ['diaries'] as const,
   diariesList: (filters: DiaryListKeyFilters) => ['diaries', 'list', filters.q, filters.from, filters.to, filters.review, filters.symbol, filters.tag] as const,
   diary: (id: string) => ['diary', id] as const,
@@ -54,6 +55,7 @@ export const queryKeys = {
 export const useBootstrapQuery = (enabled = true) => useQuery({ queryKey: queryKeys.bootstrap, queryFn: api.getBootstrap, staleTime: 60_000, enabled })
 export const useSettingsQuery = () => useQuery({ queryKey: queryKeys.settings, queryFn: api.getSettings })
 export const useDashboardQuery = () => useQuery({ queryKey: queryKeys.dashboard, queryFn: api.getDashboard })
+export const useTodayObservationQuery = () => useQuery({ queryKey: queryKeys.todayObservation, queryFn: api.getTodayMarketObservation, refetchInterval: 60_000 })
 export const useDiariesInfiniteQuery = (filters: DiaryListKeyFilters) => useInfiniteQuery({
   queryKey: queryKeys.diariesList(filters),
   initialPageParam: undefined as string | undefined,
@@ -167,6 +169,20 @@ export function useQuickNoteMutation() {
   const client = useQueryClient()
   return useMutation({ mutationFn: ({ date, content, key }: { date: string; content: string; key: string }) => api.saveQuickNote(date, content, key), onSuccess: async () => {
     await Promise.all([client.invalidateQueries({ queryKey: queryKeys.diaries }), client.invalidateQueries({ queryKey: queryKeys.dashboard }), invalidateCalendar(client)])
+  } })
+}
+
+export function useQuickObservationMutation() {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: ({ content, key }: { content: string; key: string }) => api.saveQuickObservation(content, key), onSuccess: async () => {
+    await client.invalidateQueries({ queryKey: queryKeys.todayObservation })
+  } })
+}
+
+export function useUpdateObservationMutation() {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: ({ id, content }: { id: string; content: string }) => api.updateObservation(id, content), onSuccess: async () => {
+    await client.invalidateQueries({ queryKey: queryKeys.todayObservation })
   } })
 }
 
@@ -325,6 +341,7 @@ export function useSaveSettingsMutation() {
         client.invalidateQueries({ queryKey: queryKeys.settings }),
         client.invalidateQueries({ queryKey: queryKeys.bootstrap }),
         client.invalidateQueries({ queryKey: queryKeys.dashboard }),
+        client.invalidateQueries({ queryKey: queryKeys.todayObservation }),
         client.invalidateQueries({ queryKey: calendarPrefix }),
         client.invalidateQueries({ queryKey: queryKeys.diaries }),
         client.invalidateQueries({ queryKey: queryKeys.diaryReview.summaries }),

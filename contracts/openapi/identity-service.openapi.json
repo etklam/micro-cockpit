@@ -714,6 +714,7 @@
           "email",
           "displayName",
           "timezone",
+          "journalDayRollover",
           "baseCurrency",
           "role",
           "accountType",
@@ -733,6 +734,9 @@
             "type": "string"
           },
           "timezone": {
+            "type": "string"
+          },
+          "journalDayRollover": {
             "type": "string"
           },
           "baseCurrency": {
@@ -940,6 +944,7 @@
           "email",
           "displayName",
           "timezone",
+          "journalDayRollover",
           "baseCurrency",
           "appearance",
           "locale",
@@ -955,6 +960,9 @@
             "type": "string"
           },
           "timezone": {
+            "type": "string"
+          },
+          "journalDayRollover": {
             "type": "string"
           },
           "baseCurrency": {
@@ -979,6 +987,7 @@
         "required": [
           "displayName",
           "timezone",
+          "journalDayRollover",
           "baseCurrency",
           "appearance",
           "locale",
@@ -990,6 +999,9 @@
             "type": "string"
           },
           "timezone": {
+            "type": "string"
+          },
+          "journalDayRollover": {
             "type": "string"
           },
           "baseCurrency": {

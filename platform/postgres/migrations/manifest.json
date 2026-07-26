@@ -120,6 +120,16 @@
       "id": "0024",
       "filename": "0024_tool_workflows.sql",
       "sha256": "094a2f289233deef13791a6e26ce1fe157265e2d2ef611fa68f1e3b16b1899d4"
+    },
+    {
+      "id": "0025",
+      "filename": "0025_identity_journal_day_rollover.sql",
+      "sha256": "88258efb3d3e127d916bbd0225237ad6a4fb58fe27dee20d39d238b6865ab243"
+    },
+    {
+      "id": "0026",
+      "filename": "0026_market_observations.sql",
+      "sha256": "4790b8d9012aea73e351064e9845e65f2b92a670da015cde51c0ab294ca5f206"
     }
   ]
 }

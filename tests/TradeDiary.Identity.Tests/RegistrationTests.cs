@@ -27,6 +27,7 @@ public sealed class RegistrationTests : IAsyncLifetime
                 email text NOT NULL UNIQUE,
                 display_name text NOT NULL,
                 timezone text NOT NULL DEFAULT 'Asia/Taipei',
+                journal_day_rollover time NOT NULL DEFAULT '00:00',
                 base_currency char(3) NOT NULL DEFAULT 'USD',
                 role text NOT NULL DEFAULT 'user',
                 account_type text NOT NULL DEFAULT 'human',

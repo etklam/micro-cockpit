@@ -17,6 +17,7 @@ export function queueSettingsWrite(
       ...old,
       currentUser: { ...old.currentUser, displayName: settings.displayName },
       timezone: settings.timezone,
+      journalDayRollover: settings.journalDayRollover,
       baseCurrency: settings.baseCurrency,
       appearance: settings.appearance,
       locale: settings.locale,
@@ -38,6 +39,7 @@ export function settingsFromBootstrap(
   return {
     displayName: profile.currentUser.displayName,
     timezone: profile.timezone,
+    journalDayRollover: profile.journalDayRollover,
     baseCurrency: profile.baseCurrency,
     appearance: patch.appearance ?? profile.appearance,
     locale: patch.locale ?? profile.locale,

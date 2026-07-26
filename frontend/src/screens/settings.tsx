@@ -51,6 +51,7 @@ export function SettingsPage() {
 
   const [displayName, setDisplayName] = useState('')
   const [timezone, setTimezone] = useState('')
+  const [journalDayRollover, setJournalDayRollover] = useState('00:00')
   const [timezoneCustom, setTimezoneCustom] = useState(false)
   const [baseCurrency, setBaseCurrency] = useState('USD')
   const [formError, setFormError] = useState('')
@@ -66,6 +67,7 @@ export function SettingsPage() {
     if (!settings.data) return
     setDisplayName(settings.data.displayName)
     setTimezone(settings.data.timezone)
+    setJournalDayRollover(settings.data.journalDayRollover)
     setTimezoneCustom(!COMMON_TIMEZONES.includes(settings.data.timezone))
     setBaseCurrency(settings.data.baseCurrency)
   }, [settings.data])
@@ -88,6 +90,7 @@ export function SettingsPage() {
     setBaseCurrency(ccy)
     if (name.length < 1 || name.length > 100) { setFormError(t('settings.error.displayName')); return }
     if (!tz || tz.length > 100) { setFormError(t('settings.error.timezone')); return }
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(journalDayRollover)) { setFormError(t('settings.error.rollover')); return }
     if (!/^[A-Z]{3}$/.test(ccy)) { setFormError(t('settings.error.currency')); return }
     if (!isAppearance(appearance)) { setFormError(t('settings.error.appearance')); return }
     if (!isLocale(locale)) { setFormError(t('settings.error.locale')); return }
@@ -96,6 +99,7 @@ export function SettingsPage() {
       const result = await save.mutateAsync({
         displayName: name,
         timezone: tz,
+        journalDayRollover,
         baseCurrency: ccy,
         appearance,
         locale,
@@ -110,6 +114,7 @@ export function SettingsPage() {
       setSaved(true)
       setDisplayName(result.settings.displayName)
       setTimezone(result.settings.timezone)
+      setJournalDayRollover(result.settings.journalDayRollover)
       setBaseCurrency(result.settings.baseCurrency)
       if (isAppearance(result.settings.appearance)) reconcileAppearance(result.settings.appearance)
       const serverAccent = normalizeAccent(result.settings.accentTheme)
@@ -188,6 +193,9 @@ export function SettingsPage() {
                 {t('settings.timezoneMismatch', { account: timezone, device: deviceTz })}
               </p>
             ) : null}
+            <Field label={t('settings.rollover')} hint={t('settings.rolloverHint')}>
+              <TextInput type="time" required value={journalDayRollover} onChange={event => setJournalDayRollover(event.target.value)} />
+            </Field>
             <Field label={t('settings.baseCurrency')} hint={t('settings.baseCurrencyHint')}>
               <TextInput required maxLength={3} value={baseCurrency} onChange={e => setBaseCurrency(e.target.value.toUpperCase())} />
             </Field>

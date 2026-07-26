@@ -64,7 +64,7 @@ internal sealed class RefreshTokenFamily(
             RefreshTokenRow? token = null;
             await using (var command = new NpgsqlCommand("""
                 SELECT r.id,r.user_id,r.family_id,r.expires_at,r.used_at,r.revoked_at,
-                       u.email,u.display_name,u.timezone,u.base_currency,u.role,u.account_type,u.status,u.status_version
+                       u.email,u.display_name,u.timezone,u.journal_day_rollover,u.base_currency,u.role,u.account_type,u.status,u.status_version
                 FROM identity.refresh_tokens r
                 JOIN identity.users u ON u.id=r.user_id
                 WHERE r.token_hash=$1
@@ -86,11 +86,12 @@ internal sealed class RefreshTokenFamily(
                             reader.GetString(6),
                             reader.GetString(7),
                             reader.GetString(8),
-                            reader.GetString(9),
+                            reader.GetFieldValue<TimeOnly>(9).ToString("HH:mm"),
                             reader.GetString(10),
                             reader.GetString(11),
                             reader.GetString(12),
-                            reader.GetInt32(13),
+                            reader.GetString(13),
+                            reader.GetInt32(14),
                             "system"));
                 }
             }
@@ -281,6 +282,7 @@ internal static class IdentityAccessTokenIssuer
             new Claim("account_type", user.AccountType),
             new Claim("status_version", user.StatusVersion.ToString()),
             new Claim("timezone", user.Timezone),
+            new Claim("journal_day_rollover", user.JournalDayRollover),
             new Claim("base_currency", user.BaseCurrency.Trim())
         }.Concat(scopes.Select(scope => new Claim("scope", scope)));
         var jwt = new JwtSecurityToken(

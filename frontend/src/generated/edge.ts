@@ -4,7 +4,7 @@ export type AgentRequest = { "name": string; "displayName": string; "timezone": 
 export type AgentResponse = { "userId": string; "keyId": string; "apiKey": string; "scopes": Array<string> }
 export type ApiKeyTokenRequest = { "apiKey": string }
 export type ApiKeyTokenResponse = { "accessToken": string; "expiresAt": string }
-export type AppBootstrapResponse = { "currentUser": { "id": string; "email": string; "displayName": string }; "timezone": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string; "role": string; "accountType": string; "currentLocalDate": string; "availableProductAreas": Array<string> }
+export type AppBootstrapResponse = { "currentUser": { "id": string; "email": string; "displayName": string }; "timezone": string; "journalDayRollover": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string; "role": string; "accountType": string; "currentLocalDate": string; "availableProductAreas": Array<string> }
 export type AuditResponse = { "id": string; "actorUserId": null | string; "action": string; "resourceType": string; "resourceId": null | string; "details": JsonElement; "occurredAt": string }
 export type AverageCost = { "currentQuantity": number; "currentAverageCost": number; "addedQuantity": number; "addedPrice": number }
 export type AverageCostResponse = { "averageCost": number; "totalQuantity": number; "totalCost": number; "averageCostChange": number }
@@ -54,6 +54,7 @@ export type JobResponse = { "id": string; "jobType": string; "status": string; "
 export type JobWrite = { "jobType": string; "payload": JsonElement }
 export type JsonElement = unknown
 export type LoginRequest = { "email": string; "password": string }
+export type MarketObservationResponse = { "id": string; "journalDay": string; "timezone": string; "rollover": string; "updates": Array<ObservationUpdateResponse> }
 export type MistakeTagCountResponse = { "tag": string; "count": number | string }
 export type MonitorMarketState = { "state": null | string; "breadthPercent": number | null; "benchmarkAboveMa200": null | boolean; "status": string }
 export type MonitorResponse = { "universe": MonitorUniverse; "snapshotDate": null | string; "formulaVersion": string; "status": string; "marketState": MonitorMarketState; "sectorBreadth": Array<SectorBreadthResponse>; "etfs": Array<EtfSnapshotResponse> }
@@ -61,6 +62,9 @@ export type MonitorUniverse = { "id": string; "code": string; "name": string; "r
 export type MonthSummaryResponse = { "year": number | string; "month": number | string; "total": number; "recordedDays": number | string; "profitDays": number | string; "lossDays": number | string; "flatDays": number | string; "bestDay": number | null; "worstDay": number | null }
 export type NoteResponse = { "stockId": string; "content": string; "createdAt": string; "updatedAt": string }
 export type NoteWrite = { "content": null | string }
+export type ObservationUpdateEditResponse = { "id": string; "content": string; "recordedAt": string; "updatedAt": string; "honestyReminderRequired": boolean }
+export type ObservationUpdateResponse = { "id": string; "content": string; "recordedAt": string; "updatedAt": string }
+export type ObservationUpdateWrite = { "content": string }
 export type PartnerCompareCapabilitiesResponse = { "partnerDiaries": PartnerDiaryCapability }
 export type PartnerCompareDayResponse = { "localDate": string; "mine": Array<PartnerCompareDiaryItem>; "partner": Array<PartnerCompareDiaryItem> }
 export type PartnerCompareDiaryItem = { "id": string; "localDate": string; "title": string; "content": string; "tags": Array<string> }
@@ -86,6 +90,8 @@ export type PublishedBarResponse = { "tradingDate": string; "open": number; "hig
 export type PublishedSymbolResponse = { "symbol": string; "name": string; "exchange": string; "currency": string; "timezone": string }
 export type QuickNote = { "localDate": string; "content": string; "targetDiaryId": null | string }
 export type QuickNoteResponse = { "diaryId": null | string; "appended": boolean }
+export type QuickObservationResponse = { "marketObservationId": string; "observationUpdateId": string; "journalDay": string; "recordedAt": string; "appended": boolean }
+export type QuickObservationWrite = { "content": string }
 export type RedeemInvitation = { "code": string }
 export type RedeemInvitationResponse = { "linkId": string }
 export type RegisterRequest = { "email": string; "password": string; "displayName": string; "timezone": string; "baseCurrency": string }
@@ -109,8 +115,8 @@ export type UniverseCreatedResponse = { "id": string; "code": string; "name": st
 export type UniverseResponse = { "id": string; "code": string; "name": string; "rankScope": string; "createdAt": string; "updatedAt": string }
 export type UniverseSymbolWrite = { "symbol": string; "label": string; "sector": null | string; "sortOrder": null | number | string }
 export type UniverseWrite = { "code": string; "name": string; "rankScope": null | string }
-export type UserSettingsResponse = { "email": string; "displayName": string; "timezone": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string; "updatedAt": string }
-export type UserSettingsWrite = { "displayName": string; "timezone": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string }
+export type UserSettingsResponse = { "email": string; "displayName": string; "timezone": string; "journalDayRollover": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string; "updatedAt": string }
+export type UserSettingsWrite = { "displayName": string; "timezone": string; "journalDayRollover": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string }
 export type WatchlistItemCreatedResponse = { "stockId": string }
 export type WatchlistResponse = { "stock": StockResponse; "currentNote": null | string; "noteUpdatedAt": null | string; "timelineCount": number | string }
 
@@ -182,6 +188,9 @@ export const postApiAppDiaryAlerts = (body: DiaryAlertWrite, extra?: RequestInit
 export const deleteApiAppDiaryAlertsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diary-alerts/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const postApiAppDiaryAlertsIdDismiss = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diary-alerts/${encodeURIComponent(String(id))}/dismiss`, { method: "POST", ...extra })
 export const postApiAppQuickNote = (body: QuickNote, extra?: RequestInit) => request<QuickNoteResponse>("/api/app/quick-note", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppQuickObservations = (body: QuickObservationWrite, extra?: RequestInit) => request<QuickObservationResponse>("/api/app/quick-observations", { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppMarketObservationsToday = (extra?: RequestInit) => request<MarketObservationResponse>("/api/app/market-observations/today", { method: "GET", ...extra })
+export const putApiAppObservationUpdatesId = (id: string, body: ObservationUpdateWrite, extra?: RequestInit) => request<ObservationUpdateEditResponse>(`/api/app/observation-updates/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const getApiAppDiaries = (query: { "query"?: string; "from"?: string; "to"?: string; "reviewStatus"?: string; "symbol"?: string; "tag"?: string; "cursor"?: string; "limit"?: number | string }, extra?: RequestInit) => request<DiaryPage>("/api/app/diaries" + withQuery(query), { method: "GET", ...extra })
 export const postApiAppDiaries = (body: DiaryWrite, extra?: RequestInit) => request<DiaryResponse>("/api/app/diaries", { method: "POST", body: JSON.stringify(body), ...extra })
 export const getApiAppDiariesId = (id: string, extra?: RequestInit) => request<DiaryResponse>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "GET", ...extra })

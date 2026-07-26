@@ -1216,6 +1216,159 @@
         "operationId": "post_api_app_quick_note"
       }
     },
+    "/api/app/quick-observations": {
+      "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuickObservationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickObservationResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickObservationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "post_api_app_quick_observations"
+      }
+    },
+    "/api/app/market-observations/today": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketObservationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "get_api_app_market_observations_today"
+      }
+    },
+    "/api/app/observation-updates/{id}": {
+      "put": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObservationUpdateWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationUpdateEditResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "put_api_app_observation_updates_id"
+      }
+    },
     "/api/app/diaries": {
       "get": {
         "tags": [
@@ -4075,6 +4228,7 @@
         "required": [
           "currentUser",
           "timezone",
+          "journalDayRollover",
           "baseCurrency",
           "appearance",
           "locale",
@@ -4106,6 +4260,9 @@
             }
           },
           "timezone": {
+            "type": "string"
+          },
+          "journalDayRollover": {
             "type": "string"
           },
           "baseCurrency": {
@@ -5606,6 +5763,38 @@
           }
         }
       },
+      "MarketObservationResponse": {
+        "required": [
+          "id",
+          "journalDay",
+          "timezone",
+          "rollover",
+          "updates"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "journalDay": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "rollover": {
+            "type": "string"
+          },
+          "updates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservationUpdateResponse"
+            }
+          }
+        }
+      },
       "MistakeTagCountResponse": {
         "required": [
           "tag",
@@ -5857,6 +6046,73 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "ObservationUpdateEditResponse": {
+        "required": [
+          "id",
+          "content",
+          "recordedAt",
+          "updatedAt",
+          "honestyReminderRequired"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "honestyReminderRequired": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ObservationUpdateResponse": {
+        "required": [
+          "id",
+          "content",
+          "recordedAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ObservationUpdateWrite": {
+        "required": [
+          "content"
+        ],
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
           }
         }
       },
@@ -6733,6 +6989,48 @@
           }
         }
       },
+      "QuickObservationResponse": {
+        "required": [
+          "marketObservationId",
+          "observationUpdateId",
+          "journalDay",
+          "recordedAt",
+          "appended"
+        ],
+        "type": "object",
+        "properties": {
+          "marketObservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observationUpdateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "journalDay": {
+            "type": "string",
+            "format": "date"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "appended": {
+            "type": "boolean"
+          }
+        }
+      },
+      "QuickObservationWrite": {
+        "required": [
+          "content"
+        ],
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          }
+        }
+      },
       "RedeemInvitation": {
         "required": [
           "code"
@@ -7534,6 +7832,7 @@
           "email",
           "displayName",
           "timezone",
+          "journalDayRollover",
           "baseCurrency",
           "appearance",
           "locale",
@@ -7549,6 +7848,9 @@
             "type": "string"
           },
           "timezone": {
+            "type": "string"
+          },
+          "journalDayRollover": {
             "type": "string"
           },
           "baseCurrency": {
@@ -7573,6 +7875,7 @@
         "required": [
           "displayName",
           "timezone",
+          "journalDayRollover",
           "baseCurrency",
           "appearance",
           "locale",
@@ -7584,6 +7887,9 @@
             "type": "string"
           },
           "timezone": {
+            "type": "string"
+          },
+          "journalDayRollover": {
             "type": "string"
           },
           "baseCurrency": {
