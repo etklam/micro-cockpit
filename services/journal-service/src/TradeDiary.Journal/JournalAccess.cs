@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -100,11 +101,16 @@ static class JournalAccess
     }
 
     // ponytail: camelCase so PascalCase response records serialize to the same camelCase keys as the anonymous projections they replace.
-    internal static StoredResult Stored(int statusCode, string? location, object body)
+    private static readonly JsonSerializerOptions StoredJsonOptions = CreateStoredJsonOptions();
+    private static JsonSerializerOptions CreateStoredJsonOptions()
     {
-        var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-        return new StoredResult(statusCode, location, JsonSerializer.SerializeToElement(body, options));
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        return options;
     }
+
+    internal static StoredResult Stored(int statusCode, string? location, object body) =>
+        new(statusCode, location, JsonSerializer.SerializeToElement(body, StoredJsonOptions));
 
     internal static IResult WriteResult(HttpContext context, StoredResult result)
     {

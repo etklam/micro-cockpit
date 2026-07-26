@@ -11,14 +11,20 @@ vi.mock('../features/api', () => ({
   createTransaction: vi.fn().mockResolvedValue({}),
   updateTransaction: vi.fn().mockResolvedValue({}),
   deleteTransaction: vi.fn().mockResolvedValue({}),
+  createExpectation: vi.fn().mockResolvedValue({}),
+  updateExpectation: vi.fn().mockResolvedValue({}),
+  invalidateExpectation: vi.fn().mockResolvedValue({}),
 }))
 
 import {
+  useCreateExpectationMutation,
   useCreateTransactionMutation,
   useDeleteDiaryReviewMutation,
   useDeleteTransactionMutation,
   useSaveDiaryMutation,
+  useInvalidateExpectationMutation,
   useSaveDiaryReviewMutation,
+  useUpdateExpectationMutation,
   useUpdateTransactionMutation,
 } from '../features/queries'
 
@@ -54,6 +60,31 @@ test('review delete invalidates evidence item queries and diary lists', async ()
   await act(() => result.current.mutateAsync())
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diary-review', 'items'] })
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['diaries'] })
+})
+
+test('expectation create invalidates expectations, Today, and calendar queries', async () => {
+  const invalidation = vi.spyOn(client, 'invalidateQueries')
+  const { result } = renderHook(() => useCreateExpectationMutation(), { wrapper })
+  await act(() => result.current.mutateAsync({
+    updateId: 'update-1', key: 'idempotency-key',
+    body: { expectedBehavior: 'Breadth holds', deadline: '2026-07-17T08:00:00Z', deadlinePreset: null, invalidationCondition: 'Breadth breaks', confidence: 'medium', market: 'US' },
+  }))
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['expectations'] })
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['market-observations', 'today'] })
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['calendar'] })
+})
+
+test('expectation edit and invalidation refresh expectations and calendar', async () => {
+  const invalidation = vi.spyOn(client, 'invalidateQueries')
+  const edit = renderHook(() => useUpdateExpectationMutation(), { wrapper })
+  await act(() => edit.result.current.mutateAsync({
+    id: 'expectation-1',
+    body: { expectedBehavior: 'Breadth holds', deadline: '2026-07-17T08:00:00Z', deadlinePreset: null, invalidationCondition: 'Breadth breaks', confidence: 'high', market: 'US' },
+  }))
+  const invalidate = renderHook(() => useInvalidateExpectationMutation(), { wrapper })
+  await act(() => invalidate.result.current.mutateAsync('expectation-1'))
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['expectations'] })
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['calendar'] })
 })
 
 test('transaction create invalidates diary list variants, transactions, and calendar', async () => {

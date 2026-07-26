@@ -164,6 +164,40 @@ public sealed class CockpitCompositionTests
     }
 
     [Fact]
+    public async Task Expectation_routes_forward_to_journal_with_query_and_error_body_preserved()
+    {
+        string? createPath = null;
+        string? listPath = null;
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service != "journal") return Json(HttpStatusCode.OK, "{}");
+            if (path.Contains("/observation-updates/", StringComparison.Ordinal) && path.Contains("/expectations", StringComparison.Ordinal))
+            {
+                createPath = path;
+                return Json(HttpStatusCode.BadRequest, "{\"detail\":\"trading_day_preset_unavailable\",\"status\":400}");
+            }
+            if (path.StartsWith("/internal/expectations", StringComparison.Ordinal))
+            {
+                listPath = path;
+                return Json(HttpStatusCode.OK, "{\"items\":[]}");
+            }
+            return Json(HttpStatusCode.OK, "{}");
+        });
+        using var client = factory.CreateClient();
+
+        using var create = await client.PostAsync(
+            "/api/app/observation-updates/11111111-1111-1111-1111-111111111111/expectations",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.BadRequest, create.StatusCode);
+        Assert.Contains("trading_day_preset_unavailable", await create.Content.ReadAsStringAsync());
+        Assert.Equal("/internal/observation-updates/11111111-1111-1111-1111-111111111111/expectations", createPath);
+
+        using var list = await client.GetAsync("/api/app/expectations?observationUpdateId=22222222-2222-2222-2222-222222222222");
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        Assert.Equal("/internal/expectations?observationUpdateId=22222222-2222-2222-2222-222222222222", listPath);
+    }
+
+    [Fact]
     public async Task Stock_page_succeeds_without_market_data()
     {
         using var factory = CreateFactory((service, _) => service switch

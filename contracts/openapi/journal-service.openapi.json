@@ -1221,6 +1221,326 @@
         ]
       }
     },
+    "/internal/observation-updates/{updateId}/expectations": {
+      "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "updateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpectationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/expectations": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "observationUpdateId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionResponseOfExpectationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/expectations/{id}": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpectationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpectationEditResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/expectations/{id}/invalidate": {
+      "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpectationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/internal/quick-note": {
       "post": {
         "tags": [
@@ -1761,6 +2081,20 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DiaryDaySummaryItem"
+            }
+          }
+        }
+      },
+      "CollectionResponseOfExpectationResponse": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpectationResponse"
             }
           }
         }
@@ -2326,6 +2660,220 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "ExpectationConfidence": {
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "ExpectationDeadlinePreset": {
+        "enum": [
+          "next_trading_day",
+          "five_trading_days",
+          null
+        ]
+      },
+      "ExpectationEditResponse": {
+        "required": [
+          "id",
+          "observationUpdateId",
+          "marketObservationId",
+          "journalDay",
+          "expectedBehavior",
+          "deadline",
+          "invalidationCondition",
+          "confidence",
+          "market",
+          "invalidatedAt",
+          "readiness",
+          "deadlineElapsed",
+          "createdAt",
+          "updatedAt",
+          "honestyReminderRequired"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observationUpdateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "marketObservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "journalDay": {
+            "type": "string",
+            "format": "date"
+          },
+          "expectedBehavior": {
+            "type": "string"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "invalidationCondition": {
+            "type": "string"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/ExpectationConfidence"
+          },
+          "market": {
+            "type": "string"
+          },
+          "invalidatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/ExpectationReadiness"
+          },
+          "deadlineElapsed": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "honestyReminderRequired": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ExpectationReadiness": {
+        "enum": [
+          "active",
+          "ready_for_review",
+          "reviewed"
+        ]
+      },
+      "ExpectationResponse": {
+        "required": [
+          "id",
+          "observationUpdateId",
+          "marketObservationId",
+          "journalDay",
+          "expectedBehavior",
+          "deadline",
+          "invalidationCondition",
+          "confidence",
+          "market",
+          "invalidatedAt",
+          "readiness",
+          "deadlineElapsed",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observationUpdateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "marketObservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "journalDay": {
+            "type": "string",
+            "format": "date"
+          },
+          "expectedBehavior": {
+            "type": "string"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "invalidationCondition": {
+            "type": "string"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/ExpectationConfidence"
+          },
+          "market": {
+            "type": "string"
+          },
+          "invalidatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/ExpectationReadiness"
+          },
+          "deadlineElapsed": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpectationWrite": {
+        "required": [
+          "expectedBehavior",
+          "deadline",
+          "invalidationCondition",
+          "confidence",
+          "market"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedBehavior": {
+            "type": "string"
+          },
+          "deadline": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "invalidationCondition": {
+            "type": "string"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/ExpectationConfidence"
+          },
+          "market": {
+            "type": "string"
+          },
+          "deadlinePreset": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExpectationDeadlinePreset"
+              }
+            ]
           }
         }
       },

@@ -7,6 +7,10 @@ internal static class JournalEndpoints
         EdgeTransport.MapProxy(app, "/api/app/market-observations", "journal", "/internal/market-observations", [HttpMethods.Get], preserveErrorBody: true).RequireAuthorization("diaryAccess");
         EdgeTransport.MapProxy(app, "/api/app/market-observations/today", "journal", "/internal/market-observations/today", [HttpMethods.Get]).RequireAuthorization("diaryAccess");
         EdgeTransport.MapProxy(app, "/api/app/observation-updates/{id:guid}", "journal", "/internal/observation-updates/{id}", [HttpMethods.Put]).RequireAuthorization("diaryAccess");
+        EdgeTransport.MapProxy(app, "/api/app/observation-updates/{updateId:guid}/expectations", "journal", "/internal/observation-updates/{updateId}/expectations", [HttpMethods.Post], preserveErrorBody: true).RequireAuthorization("diaryAccess");
+        EdgeTransport.MapProxy(app, "/api/app/expectations", "journal", "/internal/expectations", [HttpMethods.Get]).RequireAuthorization("diaryAccess");
+        EdgeTransport.MapProxy(app, "/api/app/expectations/{id:guid}", "journal", "/internal/expectations/{id}", [HttpMethods.Get, HttpMethods.Put], preserveErrorBody: true).RequireAuthorization("diaryAccess");
+        EdgeTransport.MapProxy(app, "/api/app/expectations/{id:guid}/invalidate", "journal", "/internal/expectations/{id}/invalidate", [HttpMethods.Post]).RequireAuthorization("diaryAccess");
         EdgeTransport.MapProxy(app, "/api/app/diaries", "journal", "/internal/diaries", [HttpMethods.Get, HttpMethods.Post]).RequireAuthorization("diaryAccess");
         EdgeTransport.MapProxy(app, "/api/app/diaries/{id:guid}", "journal", "/internal/diaries/{id}", [HttpMethods.Get, HttpMethods.Put, HttpMethods.Delete]).RequireAuthorization("diaryAccess");
         EdgeTransport.MapProxy(app, "/api/app/diaries/{diaryId:guid}/transactions", "journal", "/internal/diaries/{diaryId}/transactions", [HttpMethods.Get, HttpMethods.Post]).RequireAuthorization("diaryAccess");

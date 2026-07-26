@@ -19,6 +19,7 @@ export const queryKeys = {
   settings: ['settings'] as const,
   dashboard: ['dashboard'] as const,
   todayObservation: ['market-observations', 'today'] as const,
+  expectations: ['expectations'] as const,
   instrumentDirectory: ['market', 'instruments'] as const,
   observationHistory: (filters: api.ObservationSearchFilters) => ['market-observations', 'history', filters.query ?? '', filters.from ?? '', filters.to ?? '', filters.subjectType ?? '', filters.subject ?? '', filters.instrumentId ?? '', filters.market ?? '', filters.symbol ?? '', filters.tag ?? '', filters.author ?? ''] as const,
   diaries: ['diaries'] as const,
@@ -58,6 +59,7 @@ export const useBootstrapQuery = (enabled = true) => useQuery({ queryKey: queryK
 export const useSettingsQuery = () => useQuery({ queryKey: queryKeys.settings, queryFn: api.getSettings })
 export const useDashboardQuery = () => useQuery({ queryKey: queryKeys.dashboard, queryFn: api.getDashboard })
 export const useTodayObservationQuery = () => useQuery({ queryKey: queryKeys.todayObservation, queryFn: api.getTodayMarketObservation, refetchInterval: 60_000 })
+export const useExpectationsQuery = () => useQuery({ queryKey: queryKeys.expectations, queryFn: api.getExpectations })
 export const useInstrumentDirectoryQuery = () => useQuery({ queryKey: queryKeys.instrumentDirectory, queryFn: api.getInstrumentDirectory, staleTime: 300_000 })
 export const useObservationHistoryQuery = (filters: api.ObservationSearchFilters) => useInfiniteQuery({
   queryKey: queryKeys.observationHistory(filters),
@@ -173,6 +175,23 @@ export const useDiaryReviewItemsQuery = (from: string, to: string, status: api.D
 
 const calendarPrefix = ['calendar'] as const
 const invalidateCalendar = (client: ReturnType<typeof useQueryClient>) => client.invalidateQueries({ queryKey: calendarPrefix })
+
+export function useCreateExpectationMutation() {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: ({ updateId, body, key }: { updateId: string; body: api.ExpectationWrite; key: string }) => api.createExpectation(updateId, body, key), onSuccess: async () => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.expectations }),
+      client.invalidateQueries({ queryKey: queryKeys.todayObservation }),
+      invalidateCalendar(client),
+    ])
+  } })
+}
+
+export const useUpdateExpectationMutation = () => useInvalidatingMutation(
+  ({ id, body }: { id: string; body: api.ExpectationWrite }) => api.updateExpectation(id, body),
+  [queryKeys.expectations, calendarPrefix],
+)
+export const useInvalidateExpectationMutation = () => useInvalidatingMutation(api.invalidateExpectation, [queryKeys.expectations, calendarPrefix])
 
 export function useQuickNoteMutation() {
   const client = useQueryClient()

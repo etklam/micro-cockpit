@@ -52,6 +52,47 @@ record MarketObservationResponse(Guid Id, DateOnly JournalDay, string Timezone, 
 record ObservationSearchItemResponse(Guid MarketObservationId, DateOnly JournalDay, Guid AuthorId, ObservationUpdateResponse Update);
 record ObservationSearchPage(IReadOnlyList<ObservationSearchItemResponse> Items, string? NextCursor);
 record MarketObservationDaySummaryItem(DateOnly Date, Guid MarketObservationId, long UpdateCount, long? ReadyForReviewCount);
+enum ExpectationConfidence { low, medium, high }
+enum ExpectationReadiness { active, ready_for_review, reviewed }
+enum ExpectationDeadlinePreset { next_trading_day, five_trading_days }
+record ExpectationWrite(
+    string ExpectedBehavior,
+    DateTimeOffset? Deadline,
+    string InvalidationCondition,
+    ExpectationConfidence Confidence,
+    string Market,
+    ExpectationDeadlinePreset? DeadlinePreset = null);
+record ExpectationResponse(
+    Guid Id,
+    Guid ObservationUpdateId,
+    Guid MarketObservationId,
+    DateOnly JournalDay,
+    string ExpectedBehavior,
+    DateTime Deadline,
+    string InvalidationCondition,
+    ExpectationConfidence Confidence,
+    string Market,
+    DateTime? InvalidatedAt,
+    ExpectationReadiness Readiness,
+    bool DeadlineElapsed,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+record ExpectationEditResponse(
+    Guid Id,
+    Guid ObservationUpdateId,
+    Guid MarketObservationId,
+    DateOnly JournalDay,
+    string ExpectedBehavior,
+    DateTime Deadline,
+    string InvalidationCondition,
+    ExpectationConfidence Confidence,
+    string Market,
+    DateTime? InvalidatedAt,
+    ExpectationReadiness Readiness,
+    bool DeadlineElapsed,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    bool HonestyReminderRequired);
 record DiaryDaySummaryItem(DateOnly LocalDate, long DiaryCount, long TransactionCount);
 record CollectionResponse<T>(List<T> Items);
 /// <summary>Sanitized diary projection for partner compare. No transactions/reviews/internal IDs.</summary>

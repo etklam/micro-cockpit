@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw'
 import { BrowserRouter } from 'react-router-dom'
 import { expect, test } from 'vitest'
 import App from '../App'
-import type { ObservationUpdateResponse, ObservationUpdateWrite } from '../generated/edge'
+import type { ExpectationResponse, ExpectationWrite, ObservationUpdateResponse, ObservationUpdateWrite } from '../generated/edge'
 import { AuthProvider } from '../auth/AuthProvider'
 import { I18nProvider } from '../i18n'
 import { server } from './setup'
@@ -30,6 +30,7 @@ function authenticatedHandlers() {
     }),
     http.get('/api/app/diaries', () => HttpResponse.json({ items: [], nextCursor: null })),
     http.get('/api/app/market-observations/today', () => new HttpResponse(null, { status: 404 })),
+    http.get('/api/app/expectations', () => HttpResponse.json({ items: [] })),
     http.get('/api/app/diary-review-summary', () => HttpResponse.json({ reviewedCount: 0, averageDisciplineScore: null, averageExecutionScore: null, emotionCounts: {}, processAssessmentCounts: {}, topMistakeTags: [] })),
     http.get('/api/app/diary-review-items', () => HttpResponse.json({ items: [], nextCursor: null })),
     http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
@@ -117,6 +118,7 @@ test('mobile Today captures and edits observation updates with an honesty remind
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
   window.dispatchEvent(new Event('resize'))
   let savedWrite: ObservationUpdateWrite | null = null
+  let expectationCreates = 0
   let updates: ObservationUpdateResponse[] = [{
     id: 'update-1', content: 'Opening breadth was weak', recordedAt: '2026-07-16T13:30:00Z', updatedAt: '2026-07-16T13:30:00Z',
     signal: null, interpretation: null, mentalState: null, tags: [], primarySubject: null, relatedSubjects: [], evidence: null,
@@ -130,6 +132,7 @@ test('mobile Today captures and edits observation updates with an honesty remind
       contractVersion: 1,
       items: [{ instrumentId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', currency: 'USD', timezone: 'America/New_York' }],
     })),
+    http.post('/api/app/observation-updates/:id/expectations', () => { expectationCreates += 1; return HttpResponse.json({}, { status: 201 }) }),
     http.post('/api/app/quick-observations', async ({ request }) => {
       const body = await request.json() as { content: string }
       updates = [...updates, {
@@ -162,6 +165,7 @@ test('mobile Today captures and edits observation updates with an honesty remind
   await userEvent.type(screen.getByLabelText('What did you notice today?'), 'Buyers returned near the close')
   await userEvent.click(screen.getByRole('button', { name: 'Save observation' }))
   expect(await screen.findByText('Buyers returned near the close')).toBeInTheDocument()
+  expect(expectationCreates).toBe(0)
 
   await userEvent.click(screen.getAllByRole('button', { name: 'Edit observation' })[0])
   expect(screen.getByText(/Editing the past can weaken your self-review/)).toBeInTheDocument()
@@ -193,6 +197,212 @@ test('mobile Today captures and edits observation updates with an honesty remind
   expect(updatedItem).toHaveTextContent('Your excerpt: Advancers led decliners.')
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 })
   window.dispatchEvent(new Event('resize'))
+}, 10_000)
+
+test('Today associates Expectations with source updates and highlights those ready for review', async () => {
+  let expectationRequests = 0
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/market/symbols', () => HttpResponse.json({ contractVersion: 1, items: [] })),
+    http.get('/api/app/market-observations/today', () => HttpResponse.json({
+      id: 'observation-1', journalDay: '2026-07-16', timezone: 'Asia/Taipei', rollover: '00:00',
+      updates: [
+        { id: 'update-1', content: 'Breadth weakened into the close', recordedAt: '2026-07-16T13:30:00Z', updatedAt: '2026-07-16T13:30:00Z', signal: null, interpretation: null, mentalState: null, tags: [], primarySubject: null, relatedSubjects: [], evidence: null },
+        { id: 'update-2', content: 'Semiconductors held support', recordedAt: '2026-07-16T14:00:00Z', updatedAt: '2026-07-16T14:00:00Z', signal: null, interpretation: null, mentalState: null, tags: [], primarySubject: null, relatedSubjects: [], evidence: null },
+      ],
+    })),
+    http.get('/api/app/expectations', ({ request }) => {
+      expectationRequests += 1
+      expect(new URL(request.url).search).toBe('')
+      return HttpResponse.json({ items: [
+        { id: 'expectation-1', observationUpdateId: 'update-1', marketObservationId: 'observation-1', journalDay: '2026-07-16', expectedBehavior: 'Breadth recovers above 50%', deadline: '2026-07-18', invalidationCondition: 'Breadth closes below 35%', confidence: 'medium', market: 'US', invalidatedAt: null, readiness: 'active', deadlineElapsed: false, createdAt: '2026-07-16T13:31:00Z', updatedAt: '2026-07-16T13:31:00Z' },
+        { id: 'expectation-2', observationUpdateId: 'update-2', marketObservationId: 'observation-1', journalDay: '2026-07-16', expectedBehavior: 'Semiconductors break the weekly high', deadline: '2026-07-16', invalidationCondition: 'SOXX loses support', confidence: 'high', market: 'US', invalidatedAt: null, readiness: 'ready_for_review', deadlineElapsed: true, createdAt: '2026-07-16T14:01:00Z', updatedAt: '2026-07-16T14:01:00Z' },
+      ] })
+    }),
+  )
+
+  renderApp('/today')
+  const firstUpdate = (await screen.findByText('Breadth weakened into the close')).closest('li')!
+  const secondUpdate = screen.getByText('Semiconductors held support').closest('li')!
+  expect(within(firstUpdate).getByText('Breadth recovers above 50%')).toBeInTheDocument()
+  expect(within(firstUpdate).queryByText('Semiconductors break the weekly high')).not.toBeInTheDocument()
+  expect(within(secondUpdate).getByText('Semiconductors break the weekly high')).toBeInTheDocument()
+  expect(within(secondUpdate).queryByText('Breadth recovers above 50%')).not.toBeInTheDocument()
+  expect(secondUpdate).toHaveTextContent('Invalidation condition: SOXX loses support')
+  expect(secondUpdate).toHaveTextContent('Confidence: high')
+  expect(secondUpdate).toHaveTextContent('Market: US')
+  expect(secondUpdate).toHaveTextContent('Deadline: 2026-07-16')
+  expect(secondUpdate).toHaveTextContent('Readiness: Ready for review')
+
+  const readySection = screen.getByRole('heading', { name: 'Ready for review' }).closest('section')!
+  expect(within(readySection).getByText('Semiconductors break the weekly high')).toBeInTheDocument()
+  expect(within(readySection).queryByText('Breadth recovers above 50%')).not.toBeInTheDocument()
+  expect(expectationRequests).toBe(1)
+})
+
+test('Today creates an optional Expectation with an account-local custom deadline', async () => {
+  let items: ExpectationResponse[] = []
+  let posted: ExpectationWrite | null = null
+  let idempotencyKey: string | null = null
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/market/symbols', () => HttpResponse.json({ contractVersion: 1, items: [] })),
+    http.get('/api/app/market-observations/today', () => HttpResponse.json({
+      id: 'observation-1', journalDay: '2026-07-16', timezone: 'Asia/Taipei', rollover: '00:00',
+      updates: [{ id: 'update-1', content: 'Hong Kong momentum improved', recordedAt: '2026-07-16T13:30:00Z', updatedAt: '2026-07-16T13:30:00Z', signal: null, interpretation: null, mentalState: null, tags: [], primarySubject: null, relatedSubjects: [], evidence: null }],
+    })),
+    http.get('/api/app/expectations', () => HttpResponse.json({ items })),
+    http.post('/api/app/observation-updates/:id/expectations', async ({ params, request }) => {
+      posted = await request.json() as ExpectationWrite
+      idempotencyKey = request.headers.get('Idempotency-Key')
+      const created: ExpectationResponse = {
+        id: 'expectation-new', observationUpdateId: String(params.id), marketObservationId: 'observation-1', journalDay: '2026-07-16',
+        expectedBehavior: posted.expectedBehavior, deadline: posted.deadline!, invalidationCondition: posted.invalidationCondition,
+        confidence: posted.confidence, market: posted.market, invalidatedAt: null, readiness: 'active', deadlineElapsed: false,
+        createdAt: '2026-07-16T14:00:00Z', updatedAt: '2026-07-16T14:00:00Z',
+      }
+      items = [...items, created]
+      return HttpResponse.json(created, { status: 201 })
+    }),
+  )
+
+  renderApp('/today')
+  const update = (await screen.findByText('Hong Kong momentum improved')).closest('li')!
+  await userEvent.click(within(update).getByRole('button', { name: 'Add expectation' }))
+  await userEvent.type(within(update).getByLabelText('Expected behavior'), 'HSI holds above the breakout')
+  await userEvent.type(within(update).getByLabelText('Invalidation condition'), 'HSI closes below support')
+  await userEvent.selectOptions(within(update).getByLabelText('Confidence'), 'high')
+  await userEvent.type(within(update).getByLabelText('Market'), ' hk ')
+  await userEvent.type(within(update).getByLabelText('Deadline'), '2026-07-17T09:30')
+  await userEvent.click(within(update).getByRole('button', { name: 'Save expectation' }))
+
+  await waitFor(() => expect(posted).toEqual({
+    expectedBehavior: 'HSI holds above the breakout', invalidationCondition: 'HSI closes below support', confidence: 'high',
+    market: 'HK', deadline: '2026-07-17T01:30:00.000Z', deadlinePreset: null,
+  }))
+  expect(idempotencyKey).toBeTruthy()
+  expect(await within(update).findByText('HSI holds above the breakout')).toBeInTheDocument()
+})
+
+test('Today offers trading-day presets only for markets with a supported calendar', async () => {
+  let posted: ExpectationWrite | null = null
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/market/symbols', () => HttpResponse.json({ contractVersion: 1, items: [] })),
+    http.get('/api/app/market-observations/today', () => HttpResponse.json({
+      id: 'observation-1', journalDay: '2026-07-16', timezone: 'Asia/Taipei', rollover: '00:00',
+      updates: [{ id: 'update-1', content: 'US breadth improved', recordedAt: '2026-07-16T13:30:00Z', updatedAt: '2026-07-16T13:30:00Z', signal: null, interpretation: null, mentalState: null, tags: [], primarySubject: null, relatedSubjects: [], evidence: null }],
+    })),
+    http.post('/api/app/observation-updates/:id/expectations', async ({ request }) => {
+      posted = await request.json() as ExpectationWrite
+      return HttpResponse.json({
+        id: 'expectation-new', observationUpdateId: 'update-1', marketObservationId: 'observation-1', journalDay: '2026-07-16',
+        expectedBehavior: posted.expectedBehavior, deadline: '2026-07-17T20:00:00Z', invalidationCondition: posted.invalidationCondition,
+        confidence: posted.confidence, market: posted.market, invalidatedAt: null, readiness: 'active', deadlineElapsed: false,
+        createdAt: '2026-07-16T14:00:00Z', updatedAt: '2026-07-16T14:00:00Z',
+      }, { status: 201 })
+    }),
+  )
+
+  renderApp('/today')
+  const update = (await screen.findByText('US breadth improved')).closest('li')!
+  await userEvent.click(within(update).getByRole('button', { name: 'Add expectation' }))
+  const market = within(update).getByLabelText('Market')
+  await userEvent.type(market, 'US')
+  const deadlineMode = within(update).getByLabelText('Deadline type')
+  expect(within(deadlineMode).getByRole('option', { name: 'Next trading day' })).toBeInTheDocument()
+  expect(within(deadlineMode).getByRole('option', { name: 'Five trading days' })).toBeInTheDocument()
+  await userEvent.selectOptions(deadlineMode, 'next_trading_day')
+
+  await userEvent.clear(market)
+  await userEvent.type(market, 'JP')
+  expect(deadlineMode).toHaveValue('custom')
+  expect(within(deadlineMode).queryByRole('option', { name: 'Next trading day' })).not.toBeInTheDocument()
+  expect(within(update).getByRole('button', { name: 'Save expectation' })).toBeDisabled()
+
+  await userEvent.clear(market)
+  await userEvent.type(market, 'US')
+  await userEvent.selectOptions(deadlineMode, 'next_trading_day')
+  await userEvent.type(within(update).getByLabelText('Expected behavior'), 'Breadth remains above 60%')
+  await userEvent.type(within(update).getByLabelText('Invalidation condition'), 'Breadth closes below 45%')
+  await userEvent.click(within(update).getByRole('button', { name: 'Save expectation' }))
+
+  await waitFor(() => expect(posted).toEqual({
+    expectedBehavior: 'Breadth remains above 60%', invalidationCondition: 'Breadth closes below 45%', confidence: 'medium',
+    market: 'US', deadline: null, deadlinePreset: 'next_trading_day',
+  }))
+})
+
+test('Today edits an elapsed Expectation with a non-blocking honesty reminder', async () => {
+  let item: ExpectationResponse = {
+    id: 'expectation-1', observationUpdateId: 'update-1', marketObservationId: 'observation-1', journalDay: '2026-07-16',
+    expectedBehavior: 'Breadth remains above 50%', deadline: '2026-07-16T08:00:00Z', invalidationCondition: 'Breadth closes below 35%',
+    confidence: 'medium', market: 'US', invalidatedAt: null, readiness: 'ready_for_review', deadlineElapsed: true,
+    createdAt: '2026-07-15T14:00:00Z', updatedAt: '2026-07-15T14:00:00Z',
+  }
+  let posted: ExpectationWrite | null = null
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/market/symbols', () => HttpResponse.json({ contractVersion: 1, items: [] })),
+    http.get('/api/app/market-observations/today', () => HttpResponse.json({
+      id: 'observation-1', journalDay: '2026-07-16', timezone: 'Asia/Taipei', rollover: '00:00',
+      updates: [{ id: 'update-1', content: 'Breadth update', recordedAt: '2026-07-16T13:30:00Z', updatedAt: '2026-07-16T13:30:00Z', signal: null, interpretation: null, mentalState: null, tags: [], primarySubject: null, relatedSubjects: [], evidence: null }],
+    })),
+    http.get('/api/app/expectations', () => HttpResponse.json({ items: [item] })),
+    http.put('/api/app/expectations/:id', async ({ request }) => {
+      posted = await request.json() as ExpectationWrite
+      item = { ...item, ...posted, deadline: posted.deadline!, confidence: posted.confidence, updatedAt: '2026-07-16T14:00:00Z' }
+      return HttpResponse.json({ ...item, honestyReminderRequired: true })
+    }),
+  )
+
+  renderApp('/today')
+  const update = (await screen.findByText('Breadth update')).closest('li')!
+  await userEvent.click(within(update).getByRole('button', { name: 'Edit expectation' }))
+  expect(within(update).getByRole('note')).toHaveTextContent('Extending an elapsed deadline can weaken your self-review')
+  const behavior = within(update).getByLabelText('Expected behavior')
+  await userEvent.clear(behavior)
+  await userEvent.type(behavior, 'Breadth remains above 60%')
+  const save = within(update).getByRole('button', { name: 'Save expectation' })
+  expect(save).toBeEnabled()
+  await userEvent.click(save)
+
+  await waitFor(() => expect(posted).toEqual({
+    expectedBehavior: 'Breadth remains above 60%', invalidationCondition: 'Breadth closes below 35%', confidence: 'medium',
+    market: 'US', deadline: '2026-07-16T08:00:00.000Z', deadlinePreset: null,
+  }))
+  expect(await within(update).findByText('Breadth remains above 60%')).toBeInTheDocument()
+})
+
+test('Today marks an active Expectation invalidated and moves it to ready for review', async () => {
+  let invalidated = false
+  const active: ExpectationResponse = {
+    id: 'expectation-1', observationUpdateId: 'update-1', marketObservationId: 'observation-1', journalDay: '2026-07-16',
+    expectedBehavior: 'Breadth remains above 50%', deadline: '2026-07-18T08:00:00Z', invalidationCondition: 'Breadth closes below 35%',
+    confidence: 'medium', market: 'US', invalidatedAt: null, readiness: 'active', deadlineElapsed: false,
+    createdAt: '2026-07-15T14:00:00Z', updatedAt: '2026-07-15T14:00:00Z',
+  }
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/market/symbols', () => HttpResponse.json({ contractVersion: 1, items: [] })),
+    http.get('/api/app/market-observations/today', () => HttpResponse.json({
+      id: 'observation-1', journalDay: '2026-07-16', timezone: 'Asia/Taipei', rollover: '00:00',
+      updates: [{ id: 'update-1', content: 'Breadth update', recordedAt: '2026-07-16T13:30:00Z', updatedAt: '2026-07-16T13:30:00Z', signal: null, interpretation: null, mentalState: null, tags: [], primarySubject: null, relatedSubjects: [], evidence: null }],
+    })),
+    http.get('/api/app/expectations', () => HttpResponse.json({ items: [invalidated ? { ...active, invalidatedAt: '2026-07-16T14:00:00Z', readiness: 'ready_for_review', updatedAt: '2026-07-16T14:00:00Z' } : active] })),
+    http.post('/api/app/expectations/:id/invalidate', () => {
+      invalidated = true
+      return HttpResponse.json({ ...active, invalidatedAt: '2026-07-16T14:00:00Z', readiness: 'ready_for_review', updatedAt: '2026-07-16T14:00:00Z' })
+    }),
+  )
+
+  renderApp('/today')
+  const update = (await screen.findByText('Breadth update')).closest('li')!
+  await userEvent.click(within(update).getByRole('button', { name: 'Mark invalidation occurred' }))
+  await waitFor(() => expect(invalidated).toBe(true))
+  expect(await screen.findByRole('heading', { name: 'Ready for review' })).toBeInTheDocument()
+  expect(within(update).getByText(/Readiness:/).parentElement).toHaveTextContent('Ready for review')
+  expect(within(update).queryByRole('button', { name: 'Mark invalidation occurred' })).not.toBeInTheDocument()
 })
 
 test('Today enrichment controls are available in Traditional Chinese', async () => {
@@ -212,6 +422,12 @@ test('Today enrichment controls are available in Traditional Chinese', async () 
   expect(screen.getByLabelText('詮釋')).toBeInTheDocument()
   expect(screen.getByLabelText('主要觀察主體類型')).toBeInTheDocument()
   expect(screen.getByLabelText('證據網址')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: '取消' }))
+  await userEvent.click(screen.getByRole('button', { name: '建立預期' }))
+  expect(screen.getByLabelText('預期走勢')).toBeInTheDocument()
+  expect(screen.getByLabelText('失效條件')).toBeInTheDocument()
+  expect(screen.getByLabelText('期限類型')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '儲存預期' })).toBeInTheDocument()
 })
 
 test('mobile Today opens paginated observation history and an Instrument timeline', async () => {

@@ -1542,6 +1542,247 @@
         "operationId": "put_api_app_observation_updates_id"
       }
     },
+    "/api/app/observation-updates/{updateId}/expectations": {
+      "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "updateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpectationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "post_api_app_observation_updates_updateId_expectations"
+      }
+    },
+    "/api/app/expectations": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "observationUpdateId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionResponseOfExpectationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "get_api_app_expectations"
+      }
+    },
+    "/api/app/expectations/{id}": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpectationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "get_api_app_expectations_id"
+      },
+      "put": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpectationEditResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "put_api_app_expectations_id"
+      }
+    },
+    "/api/app/expectations/{id}/invalidate": {
+      "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpectationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "post_api_app_expectations_id_invalidate"
+      }
+    },
     "/api/app/diaries": {
       "get": {
         "tags": [
@@ -4752,6 +4993,20 @@
           }
         }
       },
+      "CollectionResponseOfExpectationResponse": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpectationResponse"
+            }
+          }
+        }
+      },
       "CollectionResponseOfInvitationListItem": {
         "required": [
           "items"
@@ -5764,6 +6019,220 @@
           "open",
           "close"
         ]
+      },
+      "ExpectationConfidence": {
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "ExpectationDeadlinePreset": {
+        "enum": [
+          "next_trading_day",
+          "five_trading_days",
+          null
+        ]
+      },
+      "ExpectationEditResponse": {
+        "required": [
+          "id",
+          "observationUpdateId",
+          "marketObservationId",
+          "journalDay",
+          "expectedBehavior",
+          "deadline",
+          "invalidationCondition",
+          "confidence",
+          "market",
+          "invalidatedAt",
+          "readiness",
+          "deadlineElapsed",
+          "createdAt",
+          "updatedAt",
+          "honestyReminderRequired"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observationUpdateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "marketObservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "journalDay": {
+            "type": "string",
+            "format": "date"
+          },
+          "expectedBehavior": {
+            "type": "string"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "invalidationCondition": {
+            "type": "string"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/ExpectationConfidence"
+          },
+          "market": {
+            "type": "string"
+          },
+          "invalidatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/ExpectationReadiness"
+          },
+          "deadlineElapsed": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "honestyReminderRequired": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ExpectationReadiness": {
+        "enum": [
+          "active",
+          "ready_for_review",
+          "reviewed"
+        ]
+      },
+      "ExpectationResponse": {
+        "required": [
+          "id",
+          "observationUpdateId",
+          "marketObservationId",
+          "journalDay",
+          "expectedBehavior",
+          "deadline",
+          "invalidationCondition",
+          "confidence",
+          "market",
+          "invalidatedAt",
+          "readiness",
+          "deadlineElapsed",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observationUpdateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "marketObservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "journalDay": {
+            "type": "string",
+            "format": "date"
+          },
+          "expectedBehavior": {
+            "type": "string"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "invalidationCondition": {
+            "type": "string"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/ExpectationConfidence"
+          },
+          "market": {
+            "type": "string"
+          },
+          "invalidatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/ExpectationReadiness"
+          },
+          "deadlineElapsed": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpectationWrite": {
+        "required": [
+          "expectedBehavior",
+          "deadline",
+          "invalidationCondition",
+          "confidence",
+          "market"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedBehavior": {
+            "type": "string"
+          },
+          "deadline": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "invalidationCondition": {
+            "type": "string"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/ExpectationConfidence"
+          },
+          "market": {
+            "type": "string"
+          },
+          "deadlinePreset": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExpectationDeadlinePreset"
+              }
+            ]
+          }
+        }
       },
       "HealthWrite": {
         "required": [

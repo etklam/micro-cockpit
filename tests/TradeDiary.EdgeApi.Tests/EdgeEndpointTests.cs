@@ -44,6 +44,11 @@ public sealed class EdgeAuthorizationTests
     [InlineData("POST", "/api/app/quick-observations", "diary:read", HttpStatusCode.Forbidden)]
     [InlineData("POST", "/api/app/quick-observations", "diary:write", HttpStatusCode.OK)]
     [InlineData("PUT", "/api/app/observation-updates/11111111-1111-1111-1111-111111111111", "diary:write", HttpStatusCode.OK)]
+    [InlineData("POST", "/api/app/observation-updates/11111111-1111-1111-1111-111111111111/expectations", "diary:read", HttpStatusCode.Forbidden)]
+    [InlineData("POST", "/api/app/observation-updates/11111111-1111-1111-1111-111111111111/expectations", "diary:write", HttpStatusCode.OK)]
+    [InlineData("GET", "/api/app/expectations?observationUpdateId=11111111-1111-1111-1111-111111111111", "diary:read", HttpStatusCode.OK)]
+    [InlineData("PUT", "/api/app/expectations/11111111-1111-1111-1111-111111111111", "diary:write", HttpStatusCode.OK)]
+    [InlineData("POST", "/api/app/expectations/11111111-1111-1111-1111-111111111111/invalidate", "diary:write", HttpStatusCode.OK)]
     [InlineData("POST", "/api/app/tools/profit-loss", "research:read", HttpStatusCode.Forbidden)]
     public async Task Agent_scope_matrix_is_enforced(string method, string path, string scopes, HttpStatusCode expected)
     {

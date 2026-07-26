@@ -15,6 +15,7 @@ export type CapabilityStatus = "available" | "empty" | "unavailable"
 export type CollectionResponseOfAuditResponse = { "items": Array<AuditResponse> }
 export type CollectionResponseOfDiaryAlertResponse = { "items": Array<DiaryAlertResponse> }
 export type CollectionResponseOfDisciplineResponse = { "items": Array<DisciplineResponse> }
+export type CollectionResponseOfExpectationResponse = { "items": Array<ExpectationResponse> }
 export type CollectionResponseOfInvitationListItem = { "items": Array<InvitationListItem> }
 export type CollectionResponseOfJobResponse = { "items": Array<JobResponse> }
 export type CollectionResponseOfPostResponse = { "items": Array<PostResponse> }
@@ -46,6 +47,12 @@ export type DisciplineWrite = { "content": string }
 export type EdgeProblemDetails = { "code": string; "title": string; "status": number; "detail": string; "correlationId": string }
 export type EtfSnapshotResponse = { "symbol": string; "label": string; "sector": null | string; "close": number | null; "return2w": number | null; "return1m": number | null; "return3m": number | null; "rank2w": null | number | string; "rankGroup": string; "percentile2w": number | null; "aboveMa20": null | boolean; "aboveMa50": null | boolean; "aboveMa200": null | boolean; "status": string }
 export type EvaluationPrice = "open" | "close"
+export type ExpectationConfidence = "low" | "medium" | "high"
+export type ExpectationDeadlinePreset = "next_trading_day" | "five_trading_days" | null
+export type ExpectationEditResponse = { "id": string; "observationUpdateId": string; "marketObservationId": string; "journalDay": string; "expectedBehavior": string; "deadline": string; "invalidationCondition": string; "confidence": ExpectationConfidence; "market": string; "invalidatedAt": null | string; "readiness": ExpectationReadiness; "deadlineElapsed": boolean; "createdAt": string; "updatedAt": string; "honestyReminderRequired": boolean }
+export type ExpectationReadiness = "active" | "ready_for_review" | "reviewed"
+export type ExpectationResponse = { "id": string; "observationUpdateId": string; "marketObservationId": string; "journalDay": string; "expectedBehavior": string; "deadline": string; "invalidationCondition": string; "confidence": ExpectationConfidence; "market": string; "invalidatedAt": null | string; "readiness": ExpectationReadiness; "deadlineElapsed": boolean; "createdAt": string; "updatedAt": string }
+export type ExpectationWrite = { "expectedBehavior": string; "deadline": null | string; "invalidationCondition": string; "confidence": ExpectationConfidence; "market": string; "deadlinePreset"?: null | ExpectationDeadlinePreset }
 export type HealthWrite = { "serviceName": string; "status": string }
 export type InvitationCreatedResponse = { "id": string; "code": string; "expiresAt": string }
 export type InvitationListItem = { "id": string; "status": string; "expiresAt": string; "createdAt": string }
@@ -200,6 +207,11 @@ export const postApiAppQuickObservations = (body: QuickObservationWrite, extra?:
 export const getApiAppMarketObservations = (query: { "query"?: string; "from"?: string; "to"?: string; "subjectType"?: ObservationSubjectType; "subject"?: string; "instrumentId"?: string; "market"?: string; "symbol"?: string; "tag"?: string; "author"?: string; "cursor"?: string; "limit"?: number | string }, extra?: RequestInit) => request<ObservationSearchPage>("/api/app/market-observations" + withQuery(query), { method: "GET", ...extra })
 export const getApiAppMarketObservationsToday = (extra?: RequestInit) => request<MarketObservationResponse>("/api/app/market-observations/today", { method: "GET", ...extra })
 export const putApiAppObservationUpdatesId = (id: string, body: ObservationUpdateWrite, extra?: RequestInit) => request<ObservationUpdateEditResponse>(`/api/app/observation-updates/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const postApiAppObservationUpdatesUpdateIdExpectations = (updateId: string, body: ExpectationWrite, extra?: RequestInit) => request<ExpectationResponse>(`/api/app/observation-updates/${encodeURIComponent(String(updateId))}/expectations`, { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppExpectations = (query: { "observationUpdateId"?: string }, extra?: RequestInit) => request<CollectionResponseOfExpectationResponse>("/api/app/expectations" + withQuery(query), { method: "GET", ...extra })
+export const getApiAppExpectationsId = (id: string, extra?: RequestInit) => request<ExpectationResponse>(`/api/app/expectations/${encodeURIComponent(String(id))}`, { method: "GET", ...extra })
+export const putApiAppExpectationsId = (id: string, body: ExpectationWrite, extra?: RequestInit) => request<ExpectationEditResponse>(`/api/app/expectations/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const postApiAppExpectationsIdInvalidate = (id: string, extra?: RequestInit) => request<ExpectationResponse>(`/api/app/expectations/${encodeURIComponent(String(id))}/invalidate`, { method: "POST", ...extra })
 export const getApiAppDiaries = (query: { "query"?: string; "from"?: string; "to"?: string; "reviewStatus"?: string; "symbol"?: string; "tag"?: string; "cursor"?: string; "limit"?: number | string }, extra?: RequestInit) => request<DiaryPage>("/api/app/diaries" + withQuery(query), { method: "GET", ...extra })
 export const postApiAppDiaries = (body: DiaryWrite, extra?: RequestInit) => request<DiaryResponse>("/api/app/diaries", { method: "POST", body: JSON.stringify(body), ...extra })
 export const getApiAppDiariesId = (id: string, extra?: RequestInit) => request<DiaryResponse>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "GET", ...extra })

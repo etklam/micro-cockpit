@@ -37,6 +37,10 @@ export type DiaryReviewFilterStatus = NonNullable<G.DiaryReviewFilterStatus>
 export type DiaryReviewAssessmentFilter = NonNullable<G.DiaryReviewAssessmentFilter>
 export type MarketObservation = G.MarketObservationResponse
 export type ObservationUpdate = G.ObservationUpdateResponse
+export type Expectation = G.ExpectationResponse
+export type ExpectationWrite = G.ExpectationWrite
+export type ExpectationConfidence = G.ExpectationConfidence
+export type ExpectationDeadlinePreset = NonNullable<G.ExpectationDeadlinePreset>
 export type ObservationUpdateWrite = G.ObservationUpdateWrite
 export type ObservationSubjectWrite = G.ObservationSubjectWrite
 export type ObservationSearchItem = G.ObservationSearchItemResponse
@@ -71,6 +75,11 @@ export const saveQuickObservation = (content: string, key?: string) =>
   G.postApiAppQuickObservations({ content }, idempotencyHeader(key))
 export const updateObservation = (id: string, body: ObservationUpdateWrite) =>
   G.putApiAppObservationUpdatesId(id, body)
+export const getExpectations = async () => (await G.getApiAppExpectations({})).items
+export const createExpectation = (updateId: string, body: ExpectationWrite, key?: string) =>
+  G.postApiAppObservationUpdatesUpdateIdExpectations(updateId, body, idempotencyHeader(key))
+export const updateExpectation = (id: string, body: ExpectationWrite) => G.putApiAppExpectationsId(id, body)
+export const invalidateExpectation = (id: string) => G.postApiAppExpectationsIdInvalidate(id)
 export const getInstrumentDirectory = async () => (await G.getApiAppMarketSymbols()).items
 export const getObservationHistory = (filters: ObservationSearchFilters, cursor?: string) => G.getApiAppMarketObservations({ ...filters, cursor, limit: 20 })
 export type DiaryPage = G.DiaryPage

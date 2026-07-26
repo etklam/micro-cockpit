@@ -206,7 +206,120 @@ public sealed class QuickObservationApiTests
         var days = await client.GetFromJsonAsync<JsonElement>("/internal/market-observation-day-summary?from=2026-07-01&to=2026-07-31");
         Assert.Equal(2, days.GetProperty("items").GetArrayLength());
         Assert.Equal(1, days.GetProperty("items")[0].GetProperty("updateCount").GetInt64());
-        Assert.Equal(JsonValueKind.Null, days.GetProperty("items")[0].GetProperty("readyForReviewCount").ValueKind);
+        Assert.Equal(0, days.GetProperty("items")[0].GetProperty("readyForReviewCount").GetInt64());
+    }
+
+    [Fact]
+    public async Task Owner_can_optionally_create_an_active_expectation_from_an_observation_update()
+    {
+        var now = new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero);
+        await using var fixture = await Fixture.StartAsync(now);
+        var owner = Guid.NewGuid();
+        using var client = fixture.Client(owner);
+        using var observation = await Post(client, "Breadth is improving", "expectation-parent");
+        var updateId = (await observation.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("observationUpdateId").GetGuid();
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/internal/observation-updates/{updateId}/expectations")
+        {
+            Content = JsonContent.Create(new
+            {
+                expectedBehavior = "Breadth should remain above 60%",
+                deadline = "2026-07-17T20:00:00Z",
+                invalidationCondition = "Breadth closes below 45%",
+                confidence = "medium",
+                market = "US",
+            }),
+        };
+        request.Headers.Add("Idempotency-Key", "expectation-1");
+        using var created = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var body = await created.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(updateId, body.GetProperty("observationUpdateId").GetGuid());
+        Assert.Equal("Breadth should remain above 60%", body.GetProperty("expectedBehavior").GetString());
+        Assert.Equal("medium", body.GetProperty("confidence").GetString());
+        Assert.Equal("active", body.GetProperty("readiness").GetString());
+        Assert.False(body.GetProperty("deadlineElapsed").GetBoolean());
+
+        var expectations = await client.GetFromJsonAsync<JsonElement>($"/internal/expectations?observationUpdateId={updateId}");
+        Assert.Single(expectations.GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Expectation_creation_rejects_unsupported_market_trading_day_preset_and_hides_cross_owner_access()
+    {
+        var now = new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero);
+        await using var fixture = await Fixture.StartAsync(now);
+        var owner = Guid.NewGuid();
+        using var client = fixture.Client(owner);
+        using var observation = await Post(client, "Breadth is improving", "expectation-parent-2");
+        var updateId = (await observation.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("observationUpdateId").GetGuid();
+
+        using var unsupportedMarket = await client.PostAsJsonAsync($"/internal/observation-updates/{updateId}/expectations", new
+        {
+            expectedBehavior = "Nikkei should hold support",
+            deadlinePreset = "next_trading_day",
+            invalidationCondition = "Closes below support",
+            confidence = "low",
+            market = "JP",
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, unsupportedMarket.StatusCode);
+        Assert.Contains("trading_day_preset_unavailable", await unsupportedMarket.Content.ReadAsStringAsync());
+
+        using var other = fixture.Client(Guid.NewGuid());
+        using var stolen = await other.PostAsJsonAsync($"/internal/observation-updates/{updateId}/expectations", new
+        {
+            expectedBehavior = "stolen",
+            deadline = "2026-07-17T20:00:00Z",
+            invalidationCondition = "n/a",
+            confidence = "low",
+            market = "US",
+        });
+        Assert.Equal(HttpStatusCode.NotFound, stolen.StatusCode);
+    }
+
+    [Fact]
+    public async Task Owner_can_invalidate_an_expectation_early_and_editing_an_elapsed_deadline_shows_honesty_reminder()
+    {
+        var now = new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero);
+        await using var fixture = await Fixture.StartAsync(now);
+        var owner = Guid.NewGuid();
+        using var client = fixture.Client(owner);
+        using var observation = await Post(client, "Breadth is improving", "expectation-parent-3");
+        var updateId = (await observation.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("observationUpdateId").GetGuid();
+
+        using var created = await client.PostAsJsonAsync($"/internal/observation-updates/{updateId}/expectations", new
+        {
+            expectedBehavior = "Breadth should remain above 60%",
+            deadline = "2026-07-17T20:00:00Z",
+            invalidationCondition = "Breadth closes below 45%",
+            confidence = "medium",
+            market = "US",
+        });
+        var expectationId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        using var invalidated = await client.PostAsync($"/internal/expectations/{expectationId}/invalidate", null);
+        Assert.Equal(HttpStatusCode.OK, invalidated.StatusCode);
+        var invalidatedBody = await invalidated.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("ready_for_review", invalidatedBody.GetProperty("readiness").GetString());
+        Assert.NotEqual(JsonValueKind.Null, invalidatedBody.GetProperty("invalidatedAt").ValueKind);
+
+        fixture.SetNow(new DateTimeOffset(2026, 7, 20, 12, 0, 0, TimeSpan.Zero));
+        using var edit = await client.PutAsJsonAsync($"/internal/expectations/{expectationId}", new
+        {
+            expectedBehavior = "Breadth should remain above 60%",
+            deadline = "2026-07-21T20:00:00Z",
+            invalidationCondition = "Breadth closes below 45%",
+            confidence = "high",
+            market = "US",
+        });
+        Assert.Equal(HttpStatusCode.OK, edit.StatusCode);
+        var editBody = await edit.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(editBody.GetProperty("honestyReminderRequired").GetBoolean());
+        Assert.Equal("high", editBody.GetProperty("confidence").GetString());
+
+        var days = await client.GetFromJsonAsync<JsonElement>("/internal/market-observation-day-summary?from=2026-07-14&to=2026-07-14");
+        Assert.Equal(1, days.GetProperty("items")[0].GetProperty("readyForReviewCount").GetInt64());
     }
 
     [Fact]
@@ -258,7 +371,7 @@ public sealed class QuickObservationApiTests
             await using var setup = new NpgsqlConnection(postgres.GetConnectionString());
             await setup.OpenAsync();
             var root = Path.GetFullPath("../../../../..", AppContext.BaseDirectory);
-            foreach (var file in new[] { "0001_initial_journal_performance.sql", "0013_journal_idempotency.sql", "0026_market_observations.sql", "0028_observation_enrichment.sql" })
+            foreach (var file in new[] { "0001_initial_journal_performance.sql", "0013_journal_idempotency.sql", "0026_market_observations.sql", "0028_observation_enrichment.sql", "0029_expectations.sql" })
                 await new NpgsqlCommand(await File.ReadAllTextAsync(Path.Combine(root, "platform/postgres/migrations", file)), setup).ExecuteNonQueryAsync();
 
             var dataSource = NpgsqlDataSource.Create(postgres.GetConnectionString());

@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import type { Alert, Discipline, InstrumentDirectoryItem, ObservationSearchFilters, ObservationSubjectWrite, ObservationUpdate } from './features/api'
+import type { Alert, Discipline, Expectation, ExpectationConfidence, ExpectationDeadlinePreset, InstrumentDirectoryItem, ObservationSearchFilters, ObservationSubjectWrite, ObservationUpdate } from './features/api'
 import { useIdempotencyKey } from './features/api'
 import {
   useAlertsQuery, useBootstrapQuery, useCalendarQuery, useCreateAlertMutation, useCreateDisciplineMutation,
   useDashboardQuery, useDeleteAlertMutation, useDeleteDisciplineMutation, useDiaryPickerQuery, useDiaryQuery,
-  useDismissAlertMutation, useInstrumentDirectoryQuery, useObservationHistoryQuery, useQuickObservationMutation,
-  useDisciplinesQuery, useTodayObservationQuery, useUpdateObservationMutation,
+  useDismissAlertMutation, useExpectationsQuery, useInstrumentDirectoryQuery, useInvalidateExpectationMutation, useObservationHistoryQuery, useQuickObservationMutation,
+  useCreateExpectationMutation, useDisciplinesQuery, useTodayObservationQuery, useUpdateExpectationMutation, useUpdateObservationMutation,
 } from './features/queries'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, TextArea, TextInput } from './ui'
 import { Icon } from './icons'
 import { PageSkeleton, SectionError, useCockpit } from './shell'
 import { cx, formatDate, formatLongDate, formatTime, monthLabel, pct, repeatLabel, signed } from './format'
-import { formatTimezoneLabel } from './features/accountTime'
+import { accountDateTimeLocalToUtc, formatTimezoneLabel, utcToAccountDateTimeLocal } from './features/accountTime'
 import { useI18n } from './i18n'
 
 export { DiaryDetailPage, DiaryPage } from './screens/diary'
@@ -104,6 +104,7 @@ export function TodayPage() {
   const { t, format, locale } = useI18n()
   const { data, isLoading: loading, isError: error, refetch: reload } = useDashboardQuery()
   const observation = useTodayObservationQuery()
+  const expectations = useExpectationsQuery()
   const instruments = useInstrumentDirectoryQuery()
   const [note, setNote] = useState('')
   const [saved, setSaved] = useState(false)
@@ -118,12 +119,44 @@ export function TodayPage() {
   const [editEvidenceUrl, setEditEvidenceUrl] = useState('')
   const [editEvidenceTitle, setEditEvidenceTitle] = useState('')
   const [editEvidenceQuote, setEditEvidenceQuote] = useState('')
+  const [expectationUpdateId, setExpectationUpdateId] = useState<string | null>(null)
+  const [editingExpectationId, setEditingExpectationId] = useState<string | null>(null)
+  const [expectationHonestyReminder, setExpectationHonestyReminder] = useState(false)
+  const [expectedBehavior, setExpectedBehavior] = useState('')
+  const [invalidationCondition, setInvalidationCondition] = useState('')
+  const [expectationConfidence, setExpectationConfidence] = useState<ExpectationConfidence>('medium')
+  const [expectationMarket, setExpectationMarket] = useState('')
+  const [expectationDeadlineMode, setExpectationDeadlineMode] = useState<'custom' | ExpectationDeadlinePreset>('custom')
+  const [expectationDeadline, setExpectationDeadline] = useState('')
+  const [expectationError, setExpectationError] = useState<string | null>(null)
   const idem = useIdempotencyKey()
+  const expectationIdem = useIdempotencyKey()
   const saveQuickObservation = useQuickObservationMutation()
   const updateObservation = useUpdateObservationMutation()
+  const createExpectation = useCreateExpectationMutation()
+  const updateExpectation = useUpdateExpectationMutation()
+  const invalidateExpectation = useInvalidateExpectationMutation()
   const observationTime = useMemo(() => new Intl.DateTimeFormat(locale, {
     hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: observation.data?.timezone ?? 'UTC',
   }), [locale, observation.data?.timezone])
+  const expectationItems = expectations.data ?? []
+  const readyExpectations = expectationItems.filter(item => item.readiness === 'ready_for_review')
+  const renderExpectation = (item: Expectation, actions = false) => <article className="stack">
+    <h3>{item.expectedBehavior}</h3>
+    <p><strong>{t('today.expectations.invalidation')}:</strong> {item.invalidationCondition}</p>
+    <p><strong>{t('today.expectations.confidence')}:</strong> {item.confidence}</p>
+    <p><strong>{t('today.expectations.market')}:</strong> {item.market}</p>
+    <p><strong>{t('today.expectations.deadline')}:</strong> {item.deadline}</p>
+    <p><strong>{t('today.expectations.readiness')}:</strong> {{
+      active: t('today.expectations.readiness.active'),
+      ready_for_review: t('today.expectations.readiness.ready'),
+      reviewed: t('today.expectations.readiness.reviewed'),
+    }[item.readiness]}</p>
+    {actions ? <div className="form-actions">
+      <Button variant="ghost" size="sm" onClick={() => beginExpectationEdit(item)}>{t('today.expectations.edit')}</Button>
+      {item.readiness === 'active' ? <Button variant="ghost" size="sm" loading={invalidateExpectation.isPending} onClick={() => invalidateExpectation.mutate(item.id)}>{t('today.expectations.invalidate')}</Button> : null}
+    </div> : null}
+  </article>
 
   async function saveNote() {
     if (!note.trim()) return
@@ -165,6 +198,59 @@ export function TodayPage() {
       evidence: editEvidenceUrl ? { url: editEvidenceUrl, title: editEvidenceTitle || null, quote: editEvidenceQuote || null } : null,
     } })
     cancelEdit()
+  }
+
+  function beginExpectationEdit(item: Expectation) {
+    setExpectationUpdateId(item.observationUpdateId)
+    setEditingExpectationId(item.id)
+    setExpectationHonestyReminder(item.deadlineElapsed)
+    setExpectedBehavior(item.expectedBehavior)
+    setInvalidationCondition(item.invalidationCondition)
+    setExpectationConfidence(item.confidence)
+    setExpectationMarket(item.market)
+    setExpectationDeadlineMode('custom')
+    setExpectationDeadline(utcToAccountDateTimeLocal(item.deadline, observation.data?.timezone ?? 'UTC'))
+    setExpectationError(null)
+  }
+
+  function cancelExpectation() {
+    setExpectationUpdateId(null)
+    setEditingExpectationId(null)
+    setExpectationHonestyReminder(false)
+    setExpectedBehavior('')
+    setInvalidationCondition('')
+    setExpectationConfidence('medium')
+    setExpectationMarket('')
+    setExpectationDeadlineMode('custom')
+    setExpectationDeadline('')
+    setExpectationError(null)
+  }
+
+  async function saveExpectation() {
+    if (!expectationUpdateId || !expectedBehavior.trim() || !invalidationCondition.trim() || !expectationMarket.trim()) return
+    let deadline: string | null = null
+    if (expectationDeadlineMode === 'custom') {
+      const converted = accountDateTimeLocalToUtc(expectationDeadline, observation.data?.timezone ?? 'UTC')
+      if (!converted.ok) {
+        setExpectationError(converted.error === 'nonexistent' ? t('today.expectations.deadlineNonexistent') : t('today.expectations.deadlineInvalid'))
+        return
+      }
+      deadline = converted.iso
+    }
+    const body = {
+      expectedBehavior: expectedBehavior.trim(),
+      deadline,
+      deadlinePreset: expectationDeadlineMode === 'custom' ? null : expectationDeadlineMode,
+      invalidationCondition: invalidationCondition.trim(),
+      confidence: expectationConfidence,
+      market: expectationMarket.trim().toUpperCase(),
+    }
+    if (editingExpectationId) await updateExpectation.mutateAsync({ id: editingExpectationId, body })
+    else {
+      await createExpectation.mutateAsync({ updateId: expectationUpdateId, key: expectationIdem.key(), body })
+      expectationIdem.reset()
+    }
+    cancelExpectation()
   }
 
   const hour = new Date().getHours()
@@ -254,13 +340,53 @@ export function TodayPage() {
                     {update.tags.length ? <p><strong>{t('today.observations.tags')}:</strong> {update.tags.join(' · ')}</p> : null}
                     {update.evidence ? <><p><a href={update.evidence.url} target="_blank" rel="noreferrer">{update.evidence.title || update.evidence.url}</a></p>{update.evidence.quote ? <blockquote><strong>{t('today.observations.evidenceQuote')}:</strong> {update.evidence.quote}</blockquote> : null}</> : null}
                     <Button variant="ghost" size="sm" onClick={() => beginEdit(update)}>{t('today.observations.edit')}</Button>
+                    <Button variant="ghost" size="sm" onClick={() => { cancelExpectation(); setExpectationUpdateId(update.id) }}>{t('today.expectations.add')}</Button>
                   </>
                 )}
+                {expectationUpdateId === update.id ? <div className="stack">
+                  {expectationHonestyReminder ? <p className="form-hint" role="note">{t('today.expectations.honestyReminder')}</p> : null}
+                  <Field label={t('today.expectations.expectedBehavior')}><TextArea value={expectedBehavior} onChange={event => setExpectedBehavior(event.target.value)} /></Field>
+                  <Field label={t('today.expectations.invalidation')}><TextArea value={invalidationCondition} onChange={event => setInvalidationCondition(event.target.value)} /></Field>
+                  <Field label={t('today.expectations.confidence')}><SelectBox value={expectationConfidence} onChange={event => setExpectationConfidence(event.target.value as ExpectationConfidence)}>
+                    <option value="low">{t('today.expectations.confidence.low')}</option>
+                    <option value="medium">{t('today.expectations.confidence.medium')}</option>
+                    <option value="high">{t('today.expectations.confidence.high')}</option>
+                  </SelectBox></Field>
+                  <Field label={t('today.expectations.market')}><TextInput value={expectationMarket} onChange={event => {
+                    const market = event.target.value
+                    setExpectationMarket(market)
+                    if (market.trim().toUpperCase() !== 'US') setExpectationDeadlineMode('custom')
+                  }} /></Field>
+                  <Field label={t('today.expectations.deadlineType')}><SelectBox value={expectationDeadlineMode} onChange={event => setExpectationDeadlineMode(event.target.value as 'custom' | ExpectationDeadlinePreset)}>
+                    <option value="custom">{t('today.expectations.deadlineCustom')}</option>
+                    {expectationMarket.trim().toUpperCase() === 'US' ? <>
+                      <option value="next_trading_day">{t('today.expectations.deadlineNextTradingDay')}</option>
+                      <option value="five_trading_days">{t('today.expectations.deadlineFiveTradingDays')}</option>
+                    </> : null}
+                  </SelectBox></Field>
+                  {expectationDeadlineMode === 'custom' ? <>
+                    <Field label={t('today.expectations.deadline')}><TextInput type="datetime-local" value={expectationDeadline} onChange={event => setExpectationDeadline(event.target.value)} /></Field>
+                    <p className="form-hint">{formatTimezoneLabel(observation.data?.timezone ?? 'UTC')}</p>
+                  </> : null}
+                  {expectationError ? <p role="alert">{expectationError}</p> : null}
+                  <div className="form-actions">
+                    <Button variant="primary" size="sm" loading={createExpectation.isPending || updateExpectation.isPending} disabled={!expectedBehavior.trim() || !invalidationCondition.trim() || !expectationMarket.trim() || (expectationDeadlineMode === 'custom' && !expectationDeadline)} onClick={saveExpectation}>{t('today.expectations.save')}</Button>
+                    <Button variant="ghost" size="sm" onClick={cancelExpectation}>{t('common.cancel')}</Button>
+                  </div>
+                </div> : null}
+                {expectationItems.some(item => item.observationUpdateId === update.id) ? <ul className="stack" aria-label={t('today.expectations.title')}>
+                  {expectationItems.filter(item => item.observationUpdateId === update.id).map(item => <li key={item.id}>{renderExpectation(item, true)}</li>)}
+                </ul> : null}
               </li>
             ))}
           </ol>
         </section>
       ) : null}
+
+      {readyExpectations.length ? <section className="recent" aria-labelledby="ready-expectations-h">
+        <div className="recent__head"><h2 id="ready-expectations-h">{t('today.expectations.ready')}</h2></div>
+        <ul className="stack">{readyExpectations.map(item => <li key={item.id}>{renderExpectation(item)}</li>)}</ul>
+      </section> : null}
 
       {data ? (
         <>
@@ -328,7 +454,7 @@ export function TodayPage() {
         </>
       ) : loading ? <PageSkeleton rows={3} /> : null}
 
-      {error || observation.isError ? <SectionError onRetry={() => { void reload(); void observation.refetch() }} /> : null}
+      {error || observation.isError || expectations.isError ? <SectionError onRetry={() => { void reload(); void observation.refetch(); void expectations.refetch() }} /> : null}
     </>
   )
 }
