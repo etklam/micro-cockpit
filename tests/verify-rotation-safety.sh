@@ -165,6 +165,6 @@ done
 run_case success '' success
 grep -q '^db-state:new$' "$root/success/events.log"
 ! grep -q '^db-state:old$' "$root/success/events.log"
-[ "$(grep -c ':rejected$' "$root/success/events.log")" -eq 14 ]
+[ "$(grep -c ':rejected$' "$root/success/events.log")" -eq 15 ]
 
 echo "Credential rotation success, negative-verification, rollback, and cleanup tests passed."
