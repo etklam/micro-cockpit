@@ -491,7 +491,7 @@ export function ObservationHistoryPage() {
   return <>
     <PageHeader title={t('observations.all')} subtitle={t('observations.retained')} />
     <Card as="section">
-      <form className="diary-filters" onSubmit={applyFilters}>
+      <form key={search.toString()} className="diary-filters" onSubmit={applyFilters}>
         <Field label={t('observations.query')}><TextInput name="query" defaultValue={filters.query} /></Field>
         <Field label={t('observations.from')}><TextInput name="from" type="date" defaultValue={filters.from} /></Field>
         <Field label={t('observations.to')}><TextInput name="to" type="date" defaultValue={filters.to} /></Field>
