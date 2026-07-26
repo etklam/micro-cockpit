@@ -1,7 +1,7 @@
 # DESIGN.md — Micro Cockpit Design System
 
 > Calm. Precise. Restrained.
-> A quiet instrument panel for post-session reflection — graphite and ink with one restrained signal lamp.
+> A quiet instrument panel for post-session reflection — graphite and ink with one jewel signal lamp, surfaces lifted by earned elevation.
 
 This document is the source of truth for visual and interaction design. Product boundaries live in [PRODUCT.md](./PRODUCT.md). Implementation tokens live in `frontend/src/index.css`.
 
@@ -103,7 +103,7 @@ Tools are intentionally dual-access: no account required to calculate; diary and
 ```text
 ┌────────────┬────────────────────────────────────────┐
 │  Rail      │  Main workspace                        │
-│  240px     │  max-width 1080px, centered            │
+│  248px     │  max-width 1080px, centered            │
 │            │                                        │
 │  Brand     │  Page header                           │
 │  Primary   │  Content stack                         │
@@ -114,7 +114,7 @@ Tools are intentionally dual-access: no account required to calculate; diary and
 
 | Region | Width / rule |
 | --- | --- |
-| Sidebar rail | `240px` sticky, full viewport height |
+| Sidebar rail | `248px` sticky, full viewport height |
 | Content max | `1080px` |
 | Page pad X | `clamp(16px, 4vw, 48px)` |
 | Content gap | `24px` vertical rhythm |
@@ -161,7 +161,7 @@ Two **independent axes** control chrome. All tokens are **OKLCH**. Source of tru
 | **Scheme** | `light` · `dark` | `html[data-theme]` | Surfaces, ink, borders, shadows |
 | **Accent** | `red` · `green` | `html[data-accent]` (or equivalent) | Brand / chrome signal only (`--primary*`, `--ring`, focus, active nav) |
 
-Dark remains the home scheme; light is a true-neutral day desk (not cream, not violet wash). Surfaces stay nearly neutral graphite/stone. Accent is a **single signal lamp**, never wallpaper.
+Dark remains the home scheme; light is a bright warm-neutral day desk — true-white cards on a soft canvas (not cream, not violet wash). Surfaces stay nearly neutral graphite/stone but sit on a real **elevation ladder** (deep `--bg` up through `--surface` / `--overlay`) so raised work areas read as lifted, not merely outlined. Accent is a **single jewel signal lamp** — emerald (default) or ruby — never wallpaper.
 
 ### Four chrome presets
 
@@ -306,23 +306,26 @@ Prefer multiples of 4. Page vertical rhythm uses `--sp-6` (24px) between major b
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--r-xs` | 6px | Tight chips |
-| `--r-sm` | 8px | Small controls |
-| `--r-md` | 10px | Buttons, inputs, nav items |
-| `--r-lg` | 14px | Cards |
-| `--r-xl` | 18px | Dialogs, login |
+| `--r-xs` | 7px | Tight chips |
+| `--r-sm` | 9px | Small controls |
+| `--r-md` | 11px | Buttons, inputs, nav items |
+| `--r-lg` | 16px | Cards |
+| `--r-xl` | 22px | Dialogs, login |
 | `--r-pill` | 999px | Badges, focus marks |
 
-### Elevation (dark: soft, wide, low)
+### Elevation (dark: layered ambient + direct, low and wide)
+
+Each shadow token is **two layers** — a tight contact shadow plus a wider ambient one — so surfaces read as genuinely lifted rather than outlined. Light mode uses the same two-layer structure with soft, low-opacity ink.
 
 | Token | Use |
 | --- | --- |
-| `--shadow-sm` | Subtle rest |
-| `--shadow-md` | Raised panels |
+| `--shadow-sm` | Cards, stats at rest |
+| `--shadow-md` | Raised panels, dropdowns |
 | `--shadow-lg` | Modal / login |
+| `--inset-top` | Top-edge highlight on raised surfaces |
 | `--ring` | Focus-visible only |
 
-Cards primarily use **surface + hairline border**, not heavy drop shadows. Shadow is for true overlays.
+Cards carry `--inset-top` + `--shadow-sm` and a hairline border together — a quiet lift, not a heavy frame. Reserve `--shadow-md` / `--shadow-lg` for dropdowns and true overlays.
 
 ---
 
