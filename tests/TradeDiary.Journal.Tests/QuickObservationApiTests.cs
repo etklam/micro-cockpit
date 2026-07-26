@@ -150,6 +150,66 @@ public sealed class QuickObservationApiTests
     }
 
     [Fact]
+    public async Task Owner_can_search_current_observation_updates_with_filters_and_stable_pagination()
+    {
+        await using var fixture = await Fixture.StartAsync(new DateTimeOffset(2026, 7, 16, 12, 0, 0, TimeSpan.Zero));
+        var owner = Guid.NewGuid();
+        using var client = fixture.Client(owner);
+
+        using var first = await Post(client, "Semiconductor breadth improved", "search-1");
+        var firstId = (await first.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("observationUpdateId").GetGuid();
+        using var enrich = await client.PutAsJsonAsync($"/internal/observation-updates/{firstId}", new
+        {
+            content = "Semiconductor breadth improved",
+            signal = "Advancers led decliners",
+            tags = new[] { "breadth" },
+            primarySubject = new { type = "instrument", instrumentId = KnownInstrumentId, market = "US", symbol = "AAPL", displayName = "Apple" },
+            relatedSubjects = new object[] { new { type = "theme", name = "AI" }, new { type = "instrument", market = "HK", symbol = "0700", displayName = "Tencent" } },
+        });
+        Assert.Equal(HttpStatusCode.OK, enrich.StatusCode);
+
+        fixture.SetNow(new DateTimeOffset(2026, 7, 17, 12, 0, 0, TimeSpan.Zero));
+        using var second = await Post(client, "Dollar strengthened", "search-2");
+        var secondId = (await second.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("observationUpdateId").GetGuid();
+        using var secondEnrich = await client.PutAsJsonAsync($"/internal/observation-updates/{secondId}", new
+        {
+            content = "Dollar strengthened",
+            primarySubject = new { type = "broad_market", name = "US macro" },
+            tags = new[] { "closing session" },
+        });
+        Assert.Equal(HttpStatusCode.OK, secondEnrich.StatusCode);
+
+        using var other = fixture.Client(Guid.NewGuid());
+        using var privateWrite = await Post(other, "Private author note", "search-private");
+        Assert.Equal(HttpStatusCode.Created, privateWrite.StatusCode);
+
+        var filtered = await client.GetFromJsonAsync<JsonElement>($"/internal/market-observations?from=2026-07-16&to=2026-07-16&query=semiconductor&subjectType=theme&subject=AI&instrumentId={KnownInstrumentId}&tag=breadth&author=current&limit=10");
+        Assert.Equal(1, filtered.GetProperty("items").GetArrayLength());
+        Assert.Equal(firstId, filtered.GetProperty("items")[0].GetProperty("update").GetProperty("id").GetGuid());
+        Assert.Equal(owner, filtered.GetProperty("items")[0].GetProperty("authorId").GetGuid());
+
+        var page1 = await client.GetFromJsonAsync<JsonElement>("/internal/market-observations?limit=1");
+        Assert.Equal(secondId, page1.GetProperty("items")[0].GetProperty("update").GetProperty("id").GetGuid());
+        var cursor = Uri.EscapeDataString(page1.GetProperty("nextCursor").GetString()!);
+        var page2 = await client.GetFromJsonAsync<JsonElement>($"/internal/market-observations?limit=1&cursor={cursor}");
+        Assert.Equal(firstId, page2.GetProperty("items")[0].GetProperty("update").GetProperty("id").GetGuid());
+        Assert.Equal(JsonValueKind.Null, page2.GetProperty("nextCursor").ValueKind);
+
+        var byInstrument = await client.GetFromJsonAsync<JsonElement>($"/internal/market-observations?instrumentId={KnownInstrumentId}&author={owner}");
+        Assert.Equal(firstId, byInstrument.GetProperty("items")[0].GetProperty("update").GetProperty("id").GetGuid());
+        var manualInstrument = await client.GetFromJsonAsync<JsonElement>("/internal/market-observations?market=HK&symbol=0700");
+        Assert.Equal(firstId, manualInstrument.GetProperty("items")[0].GetProperty("update").GetProperty("id").GetGuid());
+        var hidden = await client.GetFromJsonAsync<JsonElement>($"/internal/market-observations?author={Guid.NewGuid()}");
+        Assert.Equal(0, hidden.GetProperty("items").GetArrayLength());
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/internal/market-observations?cursor=invalid")).StatusCode);
+
+        var days = await client.GetFromJsonAsync<JsonElement>("/internal/market-observation-day-summary?from=2026-07-01&to=2026-07-31");
+        Assert.Equal(2, days.GetProperty("items").GetArrayLength());
+        Assert.Equal(1, days.GetProperty("items")[0].GetProperty("updateCount").GetInt64());
+        Assert.Equal(JsonValueKind.Null, days.GetProperty("items")[0].GetProperty("readyForReviewCount").ValueKind);
+    }
+
+    [Fact]
     public async Task Blank_capture_creates_nothing_and_cross_owner_edit_is_hidden()
     {
         await using var fixture = await Fixture.StartAsync(new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero));
@@ -229,6 +289,8 @@ public sealed class QuickObservationApiTests
             return client;
         }
 
+        internal void SetNow(DateTimeOffset value) => clock.Set(value);
+
         internal async Task<long> Count(string table)
         {
             await using var command = dataSource.CreateCommand($"SELECT count(*) FROM {table}");
@@ -256,7 +318,9 @@ public sealed class QuickObservationApiTests
 
     private sealed class FixedTimeProvider(DateTimeOffset value) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => value;
+        private DateTimeOffset current = value;
+        internal void Set(DateTimeOffset next) => current = next;
+        public override DateTimeOffset GetUtcNow() => current;
     }
 
     private sealed class TestAuth(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)

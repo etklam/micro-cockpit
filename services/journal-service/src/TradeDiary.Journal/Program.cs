@@ -286,6 +286,49 @@ diary.MapGet("/diary-review-items", async (HttpRequest request, NpgsqlDataSource
 })
 .Produces<DiaryReviewItemsResponse>(200).ProducesProblem(400).ProducesProblem(401);
 
+diary.MapGet("/market-observations", async (
+    HttpRequest request,
+    NpgsqlDataSource db,
+    string? query = null,
+    DateOnly? from = null,
+    DateOnly? to = null,
+    ObservationSubjectType? subjectType = null,
+    string? subject = null,
+    Guid? instrumentId = null,
+    string? market = null,
+    string? symbol = null,
+    string? tag = null,
+    string? author = null,
+    string? cursor = null,
+    int limit = 20) =>
+{
+    if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
+    var error = ObservationQuery.Validate(query, from, to, subjectType, subject, instrumentId, market, symbol, tag, author, limit, cursor, out var parsed);
+    if (error is not null) return Results.Problem(error, statusCode:400);
+    return Results.Ok(await ObservationQuery.ReadAsync(db, userId, parsed));
+})
+.Produces<ObservationSearchPage>(200).ProducesProblem(400).ProducesProblem(401);
+
+diary.MapGet("/market-observation-day-summary", async (DateOnly from, DateOnly to, HttpRequest request, NpgsqlDataSource db) =>
+{
+    if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
+    if (to < from || to.DayNumber - from.DayNumber > 62) return Results.Problem("invalid_date_range", statusCode:400);
+    await using var command = db.CreateCommand("""
+        SELECT o.journal_day,o.id,count(u.id)
+        FROM journal.market_observations o
+        JOIN journal.observation_updates u ON u.market_observation_id=o.id AND u.user_id=o.user_id AND u.deleted_at IS NULL
+        WHERE o.user_id=$1 AND o.deleted_at IS NULL AND o.journal_day BETWEEN $2 AND $3
+        GROUP BY o.journal_day,o.id ORDER BY o.journal_day
+        """);
+    command.Parameters.AddWithValue(userId); command.Parameters.AddWithValue(from); command.Parameters.AddWithValue(to);
+    var items = new List<MarketObservationDaySummaryItem>();
+    await using var reader = await command.ExecuteReaderAsync();
+    // ponytail: Expectation readiness lands in ticket 04; null means unavailable, never zero.
+    while (await reader.ReadAsync()) items.Add(new(reader.GetFieldValue<DateOnly>(0), reader.GetGuid(1), reader.GetInt64(2), null));
+    return Results.Ok(new CollectionResponse<MarketObservationDaySummaryItem>(items));
+})
+.Produces<CollectionResponse<MarketObservationDaySummaryItem>>(200).ProducesProblem(400).ProducesProblem(401);
+
 diary.MapGet("/market-observations/today", async (HttpRequest request, NpgsqlDataSource db, TimeProvider timeProvider) =>
 {
     if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();

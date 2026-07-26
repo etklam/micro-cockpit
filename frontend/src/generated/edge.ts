@@ -10,7 +10,7 @@ export type AverageCost = { "currentQuantity": number; "currentAverageCost": num
 export type AverageCostResponse = { "averageCost": number; "totalQuantity": number; "totalCost": number; "averageCostChange": number }
 export type BarsResponse = { "contractVersion": number | string; "symbol": string; "items": Array<PublishedBarResponse> }
 export type CalculateResponse = { "universeId": string; "snapshotDate": string; "status": string; "formulaVersion": string }
-export type CalendarResponse = { "year": number; "month": number; "summary": MonthSummaryResponse | null; "days": Array<{ "date": string; "performance": PerformanceResponse | null; "diaryCount": number; "transactionCount": number; "alertCount": number | null }>; "capabilities": { "alerts": CapabilityStatus } }
+export type CalendarResponse = { "year": number; "month": number; "summary": MonthSummaryResponse | null; "days": Array<{ "date": string; "performance": PerformanceResponse | null; "diaryCount": number; "transactionCount": number; "alertCount": number | null; "marketObservationId": string | null; "updateCount": number; "readyForReviewCount": number | null }>; "capabilities": { "alerts": CapabilityStatus } }
 export type CapabilityStatus = "available" | "empty" | "unavailable"
 export type CollectionResponseOfAuditResponse = { "items": Array<AuditResponse> }
 export type CollectionResponseOfDiaryAlertResponse = { "items": Array<DiaryAlertResponse> }
@@ -64,6 +64,8 @@ export type NoteResponse = { "stockId": string; "content": string; "createdAt": 
 export type NoteWrite = { "content": null | string }
 export type ObservationEvidenceResponse = { "url": string; "title": null | string; "quote": null | string }
 export type ObservationEvidenceWrite = { "url": string; "title"?: null | string; "quote"?: null | string }
+export type ObservationSearchItemResponse = { "marketObservationId": string; "journalDay": string; "authorId": string; "update": ObservationUpdateResponse }
+export type ObservationSearchPage = { "items": Array<ObservationSearchItemResponse>; "nextCursor": null | string }
 export type ObservationSubjectResponse = { "type": ObservationSubjectType; "name": null | string; "instrumentId": null | string; "market": null | string; "symbol": null | string; "displayName": null | string; "dailyCloseAvailable": boolean }
 export type ObservationSubjectType = "broad_market" | "sector" | "theme" | "instrument"
 export type ObservationSubjectWrite = { "type": ObservationSubjectType; "name"?: null | string; "instrumentId"?: null | string; "market"?: null | string; "symbol"?: null | string; "displayName"?: null | string }
@@ -180,6 +182,7 @@ export const postApiAdminOperationsJobs = (body: JobWrite, extra?: RequestInit) 
 export const postApiAdminOperationsHealth = (body: HealthWrite, extra?: RequestInit) => request<unknown>("/api/admin/operations/health", { method: "POST", body: JSON.stringify(body), ...extra })
 export const getApiContentPosts = (extra?: RequestInit) => request<CollectionResponseOfPostResponse>("/api/content/posts", { method: "GET", ...extra })
 export const getApiContentPostsSlug = (slug: string, extra?: RequestInit) => request<PostResponse>(`/api/content/posts/${encodeURIComponent(String(slug))}`, { method: "GET", ...extra })
+export const postApiAuthRegister = (body: RegisterRequest, extra?: RequestInit) => request<RegisterResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAuthApiKeyToken = (body: ApiKeyTokenRequest, extra?: RequestInit) => request<ApiKeyTokenResponse>("/api/auth/api-key/token", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAppAgents = (body: AgentRequest, extra?: RequestInit) => request<AgentResponse>("/api/app/agents", { method: "POST", body: JSON.stringify(body), ...extra })
 export const deleteApiAppApiKeysId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/api-keys/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
@@ -194,6 +197,7 @@ export const deleteApiAppDiaryAlertsId = (id: string, extra?: RequestInit) => re
 export const postApiAppDiaryAlertsIdDismiss = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diary-alerts/${encodeURIComponent(String(id))}/dismiss`, { method: "POST", ...extra })
 export const postApiAppQuickNote = (body: QuickNote, extra?: RequestInit) => request<QuickNoteResponse>("/api/app/quick-note", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAppQuickObservations = (body: QuickObservationWrite, extra?: RequestInit) => request<QuickObservationResponse>("/api/app/quick-observations", { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppMarketObservations = (query: { "query"?: string; "from"?: string; "to"?: string; "subjectType"?: ObservationSubjectType; "subject"?: string; "instrumentId"?: string; "market"?: string; "symbol"?: string; "tag"?: string; "author"?: string; "cursor"?: string; "limit"?: number | string }, extra?: RequestInit) => request<ObservationSearchPage>("/api/app/market-observations" + withQuery(query), { method: "GET", ...extra })
 export const getApiAppMarketObservationsToday = (extra?: RequestInit) => request<MarketObservationResponse>("/api/app/market-observations/today", { method: "GET", ...extra })
 export const putApiAppObservationUpdatesId = (id: string, body: ObservationUpdateWrite, extra?: RequestInit) => request<ObservationUpdateEditResponse>(`/api/app/observation-updates/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const getApiAppDiaries = (query: { "query"?: string; "from"?: string; "to"?: string; "reviewStatus"?: string; "symbol"?: string; "tag"?: string; "cursor"?: string; "limit"?: number | string }, extra?: RequestInit) => request<DiaryPage>("/api/app/diaries" + withQuery(query), { method: "GET", ...extra })
@@ -256,7 +260,6 @@ export const getApiAppPartners = (extra?: RequestInit) => request<PartnerLinkBro
 export const getApiAppPartnersIdSummary = (id: string, extra?: RequestInit) => request<PartnerLinkBrowserResponse>(`/api/app/partners/${encodeURIComponent(String(id))}/summary`, { method: "GET", ...extra })
 export const getApiAppSettings = (extra?: RequestInit) => request<UserSettingsResponse>("/api/app/settings", { method: "GET", ...extra })
 export const putApiAppSettings = (body: UserSettingsWrite, extra?: RequestInit) => request<UserSettingsResponse>("/api/app/settings", { method: "PUT", body: JSON.stringify(body), ...extra })
-export const postApiAuthRegister = (body: RegisterRequest, extra?: RequestInit) => request<RegisterResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAuthLogin = (body: LoginRequest, extra?: RequestInit) => request<SessionTokens>("/api/auth/login", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAuthRefresh = (extra?: RequestInit) => request<SessionTokens>("/api/auth/refresh", { method: "POST", ...extra })
 export const postApiAuthLogout = (extra?: RequestInit) => request<unknown>("/api/auth/logout", { method: "POST", ...extra })

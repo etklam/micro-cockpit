@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import type { Alert, Discipline, InstrumentDirectoryItem, ObservationSubjectWrite, ObservationUpdate } from './features/api'
+import type { Alert, Discipline, InstrumentDirectoryItem, ObservationSearchFilters, ObservationSubjectWrite, ObservationUpdate } from './features/api'
 import { useIdempotencyKey } from './features/api'
 import {
   useAlertsQuery, useBootstrapQuery, useCalendarQuery, useCreateAlertMutation, useCreateDisciplineMutation,
   useDashboardQuery, useDeleteAlertMutation, useDeleteDisciplineMutation, useDiaryPickerQuery, useDiaryQuery,
-  useDismissAlertMutation, useInstrumentDirectoryQuery, useQuickObservationMutation, useSavePerformanceMutation,
+  useDismissAlertMutation, useInstrumentDirectoryQuery, useObservationHistoryQuery, useQuickObservationMutation,
   useDisciplinesQuery, useTodayObservationQuery, useUpdateObservationMutation,
 } from './features/queries'
-import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
+import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, TextArea, TextInput } from './ui'
 import { Icon } from './icons'
 import { PageSkeleton, SectionError, useCockpit } from './shell'
-import { cx, formatDate, formatLongDate, formatTime, monthLabel, pct, repeatLabel, signed, signedCompact } from './format'
+import { cx, formatDate, formatLongDate, formatTime, monthLabel, pct, repeatLabel, signed } from './format'
 import { formatTimezoneLabel } from './features/accountTime'
 import { useI18n } from './i18n'
 
@@ -56,6 +56,14 @@ const subjectWrite = (subject: SubjectDraft): ObservationSubjectWrite | null => 
 }
 const subjectLabel = (subject: NonNullable<ObservationUpdate['primarySubject']>) =>
   subject.type === 'instrument' ? `${subject.symbol} · ${subject.displayName}` : subject.name
+const subjectHistoryHref = (subject: NonNullable<ObservationUpdate['primarySubject']>) => {
+  const params = new URLSearchParams()
+  if (subject.type === 'instrument') {
+    if (subject.instrumentId) params.set('instrumentId', subject.instrumentId)
+    else { if (subject.market) params.set('market', subject.market); if (subject.symbol) params.set('symbol', subject.symbol) }
+  } else { params.set('subjectType', subject.type); if (subject.name) params.set('subject', subject.name) }
+  return `/today/observations?${params}`
+}
 
 function SubjectFields({ subject, onChange, instruments, prefix }: { subject: SubjectDraft; onChange: (subject: SubjectDraft) => void; instruments: InstrumentDirectoryItem[]; prefix: string }) {
   const { t } = useI18n()
@@ -200,6 +208,10 @@ export function TodayPage() {
         </div>
       </Card>
 
+      <div className="recent__head">
+        <Link className="text-link" to="/today/observations">{t('observations.all')}</Link>
+      </div>
+
       {observation.data?.updates.length ? (
         <section className="recent" aria-labelledby="observation-updates-h">
           <div className="recent__head">
@@ -237,8 +249,8 @@ export function TodayPage() {
                     {update.signal ? <p><strong>{t('today.observations.signal')}:</strong> {update.signal}</p> : null}
                     {update.interpretation ? <p><strong>{t('today.observations.interpretation')}:</strong> {update.interpretation}</p> : null}
                     {update.mentalState ? <p><strong>{t('today.observations.mentalState')}:</strong> {update.mentalState}</p> : null}
-                    {update.primarySubject ? <p><strong>{t('today.observations.primarySubject')}:</strong> {subjectLabel(update.primarySubject)}{update.primarySubject.type === 'instrument' && !update.primarySubject.dailyCloseAvailable ? ` · ${t('today.observations.dailyCloseUnavailable')}` : ''}</p> : null}
-                    {update.relatedSubjects.map((subject, index) => <p key={`${subject.type}-${index}`}><strong>{t('today.observations.relatedSubject')}:</strong> {subjectLabel(subject)}{subject.type === 'instrument' && !subject.dailyCloseAvailable ? ` · ${t('today.observations.dailyCloseUnavailable')}` : ''}</p>)}
+                    {update.primarySubject ? <p><strong>{t('today.observations.primarySubject')}:</strong> <Link className="text-link" to={subjectHistoryHref(update.primarySubject)}>{subjectLabel(update.primarySubject)}</Link>{update.primarySubject.type === 'instrument' && !update.primarySubject.dailyCloseAvailable ? ` · ${t('today.observations.dailyCloseUnavailable')}` : ''}</p> : null}
+                    {update.relatedSubjects.map((subject, index) => <p key={`${subject.type}-${index}`}><strong>{t('today.observations.relatedSubject')}:</strong> <Link className="text-link" to={subjectHistoryHref(subject)}>{subjectLabel(subject)}</Link>{subject.type === 'instrument' && !subject.dailyCloseAvailable ? ` · ${t('today.observations.dailyCloseUnavailable')}` : ''}</p>)}
                     {update.tags.length ? <p><strong>{t('today.observations.tags')}:</strong> {update.tags.join(' · ')}</p> : null}
                     {update.evidence ? <><p><a href={update.evidence.url} target="_blank" rel="noreferrer">{update.evidence.title || update.evidence.url}</a></p>{update.evidence.quote ? <blockquote><strong>{t('today.observations.evidenceQuote')}:</strong> {update.evidence.quote}</blockquote> : null}</> : null}
                     <Button variant="ghost" size="sm" onClick={() => beginEdit(update)}>{t('today.observations.edit')}</Button>
@@ -321,6 +333,73 @@ export function TodayPage() {
   )
 }
 
+export function ObservationHistoryPage() {
+  const { t } = useI18n()
+  const [search, setSearch] = useSearchParams()
+  const filters: ObservationSearchFilters = {
+    query: search.get('query') || undefined,
+    from: search.get('from') || undefined,
+    to: search.get('to') || undefined,
+    subjectType: (search.get('subjectType') as ObservationSearchFilters['subjectType']) || undefined,
+    subject: search.get('subject') || undefined,
+    instrumentId: search.get('instrumentId') || undefined,
+    market: search.get('market') || undefined,
+    symbol: search.get('symbol') || undefined,
+    tag: search.get('tag') || undefined,
+    author: search.get('author') || undefined,
+  }
+  const history = useObservationHistoryQuery(filters)
+  const items = Array.from(new Map((history.data?.pages.flatMap(page => page.items) ?? []).map(item => [item.update.id, item])).values())
+
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const next = new URLSearchParams()
+    for (const name of ['query', 'from', 'to', 'subjectType', 'subject', 'instrumentId', 'market', 'symbol', 'tag', 'author']) {
+      const value = String(form.get(name) ?? '').trim()
+      if (value) next.set(name, value)
+    }
+    setSearch(next)
+  }
+
+  return <>
+    <PageHeader title={t('observations.all')} subtitle={t('observations.retained')} />
+    <Card as="section">
+      <form className="diary-filters" onSubmit={applyFilters}>
+        <Field label={t('observations.query')}><TextInput name="query" defaultValue={filters.query} /></Field>
+        <Field label={t('observations.from')}><TextInput name="from" type="date" defaultValue={filters.from} /></Field>
+        <Field label={t('observations.to')}><TextInput name="to" type="date" defaultValue={filters.to} /></Field>
+        <Field label={t('observations.subjectType')}><SelectBox name="subjectType" defaultValue={filters.subjectType ?? ''}>
+          <option value="">{t('observations.anySubject')}</option>
+          <option value="broad_market">{t('today.observations.subject.broadMarket')}</option>
+          <option value="sector">{t('today.observations.subject.sector')}</option>
+          <option value="theme">{t('today.observations.subject.theme')}</option>
+        </SelectBox></Field>
+        <Field label={t('observations.subject')}><TextInput name="subject" defaultValue={filters.subject} /></Field>
+        <Field label={t('observations.instrumentId')}><TextInput name="instrumentId" defaultValue={filters.instrumentId} /></Field>
+        <Field label={t('today.observations.market')}><TextInput name="market" defaultValue={filters.market} /></Field>
+        <Field label={t('today.observations.symbol')}><TextInput name="symbol" defaultValue={filters.symbol} /></Field>
+        <Field label={t('today.observations.tags')}><TextInput name="tag" defaultValue={filters.tag} /></Field>
+        <Field label={t('observations.author')}><TextInput name="author" defaultValue={filters.author} placeholder="current" /></Field>
+        <Button variant="primary" type="submit">{t('observations.search')}</Button>
+      </form>
+    </Card>
+    {history.isLoading ? <PageSkeleton rows={3} /> : history.isError && !history.data ? <SectionError onRetry={() => { void history.refetch() }} /> : items.length === 0 ? (
+      <EmptyBox icon="diary" title={t('observations.empty')} hint={t('observations.emptyHint')} />
+    ) : <ol className="timeline">
+      {items.map(item => <li key={item.update.id}>
+        <time dateTime={item.update.recordedAt}>{item.journalDay}</time>
+        <p>{item.update.content}</p>
+        {item.update.primarySubject ? <Link className="text-link" to={subjectHistoryHref(item.update.primarySubject)}>{subjectLabel(item.update.primarySubject)}</Link> : null}
+        {item.update.relatedSubjects.map((subject, index) => <Link className="text-link" key={`${subject.type}-${index}`} to={subjectHistoryHref(subject)}>{subjectLabel(subject)}</Link>)}
+        {item.update.tags.length ? <p>{item.update.tags.join(' · ')}</p> : null}
+      </li>)}
+    </ol>}
+    {history.hasNextPage ? <Button variant="ghost" loading={history.isFetchingNextPage} onClick={() => { void history.fetchNextPage() }}>{t('observations.loadMore')}</Button> : null}
+    {history.isFetchNextPageError ? <div><p className="form-error" role="alert">{t('observations.moreError')}</p><Button variant="ghost" onClick={() => { void history.fetchNextPage() }}>{t('common.retry')}</Button></div> : null}
+  </>
+}
+
 /* =============================== CALENDAR ============================== */
 export function CalendarPage() {
   const navigate = useNavigate()
@@ -337,126 +416,51 @@ export function CalendarPage() {
   const defaultDay = accountToday && validCalendarDay(accountToday, year, month) ? accountToday : `${year}-${String(month).padStart(2, '0')}-01`
   const selectedFromUrl = validCalendarDay(requestedDay, year, month) ? requestedDay! : defaultDay
   const [selected, setSelected] = useState(selectedFromUrl)
-  const [amount, setAmount] = useState('')
-  const [capital, setCapital] = useState('')
-  const [note, setNote] = useState('')
-  const [formError, setFormError] = useState('')
-  const savePerformance = useSavePerformanceMutation()
-
   useEffect(() => { setSelected(selectedFromUrl) }, [selectedFromUrl])
-
-  const day = data?.days.find((d) => d.date === selected)
-  useEffect(() => {
-    setAmount(day?.performance?.pnlAmount != null ? String(day.performance.pnlAmount) : '')
-    setNote(day?.performance?.note ?? '')
-  }, [selected, day?.performance?.pnlAmount, day?.performance?.note])
+  const day = data?.days.find(item => item.date === selected)
+  const firstWeekday = new Date(cursor.year, cursor.month - 1, 1).getDay()
 
   const shift = (delta: number) => {
-    const d = new Date(cursor.year, cursor.month - 1 + delta, 1)
-    navigate(`/calendar/${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}`)
+    const date = new Date(cursor.year, cursor.month - 1 + delta, 1)
+    navigate(`/calendar/${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}`)
   }
 
-  async function save(e: FormEvent) {
-    e.preventDefault()
-    setFormError('')
-    try {
-      await savePerformance.mutateAsync({ date: selected, amount: Number(amount), capital: capital ? Number(capital) : null, note })
-    } catch {
-      setFormError(t('calendar.pnl.saveError'))
-    }
-  }
-
-  const firstWeekday = new Date(cursor.year, cursor.month - 1, 1).getDay()
-  const summary = data?.summary
-
-  return (
-    <>
-      <PageHeader
-        title={t('calendar.title')}
-        subtitle={summary ? t('calendar.subtitle', { count: summary.recordedDays }) : undefined}
-      />
-
-      {summary ? (
-        <div className="stat-row">
-          <Stat label={t('calendar.netPnl')} value={signed(summary.total)} tone={pnlTone(summary.total)} />
-          <Stat label={t('calendar.winningDays')} value={String(summary.profitDays)} tone="gain" />
-          <Stat label={t('calendar.losingDays')} value={String(summary.lossDays)} tone="loss" />
-          <Stat label={t('calendar.tradingDays')} value={String(summary.recordedDays)} />
-        </div>
-      ) : null}
-
-      <div className="cal-head">
-        <IconButton icon="left" label={t('calendar.prevMonth')} onClick={() => shift(-1)} />
-        <h2 className="cal-head__title">{monthLabel(cursor.year, cursor.month)}</h2>
-        <IconButton icon="right" label={t('calendar.nextMonth')} onClick={() => shift(1)} />
+  return <>
+    <PageHeader title={t('calendar.title')} subtitle={t('calendar.observationSubtitle')} />
+    <div className="cal-head">
+      <IconButton icon="left" label={t('calendar.prevMonth')} onClick={() => shift(-1)} />
+      <h2 className="cal-head__title">{monthLabel(cursor.year, cursor.month)}</h2>
+      <IconButton icon="right" label={t('calendar.nextMonth')} onClick={() => shift(1)} />
+    </div>
+    <Link className="text-link cal-review-link" to={`/review/${cursor.year}/${String(cursor.month).padStart(2, '0')}`}>{t('calendar.reviewMonth')}</Link>
+    {error ? <SectionError onRetry={reload} /> : <Card flush as="section" className="cal">
+      <div className="cal__weekdays">{WEEKDAYS.map(key => <span key={key}>{t(key)}</span>)}</div>
+      <div className="cal__grid">
+        {loading ? Array.from({ length: 35 }, (_, index) => <span key={index} className="day day--skel"><span className="skel" style={{ height: '100%' }} /></span>) : <>
+          {Array.from({ length: firstWeekday }, (_, index) => <span key={`b${index}`} className="day day--blank" />)}
+          {data?.days.map(item => {
+            const label = item.updateCount > 0 ? t('calendar.day.observations', { count: item.updateCount }) : t('calendar.day.noObservations')
+            return <button key={item.date} type="button" className={cx('day', selected === item.date && 'is-selected')} aria-label={`${formatDate(item.date)}, ${label}`} onClick={() => {
+              setSelected(item.date)
+              const next = new URLSearchParams(search); next.set('day', item.date); setSearch(next)
+            }}>
+              <span className="day__num num">{Number(item.date.slice(-2))}</span>
+              <span className={cx('day__pnl', item.updateCount === 0 && 'is-dash')}>{item.updateCount || '·'}</span>
+              {item.updateCount > 0 ? <span className="day__note" aria-label={label} /> : null}
+            </button>
+          })}
+        </>}
       </div>
-      <Link className="text-link cal-review-link" to={`/review/${cursor.year}/${String(cursor.month).padStart(2, '0')}`}>{t('calendar.reviewMonth')}</Link>
-
-      {error ? (
-        <SectionError onRetry={reload} />
-      ) : (
-        <Card flush as="section" className="cal">
-          <div className="cal__weekdays">
-            {WEEKDAYS.map((key) => <span key={key}>{t(key)}</span>)}
-          </div>
-          <div className="cal__grid">
-            {loading
-              ? Array.from({ length: 35 }, (_, i) => <span key={i} className="day day--skel"><span className="skel" style={{ height: '100%' }} /></span>)
-              : <>
-                  {Array.from({ length: firstWeekday }, (_, i) => <span key={`b${i}`} className="day day--blank" />)}
-                  {data?.days.map((d) => {
-                    const tone = pnlTone(d.performance?.pnlAmount)
-                    const hasNote = d.diaryCount > 0
-                    const notesLabel = hasNote ? t('calendar.day.notes', { count: d.diaryCount }) : ''
-                    return (
-                      <button
-                        key={d.date}
-                        type="button"
-                        className={cx('day', selected === d.date && 'is-selected', tone !== 'muted' && `is-${tone}`)}
-                        aria-label={`${formatDate(d.date)}${d.performance ? `, ${signedCompact(d.performance.pnlAmount)}` : `, ${t('calendar.day.noResult')}`}${hasNote ? `, ${notesLabel}` : ''}`}
-                        onClick={() => { setSelected(d.date); const next = new URLSearchParams(search); next.set('day', d.date); setSearch(next) }}
-                      >
-                        <span className="day__num num">{Number(d.date.slice(-2))}</span>
-                        {d.performance ? (
-                          <span className={cx('day__pnl', 'num', `is-${tone}`)}>{signedCompact(d.performance.pnlAmount)}</span>
-                        ) : (
-                          <span className="day__pnl is-dash">·</span>
-                        )}
-                        {hasNote ? <span className="day__note" aria-label={notesLabel} /> : null}
-                      </button>
-                    )
-                  })}
-                </>
-            }
-          </div>
-        </Card>
-      )}
-
-      <Card as="section" className="pnl-form">
-        <div className="pnl-form__head">
-          <h2>{selected}</h2>
-          {day?.performance ? <Badge tone={pnlTone(day.performance.pnlAmount)}>{pct(day.performance.pnlPercent ?? 0)}</Badge> : null}
-        </div>
-        <form className="pnl-form__body" onSubmit={save}>
-          <div className="form-row">
-            <Field label={t('calendar.pnl.amount')}>
-              <TextInput type="number" step="any" inputMode="decimal" required value={amount} onChange={(e) => setAmount(e.target.value)} className="num" />
-            </Field>
-            <Field label={t('calendar.pnl.capital')} hint={t('common.optional')} className="field--grow">
-              <TextInput type="number" min="0" step="any" inputMode="decimal" value={capital} onChange={(e) => setCapital(e.target.value)} className="num" />
-            </Field>
-          </div>
-          <Field label={t('calendar.pnl.note')}>
-            <TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('calendar.pnl.notePlaceholder')} maxLength={280} />
-          </Field>
-          {formError ? <p className="form-error" role="alert">{formError}</p> : null}
-          <div className="form-actions">
-            <Button variant="primary" type="submit" icon="check" loading={savePerformance.isPending}>{t('calendar.pnl.save')}</Button>
-          </div>
-        </form>
-      </Card>
-    </>
-  )
+    </Card>}
+    <Card as="section">
+      <h2>{selected}</h2>
+      {day?.updateCount ? <>
+        <p>{t('calendar.day.observations', { count: day.updateCount })}</p>
+        <Link className="text-link" to={`/today/observations?from=${selected}&to=${selected}`}>{t('calendar.openObservations')}</Link>
+        {day.readyForReviewCount != null ? <p>{t('calendar.readyForReview', { count: day.readyForReviewCount })}</p> : null}
+      </> : <p className="form-hint">{t('calendar.day.noObservations')}</p>}
+    </Card>
+  </>
 }
 
 function validCalendarDay(value: string | null, year: number, month: number): boolean {

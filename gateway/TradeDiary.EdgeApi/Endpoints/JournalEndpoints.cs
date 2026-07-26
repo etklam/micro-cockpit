@@ -4,6 +4,7 @@ internal static class JournalEndpoints
     {
         EdgeTransport.MapProxy(app, "/api/app/quick-note", "journal", "/internal/quick-note", [HttpMethods.Post]).RequireAuthorization("diaryAccess");
         EdgeTransport.MapProxy(app, "/api/app/quick-observations", "journal", "/internal/quick-observations", [HttpMethods.Post]).RequireAuthorization("diaryAccess");
+        EdgeTransport.MapProxy(app, "/api/app/market-observations", "journal", "/internal/market-observations", [HttpMethods.Get], preserveErrorBody: true).RequireAuthorization("diaryAccess");
         EdgeTransport.MapProxy(app, "/api/app/market-observations/today", "journal", "/internal/market-observations/today", [HttpMethods.Get]).RequireAuthorization("diaryAccess");
         EdgeTransport.MapProxy(app, "/api/app/observation-updates/{id:guid}", "journal", "/internal/observation-updates/{id}", [HttpMethods.Put]).RequireAuthorization("diaryAccess");
         EdgeTransport.MapProxy(app, "/api/app/diaries", "journal", "/internal/diaries", [HttpMethods.Get, HttpMethods.Post]).RequireAuthorization("diaryAccess");

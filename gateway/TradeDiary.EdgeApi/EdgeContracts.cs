@@ -69,7 +69,10 @@ public sealed record CalendarDayResponse(
     DailyPerformanceResponse? Performance,
     long DiaryCount,
     long TransactionCount,
-    long? AlertCount);
+    long? AlertCount,
+    Guid? MarketObservationId,
+    long UpdateCount,
+    long? ReadyForReviewCount);
 
 public sealed record CalendarCapabilitiesResponse(CapabilityStatus Alerts);
 
@@ -261,6 +264,7 @@ internal sealed record RefreshRequest(string RefreshToken);
 
 internal sealed record CollectionResponse<T>(IReadOnlyList<T> Items);
 internal sealed record DiaryDayFact(DateOnly LocalDate, long DiaryCount, long TransactionCount);
+internal sealed record MarketObservationDayFact(DateOnly Date, Guid MarketObservationId, long UpdateCount, long? ReadyForReviewCount);
 internal sealed record DayAlertFact(DateOnly Date, long Count);
 internal sealed record CalendarAlertFact(DateOnly LocalDate, long Count);
 

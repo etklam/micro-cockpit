@@ -137,6 +137,33 @@ public sealed class CockpitCompositionTests
     }
 
     [Fact]
+    public async Task Observation_search_preserves_filters_and_cursor_at_the_Journal_boundary()
+    {
+        string? forwarded = null;
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service == "journal") forwarded = path;
+            return Json(HttpStatusCode.OK, "{\"items\":[],\"nextCursor\":null}");
+        });
+        using var response = await factory.CreateClient().GetAsync("/api/app/market-observations?from=2026-07-01&subjectType=theme&subject=AI&instrumentId=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&tag=breadth&author=current&cursor=abc&limit=10");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("/internal/market-observations?from=2026-07-01&subjectType=theme&subject=AI&instrumentId=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&tag=breadth&author=current&cursor=abc&limit=10", forwarded);
+    }
+
+    [Fact]
+    public async Task Observation_search_preserves_Journal_validation_errors()
+    {
+        using var factory = CreateFactory((service, _) => service == "journal"
+            ? Json(HttpStatusCode.BadRequest, "{\"detail\":\"invalid_cursor\",\"status\":400}")
+            : Json(HttpStatusCode.OK, "{}"));
+        using var response = await factory.CreateClient().GetAsync("/api/app/market-observations?cursor=bad");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("invalid_cursor", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Stock_page_succeeds_without_market_data()
     {
         using var factory = CreateFactory((service, _) => service switch
@@ -293,9 +320,14 @@ public sealed class CockpitCompositionTests
     }
 
     [Fact]
-    public async Task Calendar_merges_journal_performance_and_alert_facts_by_date()
+    public async Task Calendar_adds_current_Market_Observation_facts_without_breaking_review_data()
     {
-        using var factory = CreateFactory(CalendarResponse);
+        var calls = new List<(string Service, string Path)>();
+        using var factory = CreateFactory((service, path) =>
+        {
+            calls.Add((service, path));
+            return CalendarResponse(service, path);
+        });
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync("/api/app/calendar?year=2026&month=7");
@@ -307,13 +339,13 @@ public sealed class CockpitCompositionTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(31, days.GetArrayLength());
-        Assert.Equal(2, first.GetProperty("diaryCount").GetInt64());
-        Assert.Equal(3, first.GetProperty("transactionCount").GetInt64());
-        Assert.Equal(7, first.GetProperty("alertCount").GetInt64());
+        Assert.Equal("11111111-1111-1111-1111-111111111111", first.GetProperty("marketObservationId").GetString());
+        Assert.Equal(2, first.GetProperty("updateCount").GetInt64());
+        Assert.Equal(JsonValueKind.Null, first.GetProperty("readyForReviewCount").ValueKind);
+        Assert.Equal(JsonValueKind.Null, second.GetProperty("marketObservationId").ValueKind);
+        Assert.Equal(0, second.GetProperty("updateCount").GetInt64());
         Assert.Equal(12.5m, first.GetProperty("performance").GetProperty("pnlAmount").GetDecimal());
-        Assert.Equal(0, second.GetProperty("diaryCount").GetInt64());
-        Assert.Equal(JsonValueKind.Null, second.GetProperty("performance").ValueKind);
-        Assert.Equal(0, second.GetProperty("alertCount").GetInt64());
+        Assert.Contains(calls, call => call.Service == "journal" && call.Path.StartsWith("/internal/market-observation-day-summary?", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -710,25 +742,15 @@ public sealed class CockpitCompositionTests
         };
     }
 
-    private static HttpResponseMessage CalendarResponse(string service, string path)
+    private static HttpResponseMessage CalendarResponse(string service, string path) => (service, path) switch
     {
-        return service switch
-        {
-            "journal" => Json(
-                HttpStatusCode.OK,
-                "{\"items\":[{\"localDate\":\"2026-07-01\",\"diaryCount\":2,\"transactionCount\":3}]}"),
-            "performance" when path.Contains("daily-performances", StringComparison.Ordinal) => Json(
-                HttpStatusCode.OK,
-                "{\"items\":[{\"localDate\":\"2026-07-01\",\"pnlAmount\":12.5,\"capitalBase\":1000,\"pnlPercent\":1.25,\"note\":\"steady\"}]}"),
-            "performance" => Json(
-                HttpStatusCode.OK,
-                "{\"year\":2026,\"month\":7,\"total\":12.5,\"recordedDays\":1,\"profitDays\":1,\"lossDays\":0,\"flatDays\":0,\"bestDay\":12.5,\"worstDay\":12.5}"),
-            "reminder" => Json(
-                HttpStatusCode.OK,
-                "{\"items\":[{\"localDate\":\"2026-07-01\",\"count\":7}]}"),
-            _ => Json(HttpStatusCode.OK, "{}")
-        };
-    }
+        ("journal", var value) when value.Contains("market-observation-day-summary", StringComparison.Ordinal) => Json(HttpStatusCode.OK, "{\"items\":[{\"date\":\"2026-07-01\",\"marketObservationId\":\"11111111-1111-1111-1111-111111111111\",\"updateCount\":2,\"readyForReviewCount\":null}]}"),
+        ("journal", _) => Json(HttpStatusCode.OK, "{\"items\":[{\"localDate\":\"2026-07-01\",\"diaryCount\":2,\"transactionCount\":3}]}"),
+        ("performance", var value) when value.Contains("daily-performances", StringComparison.Ordinal) => Json(HttpStatusCode.OK, "{\"items\":[{\"localDate\":\"2026-07-01\",\"pnlAmount\":12.5,\"capitalBase\":1000,\"pnlPercent\":1.25,\"note\":\"steady\"}]}"),
+        ("performance", _) => Json(HttpStatusCode.OK, "{\"year\":2026,\"month\":7,\"total\":12.5,\"recordedDays\":1,\"profitDays\":1,\"lossDays\":0,\"flatDays\":0,\"bestDay\":12.5,\"worstDay\":12.5}"),
+        ("reminder", _) => Json(HttpStatusCode.OK, "{\"items\":[{\"localDate\":\"2026-07-01\",\"count\":7}]}"),
+        _ => Json(HttpStatusCode.OK, "{}")
+    };
 
     private static string? QueryValue(string path, string name)
     {

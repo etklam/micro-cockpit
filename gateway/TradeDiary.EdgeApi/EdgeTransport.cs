@@ -75,7 +75,7 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
         }
     }
 
-    internal async Task<IResult> ProxyAsync(string service, string path, HttpContext context, bool forwardRegistrationKey = false)
+    internal async Task<IResult> ProxyAsync(string service, string path, HttpContext context, bool forwardRegistrationKey = false, bool preserveErrorBody = false)
     {
         string? body = null;
         if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
@@ -87,7 +87,10 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
         var result = await SendAsync(service, path, new HttpMethod(context.Request.Method), body, context, forwardRegistrationKey);
         if (result.Failure == DownstreamFailure.Timeout) return EdgeProblems.DownstreamTimeout(context);
         if (result.Failure == DownstreamFailure.Unavailable) return EdgeProblems.DownstreamUnavailable(context);
-        if (result.StatusCode is < 200 or >= 300) return EdgeProblems.FromStatus(context, result.StatusCode);
+        if (result.StatusCode is < 200 or >= 300)
+            return preserveErrorBody && result.Body is not null
+                ? Results.Content(result.Body, result.ContentType ?? "application/problem+json", statusCode: result.StatusCode)
+                : EdgeProblems.FromStatus(context, result.StatusCode);
         if (result.StatusCode == StatusCodes.Status204NoContent) return Results.NoContent();
         return Results.Content(result.Body ?? string.Empty, result.ContentType ?? "application/json", statusCode: result.StatusCode);
     }
@@ -98,9 +101,10 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
         string service,
         string target,
         string[] methods,
-        bool forwardRegistrationKey = false) =>
+        bool forwardRegistrationKey = false,
+        bool preserveErrorBody = false) =>
         app.MapMethods(route, methods, async (HttpContext context, EdgeTransport transport) =>
-            await transport.ProxyAsync(service, Expand(target, context.Request.RouteValues) + context.Request.QueryString, context, forwardRegistrationKey));
+            await transport.ProxyAsync(service, Expand(target, context.Request.RouteValues) + context.Request.QueryString, context, forwardRegistrationKey, preserveErrorBody));
 
     internal IResult ProblemFor<T>(DownstreamResponse<T> response, HttpContext context)
     {

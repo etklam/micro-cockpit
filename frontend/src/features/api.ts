@@ -39,7 +39,21 @@ export type MarketObservation = G.MarketObservationResponse
 export type ObservationUpdate = G.ObservationUpdateResponse
 export type ObservationUpdateWrite = G.ObservationUpdateWrite
 export type ObservationSubjectWrite = G.ObservationSubjectWrite
+export type ObservationSearchItem = G.ObservationSearchItemResponse
+export type ObservationSearchPage = G.ObservationSearchPage
 export type InstrumentDirectoryItem = G.PublishedSymbolResponse
+export type ObservationSearchFilters = {
+  query?: string
+  from?: string
+  to?: string
+  subjectType?: G.ObservationSubjectType
+  subject?: string
+  instrumentId?: string
+  market?: string
+  symbol?: string
+  tag?: string
+  author?: string
+}
 
 export const getBootstrap = () => G.getApiAppBootstrap()
 export type Bootstrap = Awaited<ReturnType<typeof G.getApiAppBootstrap>>
@@ -58,6 +72,7 @@ export const saveQuickObservation = (content: string, key?: string) =>
 export const updateObservation = (id: string, body: ObservationUpdateWrite) =>
   G.putApiAppObservationUpdatesId(id, body)
 export const getInstrumentDirectory = async () => (await G.getApiAppMarketSymbols()).items
+export const getObservationHistory = (filters: ObservationSearchFilters, cursor?: string) => G.getApiAppMarketObservations({ ...filters, cursor, limit: 20 })
 export type DiaryPage = G.DiaryPage
 export type DiaryListQuery = {
   query?: string
@@ -112,8 +127,6 @@ export function transactionUpdateErrorMessage(error: unknown) {
   return i18nTransactionUpdateErrorMessage(getActiveFormatLocale(), error)
 }
 export const getCalendar = (year: number, month: number) => G.getApiAppCalendar({ year, month })
-export const savePerformance = (date: string, pnlAmount: number, capitalBase: number | null, note: string) =>
-  G.putApiAppDailyPerformanceDate(date, { pnlAmount, capitalBase, note })
 export const getDisciplines = () => G.getApiAppDisciplines()
 export const createDiscipline = (content: string) => G.postApiAppDisciplines({ content })
 export const deleteDiscipline = (id: string) => G.deleteApiAppDisciplinesId(id)

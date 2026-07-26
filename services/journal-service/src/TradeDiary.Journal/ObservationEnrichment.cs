@@ -1,8 +1,11 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Npgsql;
 
 static class ObservationEnrichment
 {
+    private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
+
     internal static string? Normalize(ObservationUpdateWrite input, out ObservationEnrichmentValue value)
     {
         value = default!;
@@ -73,13 +76,13 @@ static class ObservationEnrichment
         return null;
     }
 
-    internal static ObservationUpdateResponse Read(NpgsqlDataReader reader) => new(
-        reader.GetGuid(0), reader.GetString(1), reader.GetDateTime(2), reader.GetDateTime(3),
-        reader.IsDBNull(4) ? null : reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5),
-        reader.IsDBNull(6) ? null : reader.GetString(6), reader.GetFieldValue<string[]>(7),
-        ReadJson<ObservationSubjectResponse>(reader.IsDBNull(8) ? null : reader.GetString(8)),
-        ReadJson<List<ObservationSubjectResponse>>(reader.GetString(9)) ?? [],
-        ReadJson<ObservationEvidenceResponse>(reader.IsDBNull(10) ? null : reader.GetString(10)));
+    internal static ObservationUpdateResponse Read(NpgsqlDataReader reader, int offset = 0) => new(
+        reader.GetGuid(offset), reader.GetString(offset + 1), reader.GetDateTime(offset + 2), reader.GetDateTime(offset + 3),
+        reader.IsDBNull(offset + 4) ? null : reader.GetString(offset + 4), reader.IsDBNull(offset + 5) ? null : reader.GetString(offset + 5),
+        reader.IsDBNull(offset + 6) ? null : reader.GetString(offset + 6), reader.GetFieldValue<string[]>(offset + 7),
+        ReadJson<ObservationSubjectResponse>(reader.IsDBNull(offset + 8) ? null : reader.GetString(offset + 8)),
+        ReadJson<List<ObservationSubjectResponse>>(reader.GetString(offset + 9)) ?? [],
+        ReadJson<ObservationEvidenceResponse>(reader.IsDBNull(offset + 10) ? null : reader.GetString(offset + 10)));
 
     internal static ObservationUpdateEditResponse ReadEdit(NpgsqlDataReader reader) => new(
         reader.GetGuid(0), reader.GetString(1), reader.GetDateTime(2), reader.GetDateTime(3), true,
@@ -90,8 +93,14 @@ static class ObservationEnrichment
         ReadJson<ObservationEvidenceResponse>(reader.IsDBNull(10) ? null : reader.GetString(10)));
 
     internal static string? Trim(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    internal static string? Json<T>(T? value) where T : class => value is null ? null : JsonSerializer.Serialize(value, JsonSerializerOptions.Web);
-    private static T? ReadJson<T>(string? value) => value is null ? default : JsonSerializer.Deserialize<T>(value, JsonSerializerOptions.Web);
+    internal static string? Json<T>(T? value) where T : class => value is null ? null : JsonSerializer.Serialize(value, JsonOptions);
+    private static T? ReadJson<T>(string? value) => value is null ? default : JsonSerializer.Deserialize<T>(value, JsonOptions);
+    private static JsonSerializerOptions CreateJsonOptions()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        return options;
+    }
 }
 
 sealed record ObservationEnrichmentValue(

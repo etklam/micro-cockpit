@@ -95,44 +95,39 @@ internal static class CockpitComposition
     {
         var from = window.Start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var to = window.End.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var journalTask = transport.GetAsync<CollectionResponse<DiaryDayFact>>("journal", $"/internal/diary-day-summary?from={from}&to={to}", context);
+        var diaryTask = transport.GetAsync<CollectionResponse<DiaryDayFact>>("journal", $"/internal/diary-day-summary?from={from}&to={to}", context);
+        var observationTask = transport.GetAsync<CollectionResponse<MarketObservationDayFact>>("journal", $"/internal/market-observation-day-summary?from={from}&to={to}", context);
         var performanceTask = transport.GetAsync<CollectionResponse<DailyPerformanceResponse>>("performance", $"/internal/daily-performances?from={from}&to={to}", context);
         var summaryTask = transport.GetAsync<MonthSummaryResponse>("performance", $"/internal/performance/month-summary?year={window.Year}&month={window.Month}", context);
         var alertsTask = transport.GetAsync<CollectionResponse<CalendarAlertFact>>("reminder", $"/internal/diary-alerts/day-summaries?from={from}&to={to}", context);
-        await Task.WhenAll(journalTask, performanceTask, summaryTask, alertsTask);
+        await Task.WhenAll(diaryTask, observationTask, performanceTask, summaryTask, alertsTask);
 
-        var journal = await journalTask;
+        var diary = await diaryTask;
+        var observations = await observationTask;
         var performance = await performanceTask;
         var summary = await summaryTask;
         var alerts = await alertsTask;
-        var requiredFailure = RequiredFailure(journal, false) ?? RequiredFailure(performance, false) ?? RequiredFailure(summary, false);
+        var requiredFailure = RequiredFailure(diary, false) ?? RequiredFailure(observations, false) ?? RequiredFailure(performance, false) ?? RequiredFailure(summary, false);
         if (requiredFailure is not null) return CompositionResult<CalendarResponse>.Fail(requiredFailure);
         var authorizationFailure = AuthorizationFailure(alerts);
         if (authorizationFailure is not null) return CompositionResult<CalendarResponse>.Fail(authorizationFailure);
 
-        var journalByDate = journal.Value!.Items.ToDictionary(item => item.LocalDate);
+        var diaryByDate = diary.Value!.Items.ToDictionary(item => item.LocalDate);
+        var observationsByDate = observations.Value!.Items.ToDictionary(item => item.Date);
         var performanceByDate = performance.Value!.Items.ToDictionary(item => item.LocalDate);
         var alertsByDate = alerts.Value?.Items.ToDictionary(item => item.LocalDate) ?? [];
         var days = new List<CalendarDayResponse>();
         for (var date = window.Start; date <= window.End; date = date.AddDays(1))
         {
-            journalByDate.TryGetValue(date, out var journalFact);
+            diaryByDate.TryGetValue(date, out var diaryFact);
+            observationsByDate.TryGetValue(date, out var observation);
             performanceByDate.TryGetValue(date, out var performanceFact);
             alertsByDate.TryGetValue(date, out var alertFact);
-            days.Add(new CalendarDayResponse(
-                date,
-                performanceFact,
-                journalFact?.DiaryCount ?? 0,
-                journalFact?.TransactionCount ?? 0,
-                alerts.StatusCode == StatusCodes.Status200OK ? alertFact?.Count ?? 0 : null));
+            days.Add(new CalendarDayResponse(date, performanceFact, diaryFact?.DiaryCount ?? 0, diaryFact?.TransactionCount ?? 0,
+                alerts.StatusCode == StatusCodes.Status200OK ? alertFact?.Count ?? 0 : null,
+                observation?.MarketObservationId, observation?.UpdateCount ?? 0, observation?.ReadyForReviewCount));
         }
-
-        return CompositionResult<CalendarResponse>.Success(new CalendarResponse(
-            window.Year,
-            window.Month,
-            summary.Value,
-            days,
-            new CalendarCapabilitiesResponse(Capability(alerts))));
+        return CompositionResult<CalendarResponse>.Success(new CalendarResponse(window.Year, window.Month, summary.Value, days, new CalendarCapabilitiesResponse(Capability(alerts))));
     }
 
     internal static async Task<CompositionResult<StockPageResponse>> StockPageAsync(

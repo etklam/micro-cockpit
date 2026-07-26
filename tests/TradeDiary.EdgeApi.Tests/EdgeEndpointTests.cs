@@ -40,6 +40,7 @@ public sealed class EdgeAuthorizationTests
     [InlineData("POST", "/api/app/diaries", "diary:read", HttpStatusCode.Forbidden)]
     [InlineData("POST", "/api/app/diaries", "diary:write", HttpStatusCode.OK)]
     [InlineData("GET", "/api/app/market-observations/today", "diary:read", HttpStatusCode.OK)]
+    [InlineData("GET", "/api/app/market-observations?tag=breadth&limit=10", "diary:read", HttpStatusCode.OK)]
     [InlineData("POST", "/api/app/quick-observations", "diary:read", HttpStatusCode.Forbidden)]
     [InlineData("POST", "/api/app/quick-observations", "diary:write", HttpStatusCode.OK)]
     [InlineData("PUT", "/api/app/observation-updates/11111111-1111-1111-1111-111111111111", "diary:write", HttpStatusCode.OK)]

@@ -49,6 +49,9 @@ record ObservationUpdateEditResponse(
     IReadOnlyList<ObservationSubjectResponse> RelatedSubjects,
     ObservationEvidenceResponse? Evidence);
 record MarketObservationResponse(Guid Id, DateOnly JournalDay, string Timezone, string Rollover, IReadOnlyList<ObservationUpdateResponse> Updates);
+record ObservationSearchItemResponse(Guid MarketObservationId, DateOnly JournalDay, Guid AuthorId, ObservationUpdateResponse Update);
+record ObservationSearchPage(IReadOnlyList<ObservationSearchItemResponse> Items, string? NextCursor);
+record MarketObservationDaySummaryItem(DateOnly Date, Guid MarketObservationId, long UpdateCount, long? ReadyForReviewCount);
 record DiaryDaySummaryItem(DateOnly LocalDate, long DiaryCount, long TransactionCount);
 record CollectionResponse<T>(List<T> Items);
 /// <summary>Sanitized diary projection for partner compare. No transactions/reviews/internal IDs.</summary>

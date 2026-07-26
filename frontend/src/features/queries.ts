@@ -20,6 +20,7 @@ export const queryKeys = {
   dashboard: ['dashboard'] as const,
   todayObservation: ['market-observations', 'today'] as const,
   instrumentDirectory: ['market', 'instruments'] as const,
+  observationHistory: (filters: api.ObservationSearchFilters) => ['market-observations', 'history', filters.query ?? '', filters.from ?? '', filters.to ?? '', filters.subjectType ?? '', filters.subject ?? '', filters.instrumentId ?? '', filters.market ?? '', filters.symbol ?? '', filters.tag ?? '', filters.author ?? ''] as const,
   diaries: ['diaries'] as const,
   diariesList: (filters: DiaryListKeyFilters) => ['diaries', 'list', filters.q, filters.from, filters.to, filters.review, filters.symbol, filters.tag] as const,
   diary: (id: string) => ['diary', id] as const,
@@ -58,6 +59,12 @@ export const useSettingsQuery = () => useQuery({ queryKey: queryKeys.settings, q
 export const useDashboardQuery = () => useQuery({ queryKey: queryKeys.dashboard, queryFn: api.getDashboard })
 export const useTodayObservationQuery = () => useQuery({ queryKey: queryKeys.todayObservation, queryFn: api.getTodayMarketObservation, refetchInterval: 60_000 })
 export const useInstrumentDirectoryQuery = () => useQuery({ queryKey: queryKeys.instrumentDirectory, queryFn: api.getInstrumentDirectory, staleTime: 300_000 })
+export const useObservationHistoryQuery = (filters: api.ObservationSearchFilters) => useInfiniteQuery({
+  queryKey: queryKeys.observationHistory(filters),
+  initialPageParam: undefined as string | undefined,
+  queryFn: ({ pageParam }) => api.getObservationHistory(filters, pageParam),
+  getNextPageParam: page => page.nextCursor ?? undefined,
+})
 export const useDiariesInfiniteQuery = (filters: DiaryListKeyFilters) => useInfiniteQuery({
   queryKey: queryKeys.diariesList(filters),
   initialPageParam: undefined as string | undefined,
@@ -243,13 +250,6 @@ export function useDeleteTransactionMutation(diaryId: string) {
       client.invalidateQueries({ queryKey: queryKeys.diaries }),
       invalidateCalendar(client),
     ])
-  } })
-}
-
-export function useSavePerformanceMutation() {
-  const client = useQueryClient()
-  return useMutation({ mutationFn: ({ date, amount, capital, note }: { date: string; amount: number; capital: number | null; note: string }) => api.savePerformance(date, amount, capital, note), onSuccess: async () => {
-    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.dashboard }), invalidateCalendar(client)])
   } })
 }
 

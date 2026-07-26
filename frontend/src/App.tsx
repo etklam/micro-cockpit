@@ -7,7 +7,7 @@ import { Brand, Button, ErrorBox, IconButton, ThemeControls, ThemeToggle, useCon
 import { Icon } from './icons'
 import { cx } from './format'
 import './App.css'
-import { AlertsPage, CalendarPage, DiaryDetailPage, DiaryPage, DisciplinePage, TodayPage } from './pages'
+import { AlertsPage, CalendarPage, DiaryDetailPage, DiaryPage, DisciplinePage, ObservationHistoryPage, TodayPage } from './pages'
 import { ArticleDetailPage, ArticlesPage, MorePage, PartnerComparePage, PartnersPage, PriceAlertsPage, RotationPage, ToolsPage, WatchlistPage } from './latePages'
 import { SettingsPage } from './screens/settings'
 import { useBootstrapQuery } from './features/queries'
@@ -49,6 +49,7 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<Shell />}>
           <Route path="/today" element={<TodayPage />} />
+          <Route path="/today/observations" element={<ObservationHistoryPage />} />
           <Route path="/diary" element={<DiaryPage />} />
           <Route path="/diary/:diaryId" element={<DiaryDetailPage />} />
           <Route path="/calendar" element={<CalendarRedirect />} />

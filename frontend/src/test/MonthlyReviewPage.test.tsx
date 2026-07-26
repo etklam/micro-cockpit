@@ -27,9 +27,9 @@ function handlers(calendar: CalendarResponse = {
   year: 2028, month: 2,
   summary: { year: 2028, month: 2, total: 0, recordedDays: 2, profitDays: 1, lossDays: 0, flatDays: 1, bestDay: 25, worstDay: 0 },
   days: [
-    { date: '2028-02-01', performance: null, diaryCount: 0, transactionCount: 0, alertCount: null },
-    { date: '2028-02-02', performance: { localDate: '2028-02-02', pnlAmount: 0, capitalBase: null, pnlPercent: null, note: '' }, diaryCount: 1, transactionCount: 0, alertCount: null },
-    { date: '2028-02-03', performance: { localDate: '2028-02-03', pnlAmount: 25, capitalBase: null, pnlPercent: null, note: '' }, diaryCount: 2, transactionCount: 0, alertCount: null },
+    { date: '2028-02-01', performance: null, diaryCount: 0, transactionCount: 0, alertCount: null, marketObservationId: null, updateCount: 0, readyForReviewCount: null },
+    { date: '2028-02-02', performance: { localDate: '2028-02-02', pnlAmount: 0, capitalBase: null, pnlPercent: null, note: '' }, diaryCount: 1, transactionCount: 0, alertCount: null, marketObservationId: null, updateCount: 0, readyForReviewCount: null },
+    { date: '2028-02-03', performance: { localDate: '2028-02-03', pnlAmount: 25, capitalBase: null, pnlPercent: null, note: '' }, diaryCount: 2, transactionCount: 0, alertCount: null, marketObservationId: null, updateCount: 0, readyForReviewCount: null },
   ], capabilities: { alerts: 'unavailable' },
 }, review: DiaryReviewSummaryResponse = summary) {
   return [

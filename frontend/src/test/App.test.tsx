@@ -214,6 +214,96 @@ test('Today enrichment controls are available in Traditional Chinese', async () 
   expect(screen.getByLabelText('證據網址')).toBeInTheDocument()
 })
 
+test('mobile Today opens paginated observation history and an Instrument timeline', async () => {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+  window.dispatchEvent(new Event('resize'))
+  const requests: URL[] = []
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/market/symbols', () => HttpResponse.json({ contractVersion: 1, items: [] })),
+    http.get('/api/app/market-observations', ({ request }) => {
+      const url = new URL(request.url)
+      requests.push(url)
+      const cursor = url.searchParams.get('cursor')
+      const instrumentId = url.searchParams.get('instrumentId')
+      const first = {
+        marketObservationId: 'observation-1', journalDay: '2026-07-16', authorId: bootstrap.currentUser.id,
+        update: { id: 'update-1', content: 'Semiconductor breadth improved', recordedAt: '2026-07-16T13:30:00Z', updatedAt: '2026-07-16T13:30:00Z', signal: 'Advancers led decliners', interpretation: null, mentalState: null, tags: ['breadth'], primarySubject: { type: 'instrument', name: null, instrumentId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', market: 'US', symbol: 'AAPL', displayName: 'Apple Inc.', dailyCloseAvailable: true }, relatedSubjects: [], evidence: null },
+      }
+      const second = {
+        marketObservationId: 'observation-2', journalDay: '2026-07-15', authorId: bootstrap.currentUser.id,
+        update: { ...first.update, id: 'update-2', content: 'Dollar strengthened', primarySubject: { type: 'broad_market', name: 'US macro', instrumentId: null, market: null, symbol: null, displayName: null, dailyCloseAvailable: false } },
+      }
+      if (instrumentId) return HttpResponse.json({ items: [first], nextCursor: null })
+      return cursor ? HttpResponse.json({ items: [second], nextCursor: null }) : HttpResponse.json({ items: [first], nextCursor: 'next-page' })
+    }))
+
+  renderApp('/today')
+  await userEvent.click(await screen.findByRole('link', { name: 'All observations' }))
+  expect(await screen.findByRole('heading', { name: 'All observations' })).toBeInTheDocument()
+  expect(screen.getByText('Semiconductor breadth improved')).toBeInTheDocument()
+  expect(screen.getByText(/currently retained/i)).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Load more' }))
+  expect(await screen.findByText('Dollar strengthened')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('link', { name: 'AAPL · Apple Inc.' }))
+  await waitFor(() => expect(requests.at(-1)?.searchParams.get('instrumentId')).toBe('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'))
+  expect(window.location.pathname).toBe('/today/observations')
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 })
+  window.dispatchEvent(new Event('resize'))
+})
+
+test('observation history keeps loaded results when the next page fails', async () => {
+  server.use(...authenticatedHandlers())
+  server.use(http.get('/api/app/market-observations', ({ request }) => {
+    if (new URL(request.url).searchParams.get('cursor')) return new HttpResponse(null, { status: 503 })
+    return HttpResponse.json({ items: [{
+      marketObservationId: 'observation-1', journalDay: '2026-07-16', authorId: bootstrap.currentUser.id,
+      update: { id: 'update-1', content: 'Retained first page', recordedAt: '2026-07-16T13:30:00Z', updatedAt: '2026-07-16T13:30:00Z', signal: null, interpretation: null, mentalState: null, tags: [], primarySubject: null, relatedSubjects: [], evidence: null },
+    }], nextCursor: 'next-page' })
+  }))
+  renderApp('/today/observations')
+  expect(await screen.findByText('Retained first page')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Load more' }))
+  expect(await screen.findByText('Could not load more observations. Try again.')).toBeInTheDocument()
+  expect(screen.getByText('Retained first page')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+})
+
+test('observation history has Traditional Chinese empty and error states', async () => {
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/bootstrap', () => HttpResponse.json({ ...bootstrap, locale: 'zh-Hant' })),
+    http.get('/api/app/market-observations', () => HttpResponse.json({ items: [], nextCursor: null })),
+  )
+  renderApp('/today/observations')
+  expect(await screen.findByRole('heading', { name: '所有市場觀察' })).toBeInTheDocument()
+  expect(await screen.findByText('找不到市場觀察')).toBeInTheDocument()
+})
+
+test('observation history shows a retry state when search fails', async () => {
+  server.use(...authenticatedHandlers())
+  server.use(http.get('/api/app/market-observations', () => new HttpResponse(null, { status: 503 })))
+  renderApp('/today/observations')
+  expect(await screen.findByText('Couldn’t reach the cockpit.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+})
+
+test('Calendar shows Market Observations without the old Performance surface', async () => {
+  server.use(...authenticatedHandlers())
+  server.use(http.get('/api/app/calendar', () => HttpResponse.json({
+    year: 2026, month: 7, days: [
+      { date: '2026-07-01', marketObservationId: 'observation-1', updateCount: 2, readyForReviewCount: null },
+      ...Array.from({ length: 30 }, (_, index) => ({ date: `2026-07-${String(index + 2).padStart(2, '0')}`, marketObservationId: null, updateCount: 0, readyForReviewCount: null })),
+    ],
+  })))
+  renderApp('/calendar/2026/07?day=2026-07-01')
+  expect(await screen.findByText('Market Observations by Journal Day')).toBeInTheDocument()
+  expect(await screen.findByText('2 observation updates')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Open this day’s observations' })).toHaveAttribute('href', '/today/observations?from=2026-07-01&to=2026-07-01')
+  expect(screen.queryByText('Net P/L')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('P/L amount')).not.toBeInTheDocument()
+})
+
 test('quick observation remains available when dashboard composition fails', async () => {
   server.use(...authenticatedHandlers())
   server.use(http.get('/api/app/dashboard', () => new HttpResponse(null, { status: 503 })))

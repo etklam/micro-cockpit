@@ -179,6 +179,23 @@ export const en = {
   'error.trade.unavailable': 'The transaction service is temporarily unavailable. Try again.',
   'error.trade.delete': 'Could not delete the trade. Try again.',
 
+  // Observation history
+  'observations.all': 'All observations',
+  'observations.retained': 'Searches the currently retained record. This is not revision history.',
+  'observations.query': 'Content',
+  'observations.from': 'From',
+  'observations.to': 'To',
+  'observations.subjectType': 'Subject type',
+  'observations.anySubject': 'Any subject type',
+  'observations.subject': 'Subject',
+  'observations.instrumentId': 'Instrument ID',
+  'observations.author': 'Author',
+  'observations.search': 'Search observations',
+  'observations.empty': 'No observations found',
+  'observations.emptyHint': 'Try removing a filter or capture a new observation from Today.',
+  'observations.loadMore': 'Load more',
+  'observations.moreError': 'Could not load more observations. Try again.',
+
   // Today
   'today.greeting.late': 'Still up?',
   'today.greeting.morning': 'Good morning',
@@ -348,6 +365,13 @@ export const en = {
 
   // Calendar / Daily P/L
   'calendar.title': 'Calendar',
+  'calendar.observationSubtitle': 'Market Observations by Journal Day',
+  'calendar.day.observations': '{count} observation update',
+  'calendar.day.observations_other': '{count} observation updates',
+  'calendar.day.noObservations': 'No observations',
+  'calendar.openObservations': 'Open this day’s observations',
+  'calendar.readyForReview': '{count} ready for review',
+  'calendar.readyForReview_other': '{count} ready for review',
   'calendar.subtitle': '{count} trading day this month',
   'calendar.subtitle_other': '{count} trading days this month',
   'calendar.netPnl': 'Net P/L',

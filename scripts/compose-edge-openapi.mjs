@@ -43,7 +43,7 @@ function findServicePath(doc, internal, method) {
 
 // --- parse Edge route table -------------------------------------------------
 const routes = []
-for (const m of edgeSource.matchAll(/MapProxy\(app,\s*"([^"]+)",\s*"([\w-]+)",\s*"([^"]+)",\s*\[([^\]]+)\]\)/g)) {
+for (const m of edgeSource.matchAll(/MapProxy\(app,\s*"([^"]+)",\s*"([\w-]+)",\s*"([^"]+)",\s*\[([^\]]+)\](?:,\s*[^)]*)?\)/g)) {
   const pub = norm(m[1]); const svc = m[2]; const internal = norm(m[3])
   for (const vm of m[4].matchAll(/HttpMethods\.(Get|Post|Put|Patch|Delete)/g)) routes.push({ pub, method: vm[1].toLowerCase(), svc, internal })
 }
@@ -157,10 +157,12 @@ const calendarSchema = {
   properties: {
     year: { type: 'integer' }, month: { type: 'integer' },
     summary: monthSummary ? { oneOf: [ref(monthSummary), { type: 'null' }] } : { type: 'null' },
-    days: { type: 'array', items: { type: 'object', required: ['date', 'performance', 'diaryCount', 'transactionCount', 'alertCount'], properties: {
-      date: { type: 'string' },
+    days: { type: 'array', items: { type: 'object', required: ['date', 'performance', 'diaryCount', 'transactionCount', 'alertCount', 'marketObservationId', 'updateCount', 'readyForReviewCount'], properties: {
+      date: { type: 'string', format: 'date' },
       performance: perfDay ? { oneOf: [ref(perfDay), { type: 'null' }] } : { type: 'null' },
       diaryCount: { type: 'integer' }, transactionCount: { type: 'integer' }, alertCount: { type: ['integer', 'null'] },
+      marketObservationId: { type: ['string', 'null'], format: 'uuid' },
+      updateCount: { type: 'integer' }, readyForReviewCount: { type: ['integer', 'null'] },
     } } },
     capabilities: { type: 'object', required: ['alerts'], properties: { alerts: capability } },
   },
