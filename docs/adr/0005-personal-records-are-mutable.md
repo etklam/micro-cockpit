@@ -1,0 +1,3 @@
+# Personal reflection records are mutable
+
+User-owned Journal records—including Market Observations, Observation Updates, Expectations, Expectation Reviews, Action Decisions, Trades, Watchlists, Watchlist Notes, and Discipline Principles—are personal reflection records rather than an immutable audit log. Owners may overwrite or delete them without version history; the product warns that retrospective editing weakens self-review but does not prevent it. This favors personal control and low-friction correction over forensic provenance, accepting that the system cannot later reconstruct what the User originally wrote.

@@ -6,73 +6,50 @@ product
 
 ## Users
 
-Solo retail traders and serious part-time traders. They use the cockpit alone,
-usually at the end of a session — evening, low light, often a multi-monitor
-desk — to do the thing the market didn't let them do while trading: reflect.
-Their context is post-adrenaline: they just made decisions under pressure and
-now want to capture what happened, what they noticed, and what they'll remember
-next time, before the detail fades. They are fluent in trading tools and have
-zero patience for friction, decoration, or being treated like a beginner.
+Market participants who independently observe public markets and may trade only occasionally. They follow the United States market first, then Hong Kong, mainland China A-shares, and other markets. They need to preserve what they saw and believed while the context is fresh, often from a phone, without being forced into a daily trading routine.
+
+They are comfortable with market terminology and analytical tools. They value low-friction capture, explicit evidence, and honest review over gamification, generic education, or automated judgment.
 
 ## Product Purpose
 
-Micro Cockpit is a **diary-first trade journal**. It exists to make reflection
-the default, not an afterthought: a trader records the day's decisions as a
-diary, logs the trades behind them, marks daily P/L on a calendar, keeps a
-short list of personal discipline principles (one surfaces each day), and sets
-reminders to write. Success looks like a trader who, over months, can see the
-relationship between their discipline, their decisions, and their results — and
-who trusts the tool enough to be honest in it. It is explicitly **not** a
-brokerage, portfolio, or accounting engine: no holdings, no cost basis, no
-real-time quotes. The numbers are self-reported P/L, in service of reflection.
+Micro Cockpit is a **mobile-first market observation and self-review tool**. Its core record is a Market Observation for a Journal Day, not a Trade. A User can quickly capture an Observation Update, distinguish Signals from Interpretations, make a testable Expectation, record an Action Decision, and later review both the Outcome and the quality of the reasoning retained with that Expectation.
+
+Success means that, over time, a User can see which reasoning issues recur, which reasoning strengths are worth repeating, whether actions followed prior decisions, and how those patterns relate to self-reported performance without confusing outcome with process.
+
+Trading activity is optional evidence. Micro Cockpit is explicitly not a brokerage, portfolio, accounting engine, live market terminal, or embedded AI reviewer. It does not route orders, reconstruct holdings, calculate authoritative cost basis, provide real-time quotes, or decide whether a User's market view was correct. Agent Users may access explicitly granted records through the API while preserving ownership boundaries.
 
 ## Brand Personality
 
-**Calm. Precise. Restrained.** Three words. The tool feels like a quiet
-instrument panel a solo operator reads in low light — graphite and ink with a
-single signal lamp. It treats the trader's written reflection and their numbers
-with equal seriousness. It never gamifies, never flashes green-red dopamine,
-never congratulates or scolds. It is the opposite of a consumer trading app: no
-confetti, no streaks-as-pressure, no hot tips. It rewards honesty and returns
-discipline to the trader each morning. The voice is plain, adult, and direct.
+**Calm. Precise. Restrained.** Three words. The tool feels like a quiet instrument panel a market participant can use quickly on a phone and examine deeply when time permits. It treats written observation, supporting evidence, and numbers with equal seriousness.
+
+It never gamifies, flashes green-red dopamine, congratulates, scolds, or pressures a User to record something every day. It reminds rather than forces the User to preserve an honest account. The voice is plain, adult, and direct.
 
 ## Anti-references
 
-- **Consumer trading apps** (Robinhood, meme-broker UIs): confetti, neon
-  gain/loss flashes, streak pressure, dopamine loops. Forbidden.
-- **Navy-and-gold "premium fintech"** (the Bloomberg-clone / private-bank
-  cliché): dark navy panels, gold accents, faux-luxury. Reads as costume.
-- **The 2026 AI warm-cream default**: cream/sand/paper/parchment backgrounds
-  with dusty accents. Generic and off-brief.
-- **Generic SaaS dashboard**: the current build. Flat blue sidebar, identical
-  card grids, eyebrow-on-everything, hero-metric tiles. What we are replacing.
-- **Decorative motion**: orchestrated page-load reveals, hover choreography,
-  anything that makes the trader wait or watch instead of act.
+- **Consumer trading apps** (Robinhood, meme-broker UIs): confetti, neon gain/loss flashes, streak pressure, dopamine loops. Forbidden.
+- **Live market terminals**: dense streaming quotes, intraday monitoring, order entry, and alerts designed to keep the User watching prices.
+- **Navy-and-gold "premium fintech"**: dark navy panels, gold accents, faux-luxury. Reads as costume.
+- **The 2026 AI warm-cream default**: cream/sand/paper/parchment backgrounds with dusty accents. Generic and off-brief.
+- **Generic SaaS dashboards**: card grids and hero metrics that make navigation feel like a feature catalogue.
+- **Embedded AI judgment**: automatic diagnoses or opaque claims about the User's reasoning. The product provides records and transparent evidence; AI remains an Agent User or Account Delegate.
+- **Decorative motion**: orchestrated page-load reveals, hover choreography, anything that makes the User wait or watch instead of act.
 
 ## Design Principles
 
-1. **Reflection and numbers, equal weight.** The diary prose and the P/L are
-   both first-class. Neither is decoration for the other. Prose gets a real
-   reading measure; numbers get tabular precision.
-2. **Quiet by default.** One restrained accent does all the work. Surfaces are
-   deep and calm; state is signalled subtly, not shouted. Negative space is the
-   dominant material.
-3. **Instrument, not stage.** The tool disappears into the task. Every screen
-   is dense only where density serves the task, empty where it doesn't.
-   Familiar affordances, consistent vocabulary screen to screen.
-4. **Honesty over performance.** Copy and framing never congratulate, shame, or
-   pressure. "You showed up today" is as close to praise as it gets.
-5. **Reward opening it.** The daily discipline principle and the quick-note
-   capture sit at the top of the day. The hardest part — starting to write — is
-   the lowest-friction thing on screen.
+1. **Observation before transaction.** The product remains useful on days without a Trade. Market context, changing views, and Expectations are the primary material.
+2. **Capture first, structure later.** Quick Observation is the lowest-friction action. A User may later enrich it with a subject, Signal, Interpretation, Expectation, evidence, or Action Decision.
+3. **Evidence over verdicts.** Reviews separate Outcome, reasoning quality, execution, and performance. Pattern summaries show counts, denominators, and source records rather than issuing diagnoses.
+4. **Mobile first.** Every core workflow must work on a phone. Desktop may provide more space, but no core task assumes a large display.
+5. **Private by default.** Records are private until the owner creates an explicit, revocable Access Grant. Shared access never transfers ownership or permits edits.
+6. **Honesty without coercion.** Personal records may be edited or deleted. The product can warn about retrospective rewriting but does not enforce an immutable audit trail.
+7. **Quiet by default.** One restrained accent does the work. No streaks, per-item urgency, or engagement pressure.
+8. **Tools support decisions.** Calculators and completed-session market data may provide evidence, but never become trade recommendations or portfolio truth.
 
 ## Accessibility & Inclusion
 
-- WCAG 2.2 AA as the floor: body text ≥ 4.5:1, large/bold ≥ 3:1, all
-  interactive targets ≥ 24×24px (44px on touch), visible focus-visible rings.
+- WCAG 2.2 AA as the floor: body text ≥ 4.5:1, large/bold ≥ 3:1, all interactive targets ≥ 24×24px and preferably 44×44px on touch.
 - Full keyboard paths for every action; no hover-only functionality.
-- `prefers-reduced-motion` honored — every transition has a still or
-  crossfade fallback.
-- P/L direction never encoded by color alone (red/green) — always paired with a
-  sign, an arrow, or a label, for red-green color blindness.
-- Numerics tabular-aligned; money always labeled with currency.
+- `prefers-reduced-motion` honored; every transition has a still or crossfade fallback.
+- Direction and result are never encoded by color alone; always pair color with a sign, icon, or label.
+- Numerics are tabular-aligned; money is always labeled with currency.
+- English and Traditional Chinese are first-class interface languages under the existing typed i18n architecture.

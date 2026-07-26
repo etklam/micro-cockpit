@@ -1,0 +1,3 @@
+# Separate agent identities from journal access grants
+
+Agent Users are provisioned identities with their own records and API credentials, while Access Grants are read permissions over selected Journal-owned records. Identity owns Human Users, Agent Users, and Tokens; Journal owns grants because their scope depends on Journal concepts such as subject and date. This preserves whose market view each record represents and avoids teaching Identity about domain data, at the cost of a cross-service authorization check. Account Delegates remain a deliberate exception: when an external agent uses a human credential directly, its actions belong to that human identity and attribution is only self-reported.

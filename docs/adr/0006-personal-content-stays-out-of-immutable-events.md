@@ -1,0 +1,3 @@
+# Keep personal content out of immutable events
+
+Journal outbox events and consumer inboxes may retain only record ID, record type, version, operation, and event time. They never retain User-entered or personal-record content, including observation text, reasoning, review notes, Action Decisions, Mental States, Watchlist Notes, Discipline Principles, Trade details, URLs, titles, quotations, or attachments. Consumers resolve current content through Journal while authorized and remove or tombstone owned references after deletion events. This preserves ADR-0003's immutable replay history while allowing account and record deletion to remove personal content, at the cost of preventing event payloads from serving as a historical content archive.
