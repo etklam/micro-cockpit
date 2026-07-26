@@ -14,3 +14,7 @@
 - [ ] 使用者可選定至多一條 Discipline Principle 顯示在 Today
 - [ ] 選定另一條 Principle 時不自動 archive 原 Principle
 - [ ] 覆蓋 aggregation boundaries、empty ranges、ownership 與 Principle selection
+
+**決定（grill 2026-07-27）：**
+- 聚合鍵沿用 issue 05：系統預設 label 用常數 key、自訂 label 用 UID。改自訂 label 名稱不影響歷史聚合（鍵是 UID）。
+- Pattern Review 允許對使用者自己的資料做**排序與趨勢**呈現（例如「出現最多次的 Reasoning Issue」「較上月的次數變化」），因為那是使用者資料的客觀關係。**不得**加入系統結論（不宣稱某 label 是問題、不建議改進），遵 System Never Judges（CONTEXT.md／ADR-0007）。

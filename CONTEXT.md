@@ -143,3 +143,13 @@ _Avoid_: Live rotation monitor, trade signal
 **Calculation Snapshot**:
 The preserved inputs and outputs of a small analytical tool at a point in time.
 _Avoid_: Live market data, authoritative portfolio value
+
+## Product principles
+
+**System Never Judges**:
+The system presents only objective relationships within a User's own records — ordering, frequency, and trends are all permitted. It never introduces a conclusion or value judgement of its own. Stating a fact is allowed ("your invalidation condition was 'below $X' and the Daily Close was $X-5"); deciding an Outcome, declaring a reasoning flaw, or diagnosing a pattern is not. This principle governs Expectation Review, early-invalidation reminders, and Pattern Review. It is a permanent product commitment, not a first-version limitation.
+_Avoid_: Auto-decided Outcome, auto-diagnosed pattern, embedded AI reviewer speaking as the system
+
+**Judgement Belongs to a Named Owner**:
+If a judgement is to exist in the product, it must be attributed to an identifiable owner — the human User, or an Agent User. The system itself stays neutral. An Agent User is therefore the only legitimate outlet for AI judgement: its conclusions are its own records, are labelled as that Agent's view rather than as system fact, and are never written back onto a human User's records. A future platform-operated Agent (e.g. a membership AI report) is the same mechanism with an official owner, so [[System Never Judges]] holds even when the platform ships built-in AI analysis.
+_Avoid_: System-authored verdict, AI conclusion presented as a product feature, Agent output rewriting a human User's record
