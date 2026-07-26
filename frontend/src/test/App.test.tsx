@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw'
 import { BrowserRouter } from 'react-router-dom'
 import { expect, test } from 'vitest'
 import App from '../App'
+import type { ObservationUpdateResponse, ObservationUpdateWrite } from '../generated/edge'
 import { AuthProvider } from '../auth/AuthProvider'
 import { I18nProvider } from '../i18n'
 import { server } from './setup'
@@ -115,20 +116,43 @@ test('settings exposes the Journal Day rollover', async () => {
 test('mobile Today captures and edits observation updates with an honesty reminder', async () => {
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
   window.dispatchEvent(new Event('resize'))
-  let updates = [{ id: 'update-1', content: 'Opening breadth was weak', recordedAt: '2026-07-16T13:30:00Z', updatedAt: '2026-07-16T13:30:00Z' }]
+  let savedWrite: ObservationUpdateWrite | null = null
+  let updates: ObservationUpdateResponse[] = [{
+    id: 'update-1', content: 'Opening breadth was weak', recordedAt: '2026-07-16T13:30:00Z', updatedAt: '2026-07-16T13:30:00Z',
+    signal: null, interpretation: null, mentalState: null, tags: [], primarySubject: null, relatedSubjects: [], evidence: null,
+  }]
   server.use(...authenticatedHandlers())
   server.use(
     http.get('/api/app/market-observations/today', () => HttpResponse.json({
       id: 'observation-1', journalDay: '2026-07-16', timezone: 'Asia/Taipei', rollover: '00:00', updates,
     })),
+    http.get('/api/app/market/symbols', () => HttpResponse.json({
+      contractVersion: 1,
+      items: [{ instrumentId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', currency: 'USD', timezone: 'America/New_York' }],
+    })),
     http.post('/api/app/quick-observations', async ({ request }) => {
       const body = await request.json() as { content: string }
-      updates = [...updates, { id: 'update-2', content: body.content, recordedAt: '2026-07-16T14:00:00Z', updatedAt: '2026-07-16T14:00:00Z' }]
+      updates = [...updates, {
+        id: 'update-2', content: body.content, recordedAt: '2026-07-16T14:00:00Z', updatedAt: '2026-07-16T14:00:00Z',
+        signal: null, interpretation: null, mentalState: null, tags: [], primarySubject: null, relatedSubjects: [], evidence: null,
+      }]
       return HttpResponse.json({ marketObservationId: 'observation-1', observationUpdateId: 'update-2', journalDay: '2026-07-16', recordedAt: '2026-07-16T14:00:00Z', appended: true })
     }),
     http.put('/api/app/observation-updates/:id', async ({ request }) => {
-      const body = await request.json() as { content: string }
-      updates = updates.map(update => update.id === 'update-1' ? { ...update, content: body.content, updatedAt: '2026-07-16T15:00:00Z' } : update)
+      const body = await request.json() as ObservationUpdateWrite
+      savedWrite = body
+      const responseSubject = (subject: NonNullable<ObservationUpdateWrite['primarySubject']>) => ({
+        type: subject.type, name: subject.name ?? null, instrumentId: subject.instrumentId ?? null, market: subject.market ?? null,
+        symbol: subject.symbol ?? null, displayName: subject.displayName ?? null, dailyCloseAvailable: subject.market === 'US',
+      })
+      const primarySubject = body.primarySubject ? responseSubject(body.primarySubject) : null
+      const relatedSubjects = (body.relatedSubjects ?? []).map(responseSubject)
+      updates = updates.map(update => update.id === 'update-1' ? {
+        ...update, content: body.content, signal: body.signal ?? null, interpretation: body.interpretation ?? null,
+        mentalState: body.mentalState ?? null, tags: body.tags ?? [], primarySubject, relatedSubjects,
+        evidence: body.evidence ? { url: body.evidence.url, title: body.evidence.title ?? null, quote: body.evidence.quote ?? null } : null,
+        updatedAt: '2026-07-16T15:00:00Z',
+      } : update)
       return HttpResponse.json({ ...updates[0], honestyReminderRequired: true })
     }))
 
@@ -144,10 +168,50 @@ test('mobile Today captures and edits observation updates with an honesty remind
   const editor = screen.getByLabelText('Edit observation text')
   await userEvent.clear(editor)
   await userEvent.type(editor, 'Opening breadth improved')
+  await userEvent.type(screen.getByLabelText('Signal'), 'Advancers led decliners')
+  await userEvent.type(screen.getByLabelText('Interpretation'), 'Risk appetite may be returning')
+  await userEvent.type(screen.getByLabelText('Mental state'), 'patient')
+  await userEvent.type(screen.getByLabelText('Tags'), 'breadth, closing session')
+  await userEvent.selectOptions(screen.getByLabelText('Primary subject type'), 'instrument')
+  await userEvent.selectOptions(await screen.findByLabelText('US Instrument'), 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+  await userEvent.click(screen.getByRole('button', { name: 'Add related subject' }))
+  await userEvent.selectOptions(screen.getByLabelText('Related subject type'), 'instrument')
+  const markets = screen.getAllByLabelText('Market')
+  await userEvent.clear(markets[1])
+  await userEvent.type(markets[1], 'HK')
+  await userEvent.type(screen.getByLabelText('Symbol'), '0700')
+  await userEvent.type(screen.getByLabelText('Display name'), 'Tencent')
+  await userEvent.type(screen.getByLabelText('Evidence URL'), 'https://example.com/market')
+  await userEvent.type(screen.getByLabelText('Your excerpt'), 'Advancers led decliners.')
   await userEvent.click(screen.getByRole('button', { name: 'Save edit' }))
-  expect(await screen.findByText('Opening breadth improved')).toBeInTheDocument()
+  expect(savedWrite).toMatchObject({ primarySubject: { type: 'instrument', instrumentId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' }, relatedSubjects: [{ type: 'instrument', market: 'HK', symbol: '0700' }] })
+  const updatedItem = (await screen.findByText('Opening breadth improved')).closest('li')!
+  expect(updatedItem).toHaveTextContent('Advancers led decliners')
+  expect(updatedItem).toHaveTextContent('Primary subject: AAPL · Apple Inc.')
+  expect(updatedItem).toHaveTextContent('Related subject: 0700 · Tencent · Daily Close unavailable')
+  expect(updatedItem).toHaveTextContent('Mental state: patient')
+  expect(updatedItem).toHaveTextContent('Your excerpt: Advancers led decliners.')
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 })
   window.dispatchEvent(new Event('resize'))
+})
+
+test('Today enrichment controls are available in Traditional Chinese', async () => {
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/bootstrap', () => HttpResponse.json({ ...bootstrap, locale: 'zh-Hant' })),
+    http.get('/api/app/market/symbols', () => HttpResponse.json({ contractVersion: 1, items: [] })),
+    http.get('/api/app/market-observations/today', () => HttpResponse.json({
+      id: 'observation-1', journalDay: '2026-07-16', timezone: 'Asia/Taipei', rollover: '00:00',
+      updates: [{ id: 'update-1', content: '開市廣度偏弱', recordedAt: '2026-07-16T13:30:00Z', updatedAt: '2026-07-16T13:30:00Z', signal: null, interpretation: null, mentalState: null, tags: [], primarySubject: null, relatedSubjects: [], evidence: null }],
+    }))
+  )
+
+  renderApp('/today')
+  await userEvent.click(await screen.findByRole('button', { name: '編輯市場觀察' }))
+  expect(screen.getByLabelText('訊號')).toBeInTheDocument()
+  expect(screen.getByLabelText('詮釋')).toBeInTheDocument()
+  expect(screen.getByLabelText('主要觀察主體類型')).toBeInTheDocument()
+  expect(screen.getByLabelText('證據網址')).toBeInTheDocument()
 })
 
 test('quick observation remains available when dashboard composition fails', async () => {

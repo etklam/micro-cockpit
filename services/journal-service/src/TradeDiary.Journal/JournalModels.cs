@@ -9,9 +9,45 @@ record StoredResult(int StatusCode, string? Location, JsonElement Body);
 record QuickNoteResponse(Guid? DiaryId, bool Appended);
 record QuickObservationWrite(string Content);
 record QuickObservationResponse(Guid MarketObservationId, Guid ObservationUpdateId, DateOnly JournalDay, DateTime RecordedAt, bool Appended);
-record ObservationUpdateWrite(string Content);
-record ObservationUpdateResponse(Guid Id, string Content, DateTime RecordedAt, DateTime UpdatedAt);
-record ObservationUpdateEditResponse(Guid Id, string Content, DateTime RecordedAt, DateTime UpdatedAt, bool HonestyReminderRequired);
+enum ObservationSubjectType { broad_market, sector, theme, instrument }
+record ObservationSubjectWrite(ObservationSubjectType Type, string? Name = null, Guid? InstrumentId = null, string? Market = null, string? Symbol = null, string? DisplayName = null);
+record ObservationSubjectResponse(ObservationSubjectType Type, string? Name, Guid? InstrumentId, string? Market, string? Symbol, string? DisplayName, bool DailyCloseAvailable);
+record ObservationEvidenceWrite(string Url, string? Title = null, string? Quote = null);
+record ObservationEvidenceResponse(string Url, string? Title, string? Quote);
+record ObservationUpdateWrite(
+    string Content,
+    string? Signal = null,
+    string? Interpretation = null,
+    string? MentalState = null,
+    IReadOnlyList<string>? Tags = null,
+    ObservationSubjectWrite? PrimarySubject = null,
+    IReadOnlyList<ObservationSubjectWrite>? RelatedSubjects = null,
+    ObservationEvidenceWrite? Evidence = null);
+record ObservationUpdateResponse(
+    Guid Id,
+    string Content,
+    DateTime RecordedAt,
+    DateTime UpdatedAt,
+    string? Signal,
+    string? Interpretation,
+    string? MentalState,
+    IReadOnlyList<string> Tags,
+    ObservationSubjectResponse? PrimarySubject,
+    IReadOnlyList<ObservationSubjectResponse> RelatedSubjects,
+    ObservationEvidenceResponse? Evidence);
+record ObservationUpdateEditResponse(
+    Guid Id,
+    string Content,
+    DateTime RecordedAt,
+    DateTime UpdatedAt,
+    bool HonestyReminderRequired,
+    string? Signal,
+    string? Interpretation,
+    string? MentalState,
+    IReadOnlyList<string> Tags,
+    ObservationSubjectResponse? PrimarySubject,
+    IReadOnlyList<ObservationSubjectResponse> RelatedSubjects,
+    ObservationEvidenceResponse? Evidence);
 record MarketObservationResponse(Guid Id, DateOnly JournalDay, string Timezone, string Rollover, IReadOnlyList<ObservationUpdateResponse> Updates);
 record DiaryDaySummaryItem(DateOnly LocalDate, long DiaryCount, long TransactionCount);
 record CollectionResponse<T>(List<T> Items);

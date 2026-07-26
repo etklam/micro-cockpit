@@ -1,4 +1,5 @@
 using Npgsql;
+using NpgsqlTypes;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using System.Text.Json;
@@ -31,6 +32,7 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.AddHttpClient("reminder", client => client.BaseAddress = new Uri(builder.Configuration["Services:Reminder"] ?? "http://127.0.0.1:5104"));
 builder.Services.AddHttpClient("partner", client => client.BaseAddress = new Uri(builder.Configuration["Services:Partner"] ?? "http://127.0.0.1:5109"));
+builder.Services.AddHttpClient("market-data", client => client.BaseAddress = new Uri(builder.Configuration["Services:MarketData"] ?? "http://127.0.0.1:5106"));
 builder.Services.AddHostedService<OutboxPublisher>();
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
@@ -314,7 +316,8 @@ diary.MapGet("/market-observations/today", async (HttpRequest request, NpgsqlDat
     }
 
     await using var updatesCommand = db.CreateCommand("""
-        SELECT id, content, recorded_at, updated_at
+        SELECT id, content, recorded_at, updated_at, signal, interpretation, mental_state, tags,
+               primary_subject::text, related_subjects::text, evidence::text
         FROM journal.observation_updates
         WHERE market_observation_id=$1 AND user_id=$2 AND deleted_at IS NULL
         ORDER BY sequence
@@ -323,7 +326,7 @@ diary.MapGet("/market-observations/today", async (HttpRequest request, NpgsqlDat
     updatesCommand.Parameters.AddWithValue(userId);
     var updates = new List<ObservationUpdateResponse>();
     await using (var reader = await updatesCommand.ExecuteReaderAsync())
-        while (await reader.ReadAsync()) updates.Add(new(reader.GetGuid(0), reader.GetString(1), reader.GetDateTime(2), reader.GetDateTime(3)));
+        while (await reader.ReadAsync()) updates.Add(ObservationEnrichment.Read(reader));
     return Results.Ok(new MarketObservationResponse(observationId, storedDay, storedTimezone, storedRollover, updates));
 })
 .Produces<MarketObservationResponse>(200).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
@@ -394,24 +397,37 @@ diary.MapPost("/quick-observations", async (QuickObservationWrite input, HttpReq
 .Produces<QuickObservationResponse>(200).Produces<QuickObservationResponse>(201).ProducesProblem(400).ProducesProblem(401).ProducesProblem(409)
 .WithMetadata(new IdempotencyKeyHeaderMarker());
 
-diary.MapPut("/observation-updates/{id:guid}", async (Guid id, ObservationUpdateWrite input, HttpRequest request, NpgsqlDataSource db) =>
+diary.MapPut("/observation-updates/{id:guid}", async (Guid id, ObservationUpdateWrite input, HttpRequest request, NpgsqlDataSource db, IHttpClientFactory httpFactory) =>
 {
     if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
-    if (string.IsNullOrWhiteSpace(input.Content)) return Results.Problem("content_required", statusCode: 400);
+    var error = ObservationEnrichment.Normalize(input, out var value);
+    if (error is not null) return Results.Problem(error, statusCode: 400);
+    var resolution = await ObservationInstruments.ResolveAsync(httpFactory, value, request.HttpContext.RequestAborted);
+    if (resolution.Error is not null) return Results.Problem(resolution.Error, statusCode: resolution.StatusCode);
+    value = resolution.Value!;
     await using var command = db.CreateCommand("""
         UPDATE journal.observation_updates u
-        SET content=$3, updated_at=now()
+        SET content=$3, signal=$4, interpretation=$5, mental_state=$6, tags=$7,
+            primary_subject=$8, related_subjects=$9, evidence=$10, updated_at=now()
         FROM journal.market_observations o
         WHERE u.id=$1 AND u.user_id=$2 AND u.deleted_at IS NULL
           AND o.id=u.market_observation_id AND o.user_id=$2 AND o.deleted_at IS NULL
-        RETURNING u.id, u.content, u.recorded_at, u.updated_at
+        RETURNING u.id, u.content, u.recorded_at, u.updated_at, u.signal, u.interpretation,
+                  u.mental_state, u.tags, u.primary_subject::text, u.related_subjects::text, u.evidence::text
         """);
     command.Parameters.AddWithValue(id);
     command.Parameters.AddWithValue(userId);
-    command.Parameters.AddWithValue(input.Content.Trim());
+    command.Parameters.AddWithValue(value.Content);
+    command.Parameters.AddWithValue((object?)value.Signal ?? DBNull.Value);
+    command.Parameters.AddWithValue((object?)value.Interpretation ?? DBNull.Value);
+    command.Parameters.AddWithValue((object?)value.MentalState ?? DBNull.Value);
+    command.Parameters.AddWithValue(value.Tags.ToArray());
+    command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = (object?)ObservationEnrichment.Json(value.PrimarySubject) ?? DBNull.Value });
+    command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = ObservationEnrichment.Json(value.RelatedSubjects) ?? "[]" });
+    command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = (object?)ObservationEnrichment.Json(value.Evidence) ?? DBNull.Value });
     await using var reader = await command.ExecuteReaderAsync();
     if (!await reader.ReadAsync()) return Results.Problem("not_found", statusCode: 404);
-    return Results.Ok(new ObservationUpdateEditResponse(reader.GetGuid(0), reader.GetString(1), reader.GetDateTime(2), reader.GetDateTime(3), true));
+    return Results.Ok(ObservationEnrichment.ReadEdit(reader));
 })
 .Produces<ObservationUpdateEditResponse>(200).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
 

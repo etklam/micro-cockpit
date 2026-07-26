@@ -2164,13 +2164,169 @@
           }
         }
       },
+      "ObservationEvidenceResponse": {
+        "required": [
+          "url",
+          "title",
+          "quote"
+        ],
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "quote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ObservationEvidenceWrite": {
+        "required": [
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "quote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ObservationSubjectResponse": {
+        "required": [
+          "type",
+          "name",
+          "instrumentId",
+          "market",
+          "symbol",
+          "displayName",
+          "dailyCloseAvailable"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/ObservationSubjectType"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "market": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dailyCloseAvailable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ObservationSubjectType": {
+        "enum": [
+          "broad_market",
+          "sector",
+          "theme",
+          "instrument"
+        ]
+      },
+      "ObservationSubjectWrite": {
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/ObservationSubjectType"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "market": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ObservationUpdateEditResponse": {
         "required": [
           "id",
           "content",
           "recordedAt",
           "updatedAt",
-          "honestyReminderRequired"
+          "honestyReminderRequired",
+          "signal",
+          "interpretation",
+          "mentalState",
+          "tags",
+          "primarySubject",
+          "relatedSubjects",
+          "evidence"
         ],
         "type": "object",
         "properties": {
@@ -2191,6 +2347,56 @@
           },
           "honestyReminderRequired": {
             "type": "boolean"
+          },
+          "signal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "interpretation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mentalState": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "primarySubject": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ObservationSubjectResponse"
+              }
+            ]
+          },
+          "relatedSubjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservationSubjectResponse"
+            }
+          },
+          "evidence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ObservationEvidenceResponse"
+              }
+            ]
           }
         }
       },
@@ -2199,7 +2405,14 @@
           "id",
           "content",
           "recordedAt",
-          "updatedAt"
+          "updatedAt",
+          "signal",
+          "interpretation",
+          "mentalState",
+          "tags",
+          "primarySubject",
+          "relatedSubjects",
+          "evidence"
         ],
         "type": "object",
         "properties": {
@@ -2217,6 +2430,56 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "signal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "interpretation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mentalState": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "primarySubject": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ObservationSubjectResponse"
+              }
+            ]
+          },
+          "relatedSubjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservationSubjectResponse"
+            }
+          },
+          "evidence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ObservationEvidenceResponse"
+              }
+            ]
           }
         }
       },
@@ -2228,6 +2491,62 @@
         "properties": {
           "content": {
             "type": "string"
+          },
+          "signal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "interpretation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mentalState": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tags": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "primarySubject": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ObservationSubjectWrite"
+              }
+            ]
+          },
+          "relatedSubjects": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ObservationSubjectWrite"
+            }
+          },
+          "evidence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ObservationEvidenceWrite"
+              }
+            ]
           }
         }
       },

@@ -37,6 +37,9 @@ export type DiaryReviewFilterStatus = NonNullable<G.DiaryReviewFilterStatus>
 export type DiaryReviewAssessmentFilter = NonNullable<G.DiaryReviewAssessmentFilter>
 export type MarketObservation = G.MarketObservationResponse
 export type ObservationUpdate = G.ObservationUpdateResponse
+export type ObservationUpdateWrite = G.ObservationUpdateWrite
+export type ObservationSubjectWrite = G.ObservationSubjectWrite
+export type InstrumentDirectoryItem = G.PublishedSymbolResponse
 
 export const getBootstrap = () => G.getApiAppBootstrap()
 export type Bootstrap = Awaited<ReturnType<typeof G.getApiAppBootstrap>>
@@ -52,8 +55,9 @@ export async function getTodayMarketObservation(): Promise<MarketObservation | n
 }
 export const saveQuickObservation = (content: string, key?: string) =>
   G.postApiAppQuickObservations({ content }, idempotencyHeader(key))
-export const updateObservation = (id: string, content: string) =>
-  G.putApiAppObservationUpdatesId(id, { content })
+export const updateObservation = (id: string, body: ObservationUpdateWrite) =>
+  G.putApiAppObservationUpdatesId(id, body)
+export const getInstrumentDirectory = async () => (await G.getApiAppMarketSymbols()).items
 export type DiaryPage = G.DiaryPage
 export type DiaryListQuery = {
   query?: string

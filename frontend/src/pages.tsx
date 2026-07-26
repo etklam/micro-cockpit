@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import type { Alert, Discipline } from './features/api'
+import type { Alert, Discipline, InstrumentDirectoryItem, ObservationSubjectWrite, ObservationUpdate } from './features/api'
 import { useIdempotencyKey } from './features/api'
 import {
   useAlertsQuery, useBootstrapQuery, useCalendarQuery, useCreateAlertMutation, useCreateDisciplineMutation,
   useDashboardQuery, useDeleteAlertMutation, useDeleteDisciplineMutation, useDiaryPickerQuery, useDiaryQuery,
-  useDismissAlertMutation, useQuickObservationMutation, useSavePerformanceMutation,
+  useDismissAlertMutation, useInstrumentDirectoryQuery, useQuickObservationMutation, useSavePerformanceMutation,
   useDisciplinesQuery, useTodayObservationQuery, useUpdateObservationMutation,
 } from './features/queries'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, Stat, TextArea, TextInput } from './ui'
@@ -35,16 +35,81 @@ const WEEKDAYS = [
   'calendar.weekday.sat',
 ] as const
 
+type SubjectDraft = {
+  type: '' | 'broad_market' | 'sector' | 'theme' | 'instrument'
+  name: string
+  instrumentId: string
+  market: string
+  symbol: string
+  displayName: string
+}
+
+const emptySubject = (): SubjectDraft => ({ type: '', name: '', instrumentId: '', market: 'US', symbol: '', displayName: '' })
+const subjectDraft = (subject: ObservationUpdate['primarySubject']): SubjectDraft => subject ? {
+  type: subject.type as SubjectDraft['type'], name: subject.name ?? '', instrumentId: subject.instrumentId ?? '',
+  market: subject.market ?? 'US', symbol: subject.symbol ?? '', displayName: subject.displayName ?? '',
+} : emptySubject()
+const subjectWrite = (subject: SubjectDraft): ObservationSubjectWrite | null => {
+  if (!subject.type) return null
+  if (subject.type !== 'instrument') return { type: subject.type, name: subject.name }
+  return { type: 'instrument', instrumentId: subject.market.trim().toUpperCase() === 'US' ? subject.instrumentId || null : null, market: subject.market, symbol: subject.symbol, displayName: subject.displayName }
+}
+const subjectLabel = (subject: NonNullable<ObservationUpdate['primarySubject']>) =>
+  subject.type === 'instrument' ? `${subject.symbol} · ${subject.displayName}` : subject.name
+
+function SubjectFields({ subject, onChange, instruments, prefix }: { subject: SubjectDraft; onChange: (subject: SubjectDraft) => void; instruments: InstrumentDirectoryItem[]; prefix: string }) {
+  const { t } = useI18n()
+  const set = (patch: Partial<SubjectDraft>) => onChange({ ...subject, ...patch })
+  return <div className="stack">
+    <Field label={t(prefix === 'today.observations.primary' ? 'today.observations.primary.type' : 'today.observations.related.type')}>
+      <SelectBox value={subject.type} onChange={event => set({ type: event.target.value as SubjectDraft['type'] })}>
+        <option value="">{t('today.observations.subject.none')}</option>
+        <option value="broad_market">{t('today.observations.subject.broadMarket')}</option>
+        <option value="sector">{t('today.observations.subject.sector')}</option>
+        <option value="theme">{t('today.observations.subject.theme')}</option>
+        <option value="instrument">{t('today.observations.subject.instrument')}</option>
+      </SelectBox>
+    </Field>
+    {subject.type && subject.type !== 'instrument' ? <Field label={t('today.observations.subjectName')}><TextInput value={subject.name} onChange={event => set({ name: event.target.value })} /></Field> : null}
+    {subject.type === 'instrument' ? <>
+      <Field label={t('today.observations.market')}><TextInput value={subject.market} onChange={event => set({ market: event.target.value, instrumentId: '', symbol: '', displayName: '' })} /></Field>
+      {subject.market.trim().toUpperCase() === 'US' ? <Field label={t('today.observations.usInstrument')}>
+        <SelectBox value={subject.instrumentId} onChange={event => {
+          const selected = instruments.find(item => item.instrumentId === event.target.value)
+          set({ instrumentId: event.target.value, symbol: selected?.symbol ?? '', displayName: selected?.name ?? '' })
+        }}>
+          <option value="">{t('today.observations.chooseInstrument')}</option>
+          {instruments.map(item => <option key={item.instrumentId} value={item.instrumentId}>{item.symbol} · {item.name}</option>)}
+        </SelectBox>
+      </Field> : <>
+        <Field label={t('today.observations.symbol')}><TextInput value={subject.symbol} onChange={event => set({ symbol: event.target.value })} /></Field>
+        <Field label={t('today.observations.displayName')}><TextInput value={subject.displayName} onChange={event => set({ displayName: event.target.value })} /></Field>
+        <p className="form-hint">{t('today.observations.noDailyClose')}</p>
+      </>}
+    </> : null}
+  </div>
+}
+
 /* =============================== TODAY ============================== */
 export function TodayPage() {
   const { go } = useCockpit()
   const { t, format, locale } = useI18n()
   const { data, isLoading: loading, isError: error, refetch: reload } = useDashboardQuery()
   const observation = useTodayObservationQuery()
+  const instruments = useInstrumentDirectoryQuery()
   const [note, setNote] = useState('')
   const [saved, setSaved] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
+  const [editSignal, setEditSignal] = useState('')
+  const [editInterpretation, setEditInterpretation] = useState('')
+  const [editMentalState, setEditMentalState] = useState('')
+  const [editTags, setEditTags] = useState('')
+  const [editPrimarySubject, setEditPrimarySubject] = useState<SubjectDraft>(emptySubject)
+  const [editRelatedSubjects, setEditRelatedSubjects] = useState<SubjectDraft[]>([])
+  const [editEvidenceUrl, setEditEvidenceUrl] = useState('')
+  const [editEvidenceTitle, setEditEvidenceTitle] = useState('')
+  const [editEvidenceQuote, setEditEvidenceQuote] = useState('')
   const idem = useIdempotencyKey()
   const saveQuickObservation = useQuickObservationMutation()
   const updateObservation = useUpdateObservationMutation()
@@ -63,11 +128,35 @@ export function TodayPage() {
     } finally { /* Mutation state drives the button. */ }
   }
 
-  async function saveEdit() {
-    if (!editingId || !editContent.trim()) return
-    await updateObservation.mutateAsync({ id: editingId, content: editContent.trim() })
+  function beginEdit(update: ObservationUpdate) {
+    setEditingId(update.id)
+    setEditContent(update.content)
+    setEditSignal(update.signal ?? '')
+    setEditInterpretation(update.interpretation ?? '')
+    setEditMentalState(update.mentalState ?? '')
+    setEditTags(update.tags.join(', '))
+    setEditPrimarySubject(subjectDraft(update.primarySubject))
+    setEditRelatedSubjects(update.relatedSubjects.map(subject => subjectDraft(subject)))
+    setEditEvidenceUrl(update.evidence?.url ?? '')
+    setEditEvidenceTitle(update.evidence?.title ?? '')
+    setEditEvidenceQuote(update.evidence?.quote ?? '')
+  }
+
+  function cancelEdit() {
     setEditingId(null)
     setEditContent('')
+  }
+
+  async function saveEdit() {
+    if (!editingId || !editContent.trim()) return
+    const primarySubject = subjectWrite(editPrimarySubject)
+    await updateObservation.mutateAsync({ id: editingId, body: {
+      content: editContent.trim(), signal: editSignal || null, interpretation: editInterpretation || null,
+      mentalState: editMentalState || null, tags: editTags.split(',').map(tag => tag.trim()).filter(Boolean),
+      primarySubject, relatedSubjects: editRelatedSubjects.map(subjectWrite).filter((subject): subject is ObservationSubjectWrite => subject !== null),
+      evidence: editEvidenceUrl ? { url: editEvidenceUrl, title: editEvidenceTitle || null, quote: editEvidenceQuote || null } : null,
+    } })
+    cancelEdit()
   }
 
   const hour = new Date().getHours()
@@ -122,19 +211,37 @@ export function TodayPage() {
                 {editingId === update.id ? (
                   <div className="stack">
                     <p className="form-hint" role="note">{t('today.observations.honestyReminder')}</p>
-                    <Field label={t('today.observations.editLabel')}>
-                      <TextArea value={editContent} onChange={event => setEditContent(event.target.value)} />
-                    </Field>
+                    <Field label={t('today.observations.editLabel')}><TextArea value={editContent} onChange={event => setEditContent(event.target.value)} /></Field>
+                    <Field label={t('today.observations.signal')}><TextArea value={editSignal} onChange={event => setEditSignal(event.target.value)} /></Field>
+                    <Field label={t('today.observations.interpretation')}><TextArea value={editInterpretation} onChange={event => setEditInterpretation(event.target.value)} /></Field>
+                    <Field label={t('today.observations.mentalState')}><TextInput value={editMentalState} onChange={event => setEditMentalState(event.target.value)} /></Field>
+                    <Field label={t('today.observations.tags')}><TextInput value={editTags} onChange={event => setEditTags(event.target.value)} /></Field>
+                    <SubjectFields subject={editPrimarySubject} onChange={setEditPrimarySubject} instruments={instruments.data ?? []} prefix="today.observations.primary" />
+                    {editRelatedSubjects.map((subject, index) => <div className="stack" key={index}>
+                      <SubjectFields subject={subject} instruments={instruments.data ?? []} prefix="today.observations.related" onChange={next => setEditRelatedSubjects(current => current.map((item, itemIndex) => itemIndex === index ? next : item))} />
+                      <Button variant="ghost" size="sm" onClick={() => setEditRelatedSubjects(current => current.filter((_, itemIndex) => itemIndex !== index))}>{t('today.observations.removeRelated')}</Button>
+                    </div>)}
+                    <Button variant="ghost" size="sm" onClick={() => setEditRelatedSubjects(current => [...current, emptySubject()])}>{t('today.observations.addRelated')}</Button>
+                    <Field label={t('today.observations.evidenceUrl')}><TextInput type="url" value={editEvidenceUrl} onChange={event => setEditEvidenceUrl(event.target.value)} /></Field>
+                    <Field label={t('today.observations.evidenceTitle')}><TextInput value={editEvidenceTitle} onChange={event => setEditEvidenceTitle(event.target.value)} /></Field>
+                    <Field label={t('today.observations.evidenceQuote')}><TextArea value={editEvidenceQuote} onChange={event => setEditEvidenceQuote(event.target.value)} /></Field>
                     <div className="form-actions">
                       <Button variant="primary" size="sm" loading={updateObservation.isPending} disabled={!editContent.trim()} onClick={saveEdit}>{t('today.observations.saveEdit')}</Button>
-                      <Button variant="ghost" size="sm" onClick={() => { setEditingId(null); setEditContent('') }}>{t('common.cancel')}</Button>
+                      <Button variant="ghost" size="sm" onClick={cancelEdit}>{t('common.cancel')}</Button>
                     </div>
                   </div>
                 ) : (
                   <>
                     <time dateTime={update.recordedAt}>{observationTime.format(new Date(update.recordedAt))}</time>
                     <p>{update.content}</p>
-                    <Button variant="ghost" size="sm" onClick={() => { setEditingId(update.id); setEditContent(update.content) }}>{t('today.observations.edit')}</Button>
+                    {update.signal ? <p><strong>{t('today.observations.signal')}:</strong> {update.signal}</p> : null}
+                    {update.interpretation ? <p><strong>{t('today.observations.interpretation')}:</strong> {update.interpretation}</p> : null}
+                    {update.mentalState ? <p><strong>{t('today.observations.mentalState')}:</strong> {update.mentalState}</p> : null}
+                    {update.primarySubject ? <p><strong>{t('today.observations.primarySubject')}:</strong> {subjectLabel(update.primarySubject)}{update.primarySubject.type === 'instrument' && !update.primarySubject.dailyCloseAvailable ? ` · ${t('today.observations.dailyCloseUnavailable')}` : ''}</p> : null}
+                    {update.relatedSubjects.map((subject, index) => <p key={`${subject.type}-${index}`}><strong>{t('today.observations.relatedSubject')}:</strong> {subjectLabel(subject)}{subject.type === 'instrument' && !subject.dailyCloseAvailable ? ` · ${t('today.observations.dailyCloseUnavailable')}` : ''}</p>)}
+                    {update.tags.length ? <p><strong>{t('today.observations.tags')}:</strong> {update.tags.join(' · ')}</p> : null}
+                    {update.evidence ? <><p><a href={update.evidence.url} target="_blank" rel="noreferrer">{update.evidence.title || update.evidence.url}</a></p>{update.evidence.quote ? <blockquote><strong>{t('today.observations.evidenceQuote')}:</strong> {update.evidence.quote}</blockquote> : null}</> : null}
+                    <Button variant="ghost" size="sm" onClick={() => beginEdit(update)}>{t('today.observations.edit')}</Button>
                   </>
                 )}
               </li>

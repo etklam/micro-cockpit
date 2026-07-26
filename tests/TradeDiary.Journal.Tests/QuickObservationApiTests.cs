@@ -16,6 +16,8 @@ using Testcontainers.PostgreSql;
 
 public sealed class QuickObservationApiTests
 {
+    private static readonly Guid KnownInstrumentId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+
     [Theory]
     [InlineData("2026-07-14T01:29:59Z", "America/Los_Angeles", "18:30", "2026-07-12")]
     [InlineData("2026-07-14T01:30:00Z", "America/Los_Angeles", "18:30", "2026-07-13")]
@@ -72,6 +74,82 @@ public sealed class QuickObservationApiTests
     }
 
     [Fact]
+    public async Task Owner_can_enrich_an_update_without_blurring_subjects_tags_or_evidence()
+    {
+        await using var fixture = await Fixture.StartAsync(new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero));
+        var owner = Guid.NewGuid();
+        using var client = fixture.Client(owner);
+        using var created = await Post(client, "Initial note", "enrich-1");
+        var updateId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("observationUpdateId").GetGuid();
+        var instrumentId = KnownInstrumentId;
+
+        using var enriched = await client.PutAsJsonAsync($"/internal/observation-updates/{updateId}", new
+        {
+            content = "Initial note",
+            signal = "Breadth improved into the close",
+            interpretation = "Risk appetite may be returning",
+            mentalState = "patient",
+            tags = new[] { "Closing session", "closing session", "breadth" },
+            primarySubject = new { type = "instrument", instrumentId, market = "US", symbol = "AAPL", displayName = "Apple Inc." },
+            relatedSubjects = new object[]
+            {
+                new { type = "broad_market", name = "US equities" },
+                new { type = "theme", name = "Artificial intelligence" },
+                new { type = "instrument", market = "HK", symbol = "0700", displayName = "Tencent" },
+            },
+            evidence = new { url = "https://example.com/market", title = "Closing breadth", quote = "Advancers led decliners." },
+        });
+
+        Assert.Equal(HttpStatusCode.OK, enriched.StatusCode);
+        var today = await client.GetFromJsonAsync<JsonElement>("/internal/market-observations/today");
+        var update = today.GetProperty("updates")[0];
+        Assert.Equal("Breadth improved into the close", update.GetProperty("signal").GetString());
+        Assert.Equal("Risk appetite may be returning", update.GetProperty("interpretation").GetString());
+        Assert.Equal("patient", update.GetProperty("mentalState").GetString());
+        Assert.Equal(new[] { "breadth", "closing session" }, update.GetProperty("tags").EnumerateArray().Select(x => x.GetString()).ToArray());
+        Assert.Equal(instrumentId, update.GetProperty("primarySubject").GetProperty("instrumentId").GetGuid());
+        Assert.True(update.GetProperty("primarySubject").GetProperty("dailyCloseAvailable").GetBoolean());
+        Assert.False(update.GetProperty("relatedSubjects")[2].GetProperty("dailyCloseAvailable").GetBoolean());
+        Assert.Equal("https://example.com/market", update.GetProperty("evidence").GetProperty("url").GetString());
+
+        using var unsupportedUs = await client.PutAsJsonAsync($"/internal/observation-updates/{updateId}", new
+        {
+            content = "Initial note",
+            primarySubject = new { type = "instrument", market = "US", symbol = "AAPL", displayName = "Apple Inc." },
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, unsupportedUs.StatusCode);
+        Assert.Contains("directory_instrument_required", await unsupportedUs.Content.ReadAsStringAsync());
+
+        using var unknownInstrument = await client.PutAsJsonAsync($"/internal/observation-updates/{updateId}", new
+        {
+            content = "Initial note",
+            primarySubject = new { type = "instrument", instrumentId = Guid.NewGuid(), market = "US", symbol = "FAKE", displayName = "Fabricated" },
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, unknownInstrument.StatusCode);
+        Assert.Contains("unknown_instrument", await unknownInstrument.Content.ReadAsStringAsync());
+
+        using var evidenceWithoutSignal = await client.PutAsJsonAsync($"/internal/observation-updates/{updateId}", new
+        {
+            content = "Initial note",
+            evidence = new { url = "https://example.com/source", title = "Source", quote = "Context" },
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, evidenceWithoutSignal.StatusCode);
+        Assert.Contains("evidence_requires_signal", await evidenceWithoutSignal.Content.ReadAsStringAsync());
+
+        using var invalidEvidence = await client.PutAsJsonAsync($"/internal/observation-updates/{updateId}", new
+        {
+            content = "Initial note",
+            signal = "A signal",
+            evidence = new { url = "file:///tmp/source", title = "Local", quote = "Not allowed" },
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, invalidEvidence.StatusCode);
+        Assert.Contains("invalid_evidence_url", await invalidEvidence.Content.ReadAsStringAsync());
+
+        using var other = fixture.Client(Guid.NewGuid());
+        Assert.Equal(HttpStatusCode.NotFound, (await other.PutAsJsonAsync($"/internal/observation-updates/{updateId}", new { content = "stolen", signal = "private" })).StatusCode);
+    }
+
+    [Fact]
     public async Task Blank_capture_creates_nothing_and_cross_owner_edit_is_hidden()
     {
         await using var fixture = await Fixture.StartAsync(new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero));
@@ -120,7 +198,7 @@ public sealed class QuickObservationApiTests
             await using var setup = new NpgsqlConnection(postgres.GetConnectionString());
             await setup.OpenAsync();
             var root = Path.GetFullPath("../../../../..", AppContext.BaseDirectory);
-            foreach (var file in new[] { "0001_initial_journal_performance.sql", "0013_journal_idempotency.sql", "0026_market_observations.sql" })
+            foreach (var file in new[] { "0001_initial_journal_performance.sql", "0013_journal_idempotency.sql", "0026_market_observations.sql", "0028_observation_enrichment.sql" })
                 await new NpgsqlCommand(await File.ReadAllTextAsync(Path.Combine(root, "platform/postgres/migrations", file)), setup).ExecuteNonQueryAsync();
 
             var dataSource = NpgsqlDataSource.Create(postgres.GetConnectionString());
@@ -132,6 +210,7 @@ public sealed class QuickObservationApiTests
                 services.RemoveAll<TimeProvider>();
                 services.AddSingleton(dataSource);
                 services.AddSingleton<TimeProvider>(clock);
+                services.AddHttpClient("market-data").ConfigurePrimaryHttpMessageHandler(() => new InstrumentDirectoryHandler());
                 services.AddAuthentication(options =>
                 {
                     options.DefaultAuthenticateScheme = TestAuth.Scheme;
@@ -161,6 +240,17 @@ public sealed class QuickObservationApiTests
             factory.Dispose();
             await dataSource.DisposeAsync();
             await postgres.DisposeAsync();
+        }
+    }
+
+    private sealed class InstrumentDirectoryHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var known = request.RequestUri?.AbsolutePath.EndsWith(KnownInstrumentId.ToString(), StringComparison.OrdinalIgnoreCase) is true;
+            return Task.FromResult(known
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { instrumentId = KnownInstrumentId, symbol = "AAPL", name = "Apple Inc.", exchange = "NASDAQ", currency = "USD", timezone = "America/New_York" }) }
+                : new HttpResponseMessage(HttpStatusCode.NotFound));
         }
     }
 

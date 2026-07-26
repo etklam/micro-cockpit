@@ -112,6 +112,8 @@ spec:
               value: "http://identity:8080/.well-known/openid-configuration"
             - name: Services__Reminder
               value: "http://reminder:8080"
+            - name: Services__MarketData
+              value: "http://market-data:8080"
             - name: Internal__ServiceKey
               valueFrom:
                 secretKeyRef:

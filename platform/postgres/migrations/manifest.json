@@ -130,6 +130,16 @@
       "id": "0026",
       "filename": "0026_market_observations.sql",
       "sha256": "4790b8d9012aea73e351064e9845e65f2b92a670da015cde51c0ab294ca5f206"
+    },
+    {
+      "id": "0027",
+      "filename": "0027_market_instrument_identity.sql",
+      "sha256": "0b8bdae2f7d20fa055f1577a7b3813f8b359702cdde82eea52fba608f368ef38"
+    },
+    {
+      "id": "0028",
+      "filename": "0028_observation_enrichment.sql",
+      "sha256": "572820b7bfad36eda1a2a9c364fc7d70c36d0696a28c6c4b39b263a2b77c5ef5"
     }
   ]
 }

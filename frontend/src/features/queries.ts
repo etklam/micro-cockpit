@@ -19,6 +19,7 @@ export const queryKeys = {
   settings: ['settings'] as const,
   dashboard: ['dashboard'] as const,
   todayObservation: ['market-observations', 'today'] as const,
+  instrumentDirectory: ['market', 'instruments'] as const,
   diaries: ['diaries'] as const,
   diariesList: (filters: DiaryListKeyFilters) => ['diaries', 'list', filters.q, filters.from, filters.to, filters.review, filters.symbol, filters.tag] as const,
   diary: (id: string) => ['diary', id] as const,
@@ -56,6 +57,7 @@ export const useBootstrapQuery = (enabled = true) => useQuery({ queryKey: queryK
 export const useSettingsQuery = () => useQuery({ queryKey: queryKeys.settings, queryFn: api.getSettings })
 export const useDashboardQuery = () => useQuery({ queryKey: queryKeys.dashboard, queryFn: api.getDashboard })
 export const useTodayObservationQuery = () => useQuery({ queryKey: queryKeys.todayObservation, queryFn: api.getTodayMarketObservation, refetchInterval: 60_000 })
+export const useInstrumentDirectoryQuery = () => useQuery({ queryKey: queryKeys.instrumentDirectory, queryFn: api.getInstrumentDirectory, staleTime: 300_000 })
 export const useDiariesInfiniteQuery = (filters: DiaryListKeyFilters) => useInfiniteQuery({
   queryKey: queryKeys.diariesList(filters),
   initialPageParam: undefined as string | undefined,
@@ -181,7 +183,7 @@ export function useQuickObservationMutation() {
 
 export function useUpdateObservationMutation() {
   const client = useQueryClient()
-  return useMutation({ mutationFn: ({ id, content }: { id: string; content: string }) => api.updateObservation(id, content), onSuccess: async () => {
+  return useMutation({ mutationFn: ({ id, body }: { id: string; body: api.ObservationUpdateWrite }) => api.updateObservation(id, body), onSuccess: async () => {
     await client.invalidateQueries({ queryKey: queryKeys.todayObservation })
   } })
 }

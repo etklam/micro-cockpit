@@ -315,6 +315,46 @@
         }
       }
     },
+    "/internal/v1/instruments/{id}": {
+      "get": {
+        "tags": [
+          "TradeDiary.MarketData"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedSymbolResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/bars/{raw}": {
       "get": {
         "tags": [
@@ -674,6 +714,7 @@
       },
       "PublishedSymbolResponse": {
         "required": [
+          "instrumentId",
           "symbol",
           "name",
           "exchange",
@@ -682,6 +723,10 @@
         ],
         "type": "object",
         "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "symbol": {
             "type": "string"
           },
@@ -746,6 +791,13 @@
           "active": {
             "type": "boolean",
             "default": true
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       }
