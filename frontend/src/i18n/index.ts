@@ -25,9 +25,5 @@ export { translate, createTranslator } from './translate'
 export * as i18nFormat from './format'
 export {
   translateApiError,
-  diaryMutationErrorMessage,
-  diaryDeleteErrorMessage,
-  transactionDeleteErrorMessage,
-  transactionUpdateErrorMessage,
   registerErrorMessage,
 } from './errors'

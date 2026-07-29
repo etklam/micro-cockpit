@@ -8,7 +8,7 @@ import { Icon } from '../../icons'
 import { useI18n, type MessageKey } from '../../i18n'
 import { Button, Card, EmptyBox, Field, PageHeader, SelectBox, TextInput } from '../../ui'
 import { useBootstrapQuery } from '../../features/queries'
-import { buildDiaryDraft, buildTradeDraft, readToolContext } from '../../features/toolsWorkflow'
+import { readToolContext } from '../../features/toolsWorkflow'
 import { createToolPreset, deleteSavedCalculation, deleteToolPreset, editableInputs, listSavedCalculations, listToolPresets, markToolPresetUsed, persistedInputs, saveCalculation, updateToolPreset, type SavedCalculation, type ToolPreset } from '../../features/toolsPersistence'
 import { ApiError } from '../../generated/edge'
 
@@ -239,23 +239,13 @@ export function ToolsPage() {
     setSavingResult(true); setPersistenceError('')
     saveKey.current ??= crypto.randomUUID()
     try {
-      await saveCalculation({ toolType: tool, inputs: persistedInputs(values), currency, symbol: context?.symbol ?? null, sourceDiaryId: context?.sourceDiaryId ?? null, sourceTransactionId: context?.sourceTransactionId ?? null, note: note.trim() || null }, saveKey.current)
+      await saveCalculation({ toolType: tool, inputs: persistedInputs(values), currency, symbol: context?.symbol ?? null, note: note.trim() || null }, saveKey.current)
       await refreshPersistence(); setWorkflowStatus(t('tools.workflow.resultSaved'))
     } catch (error) { setPersistenceError(error instanceof ApiError && error.status === 404 ? t('tools.workflow.sourceMissing') : t('tools.workflow.resultError')) } finally { setSavingResult(false) }
   }
 
   function reopen(item: SavedCalculation) {
     setSearchParams({ tool: item.toolType }); setValues(editableInputs(item.inputs)); setCurrency(item.currency as typeof currency); setAnswer(null); setContext(null); setNote(item.note ?? ''); setWorkflowStatus(t('tools.workflow.reopened')); saveKey.current = null
-  }
-
-  function toTradeDraft() {
-    if (!answer || !context?.returnTo.startsWith('/diary/')) return
-    navigate(context.returnTo, { state: { tradeDraft: buildTradeDraft(tool, values, answer, currency, context.symbol) } })
-  }
-
-  function toDiaryDraft() {
-    if (!answer) return
-    navigate('/diary', { state: { diaryDraft: buildDiaryDraft(tool, values, answer, currency, context?.symbol, context?.diaryDate ?? bootstrap.data?.currentLocalDate ?? '') } })
   }
 
   function formatResult(config: ResultConfig, value: number, resultCurrency: string = currency): string {
@@ -338,7 +328,7 @@ export function ToolsPage() {
                     : undefined
                   return <div key={config.key} className={cx('tool-result', config.primary && 'tool-result--primary')}><span>{t(config.labelKey)}</span><strong className={semantic}>{formatResult(config, value)}</strong></div>
                 })}
-              </div><div className="tool-result-actions">{authState === 'authenticated' ? <><TextInput aria-label={t('tools.workflow.note')} value={note} maxLength={1000} onChange={event => setNote(event.target.value)} placeholder={t('tools.workflow.note')} /><Button loading={savingResult} onClick={() => { void saveResult() }}>{t('tools.workflow.saveResult')}</Button></> : null}{(tool === 'position-sizing' || tool === 'risk-reward') && context?.returnTo.startsWith('/diary/') ? <Button variant="primary" onClick={toTradeDraft}>{t('tools.workflow.tradeDraft')}</Button> : null}<Button variant="subtle" onClick={toDiaryDraft}>{t('tools.workflow.diaryDraft')}</Button></div></>
+              </div><div className="tool-result-actions">{authState === 'authenticated' ? <><TextInput aria-label={t('tools.workflow.note')} value={note} maxLength={1000} onChange={event => setNote(event.target.value)} placeholder={t('tools.workflow.note')} /><Button loading={savingResult} onClick={() => { void saveResult() }}>{t('tools.workflow.saveResult')}</Button></> : null}</div></>
             ) : (
               <EmptyBox icon="compass" title={t('tools.empty.title')} hint={t('tools.empty.body')} dense />
             )}

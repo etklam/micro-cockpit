@@ -26,6 +26,6 @@ record ProfitLossResponse(decimal NetPnl,decimal ReturnPercent,decimal GrossPnl,
 
 record PresetWrite(string Name,string ToolType,JsonElement Inputs,string? Currency);
 record PresetResponse(Guid Id,string Name,string ToolType,JsonElement Inputs,string? Currency,DateTime? LastUsedAt,DateTime CreatedAt,DateTime UpdatedAt);
-record SavedCalculationWrite(string ToolType,JsonElement Inputs,string Currency,string? Symbol,Guid? SourceDiaryId,Guid? SourceTransactionId,string? Note);
-record SavedCalculationResponse(Guid Id,string ToolType,int SchemaVersion,JsonElement Inputs,JsonElement Output,string Currency,string? Symbol,Guid? SourceDiaryId,Guid? SourceTransactionId,string? Note,DateTime CreatedAt);
+record SavedCalculationWrite(string ToolType,JsonElement Inputs,string Currency,string? Symbol,string? Note);
+record SavedCalculationResponse(Guid Id,string ToolType,int SchemaVersion,JsonElement Inputs,JsonElement Output,string Currency,string? Symbol,string? Note,DateTime CreatedAt);
 record ToolCollection<T>(IReadOnlyList<T> Items);

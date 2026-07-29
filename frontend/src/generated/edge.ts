@@ -1,138 +1,97 @@
 // Generated from contracts/openapi/edge-api.openapi.json. Do not edit.
 
+export type AccessGrantMode = "fixed" | "ongoing"
+export type AccessGrantResponse = { "id": string; "agentUserId": string; "mode": AccessGrantMode; "from": string; "to": string; "subjectType": null | string; "subject": null | string; "instrumentId": null | string; "expiresAt": null | string; "revokedAt": null | string; "createdAt": string }
+export type AccessGrantWrite = { "agentUserId": string; "mode": AccessGrantMode; "from": string; "to": string; "subjectType"?: null | string; "subject"?: null | string; "instrumentId"?: null | string; "expiresAt"?: null | string }
+export type AccountDeletionWrite = { "confirmation": string }
+export type AccountExportResponse = { "schemaVersion": number; "exportedAt": string; "identity": { [key: string]: unknown }; "journal": { [key: string]: unknown }; "tools": { [key: string]: unknown } }
+export type ActionDecisionEditResponse = { "id": string; "observationUpdateId": string; "expectationId": null | string; "intent": ActionDecisionIntent; "reason": string; "recordedAt": string; "executionReview": null | ExecutionReview; "updatedAt": string; "honestyReminderRequired": boolean }
+export type ActionDecisionIntent = "trade" | "continue_observing" | "avoid_trade"
+export type ActionDecisionResponse = { "id": string; "observationUpdateId": string; "expectationId": null | string; "intent": ActionDecisionIntent; "reason": string; "recordedAt": string; "executionReview": null | ExecutionReview; "updatedAt": string }
+export type ActionDecisionWrite = { "intent": ActionDecisionIntent; "reason": string; "expectationId"?: null | string; "executionReview"?: null | ExecutionReview }
+export type AgentManagementResponse = { "userId": string; "displayName": string; "timezone": string; "baseCurrency": string; "keyId": null | string; "scopes": Array<string>; "tokenCreatedAt": null | string; "lastUsedAt": null | string; "lastSuccessfulRequestAt": null | string }
+export type AgentProvisionResponse = { "userId": string; "displayName": string; "keyId": string; "apiToken": string; "scopes": Array<string>; "createdAt": string; "lastUsedAt": null | string; "lastSuccessfulRequestAt": null | string }
 export type AgentRequest = { "name": string; "displayName": string; "timezone": string; "baseCurrency": string; "scopes": Array<string>; "expiresAt": null | string }
-export type AgentResponse = { "userId": string; "keyId": string; "apiKey": string; "scopes": Array<string> }
+export type AgentTokenRequest = { "scopes": Array<string> }
+export type AgentTokenResponse = { "keyId": string; "apiToken": string; "scopes": Array<string>; "createdAt": string }
 export type ApiKeyTokenRequest = { "apiKey": string }
 export type ApiKeyTokenResponse = { "accessToken": string; "expiresAt": string }
 export type AppBootstrapResponse = { "currentUser": { "id": string; "email": string; "displayName": string }; "timezone": string; "journalDayRollover": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string; "role": string; "accountType": string; "currentLocalDate": string; "availableProductAreas": Array<string> }
-export type AuditResponse = { "id": string; "actorUserId": null | string; "action": string; "resourceType": string; "resourceId": null | string; "details": JsonElement; "occurredAt": string }
-export type AverageCost = { "currentQuantity": number; "currentAverageCost": number; "addedQuantity": number; "addedPrice": number }
-export type AverageCostResponse = { "averageCost": number; "totalQuantity": number; "totalCost": number; "averageCostChange": number }
 export type BarsResponse = { "contractVersion": number | string; "symbol": string; "items": Array<PublishedBarResponse> }
-export type CalculateResponse = { "universeId": string; "snapshotDate": string; "status": string; "formulaVersion": string }
-export type CalendarResponse = { "year": number; "month": number; "summary": MonthSummaryResponse | null; "days": Array<{ "date": string; "performance": PerformanceResponse | null; "diaryCount": number; "transactionCount": number; "alertCount": number | null; "marketObservationId": string | null; "updateCount": number; "readyForReviewCount": number | null }>; "capabilities": { "alerts": CapabilityStatus } }
-export type CapabilityStatus = "available" | "empty" | "unavailable"
-export type CollectionResponseOfAuditResponse = { "items": Array<AuditResponse> }
-export type CollectionResponseOfDiaryAlertResponse = { "items": Array<DiaryAlertResponse> }
-export type CollectionResponseOfDisciplineResponse = { "items": Array<DisciplineResponse> }
+export type CalendarResponse = { "year": number; "month": number; "days": Array<{ "date": string; "marketObservationId": string | null; "updateCount": number; "readyForReviewCount": number | null }> }
+export type CollectionResponseOfAccessGrantResponse = { "items": Array<AccessGrantResponse> }
+export type CollectionResponseOfActionDecisionResponse = { "items": Array<ActionDecisionResponse> }
+export type CollectionResponseOfAgentManagementResponse = { "items": Array<AgentManagementResponse> }
+export type CollectionResponseOfDisciplinePrincipleResponse = { "items": Array<DisciplinePrincipleResponse> }
 export type CollectionResponseOfExpectationResponse = { "items": Array<ExpectationResponse> }
-export type CollectionResponseOfInvitationListItem = { "items": Array<InvitationListItem> }
-export type CollectionResponseOfJobResponse = { "items": Array<JobResponse> }
-export type CollectionResponseOfPostResponse = { "items": Array<PostResponse> }
-export type CollectionResponseOfPriceAlertResponse = { "items": Array<PriceAlertResponse> }
-export type CollectionResponseOfStockResponse = { "items": Array<StockResponse> }
-export type CollectionResponseOfTimelineResponse = { "items": Array<TimelineResponse> }
-export type CollectionResponseOfTransactionResponse = { "items": Array<TransactionResponse> }
-export type CollectionResponseOfTriggerResponse = { "items": Array<TriggerResponse> }
-export type CollectionResponseOfUniverseResponse = { "items": Array<UniverseResponse> }
-export type CollectionResponseOfWatchlistResponse = { "items": Array<WatchlistResponse> }
-export type CreatedResponse = { "id": string }
-export type DashboardResponse = { "localDate": string; "diary": { "writtenToday": boolean; "count": number }; "performance": PerformanceResponse | null; "pendingAlerts": number | null; "discipline": DisciplineResponse | null; "recentDiaries": Array<DiaryResponse>; "capabilities": { "alerts": CapabilityStatus; "discipline": CapabilityStatus } }
-export type DiaryAlertResponse = { "id": string; "diaryId": string; "startLocalDate": string; "nextLocalDate": null | string; "localTime": string; "timezone": string; "repeatMode": string; "recurrenceEndLocalDate": string; "nextTriggerAt": null | string; "status": string; "createdAt": string; "updatedAt": string }
-export type DiaryAlertWrite = { "diaryId": string; "startLocalDate": string; "localTime": string; "timezone": string; "repeatMode": string }
-export type DiaryPage = { "items": Array<DiaryResponse>; "nextCursor": null | string }
-export type DiaryResponse = { "id": string; "localDate": string; "title": string; "content": string; "createdAt": string; "updatedAt": string; "tags": Array<string> }
-export type DiaryReviewAssessmentFilter = "all" | "good" | "mixed" | "poor"
-export type DiaryReviewFilterStatus = "all" | "reviewed" | "unreviewed"
-export type DiaryReviewItemResponse = { "diaryId": string; "localDate": string; "title": string; "contentPreview": string; "reviewStatus": DiaryReviewStatus; "processAssessment": null | DiaryReviewProcessAssessment; "emotion": null | string; "disciplineScore": null | number | string; "executionScore": null | number | string; "mistakeTags": Array<string>; "lesson": null | string; "nextAction": null | string; "reviewUpdatedAt": null | string }
-export type DiaryReviewItemsResponse = { "items": Array<DiaryReviewItemResponse>; "nextCursor": null | string }
-export type DiaryReviewProcessAssessment = "good" | "mixed" | "poor" | null
-export type DiaryReviewResponse = { "diaryId": string; "thesis": null | string; "plannedAction": null | string; "actualAction": null | string; "emotion": null | string; "disciplineScore": null | number | string; "executionScore": null | number | string; "processAssessment": null | string; "mistakeTags": Array<string>; "lesson": null | string; "nextAction": null | string; "createdAt": string; "updatedAt": string }
-export type DiaryReviewStatus = "reviewed" | "unreviewed"
-export type DiaryReviewSummaryResponse = { "reviewedCount": number | string; "averageDisciplineScore": number | null; "averageExecutionScore": number | null; "emotionCounts": { [key: string]: number | string }; "processAssessmentCounts": { [key: string]: number | string }; "topMistakeTags": Array<MistakeTagCountResponse> }
-export type DiaryReviewWrite = { "thesis": null | string; "plannedAction": null | string; "actualAction": null | string; "emotion": null | string; "disciplineScore": null | number | string; "executionScore": null | number | string; "processAssessment": null | string; "mistakeTags": null | Array<string>; "lesson": null | string; "nextAction": null | string }
-export type DiaryWrite = { "localDate": string; "title": string; "content": null | string; "tags"?: null | Array<string> }
-export type DisciplineResponse = { "id": string; "content": string; "position": number | string; "createdAt": string; "updatedAt": string }
-export type DisciplineWrite = { "content": string }
+export type CollectionResponseOfReasoningLabelResponse = { "items": Array<ReasoningLabelResponse> }
+export type CollectionResponseOfTradeEvidenceResponse = { "items": Array<TradeEvidenceResponse> }
+export type CollectionResponseOfWatchlistItemResponse = { "items": Array<WatchlistItemResponse> }
+export type ComparisonAvailability = "available" | "empty" | "unavailable"
+export type ComparisonDifferenceResponse = { "outcomeConsistent": null | boolean; "confidenceDifference": null | number | string }
+export type ComparisonExpectationResponse = { "id": string; "expectedBehavior": string; "deadline": string; "invalidationCondition": string; "confidence": ExpectationConfidence; "market": string; "outcome": null | ExpectationOutcome; "reasoningQuality": null | ReasoningQuality; "reviewExplanation": null | string }
+export type ComparisonObservationResponse = { "journalDay": string; "update": ObservationUpdateResponse; "expectations": Array<ComparisonExpectationResponse> }
+export type ComparisonOwnerResponse = { "ownerId": string; "ownerType": ComparisonOwnerType; "availability": ComparisonAvailability; "observations": Array<ComparisonObservationResponse> }
+export type ComparisonOwnerType = "human" | "agent"
+export type DailyCloseEvidenceResponse = { "tradingDate": string; "rawClose": number; "adjustedClose": number; "provider": string; "publishedAt": string }
+export type DailyCloseStatus = "available" | "unavailable" | "unsupported"
+export type DisciplinePrincipleCreate = { "content": string }
+export type DisciplinePrincipleResponse = { "id": string; "content": string; "status": DisciplinePrincipleStatus; "selectedForToday": boolean; "createdAt": string; "updatedAt": string }
+export type DisciplinePrincipleStatus = "active" | "disabled" | "archived"
+export type DisciplinePrincipleUpdate = { "content": string; "status": DisciplinePrincipleStatus }
 export type EdgeProblemDetails = { "code": string; "title": string; "status": number; "detail": string; "correlationId": string }
-export type EtfSnapshotResponse = { "symbol": string; "label": string; "sector": null | string; "close": number | null; "return2w": number | null; "return1m": number | null; "return3m": number | null; "rank2w": null | number | string; "rankGroup": string; "percentile2w": number | null; "aboveMa20": null | boolean; "aboveMa50": null | boolean; "aboveMa200": null | boolean; "status": string }
-export type EvaluationPrice = "open" | "close"
+export type ExecutionReview = "followed" | "partially_followed" | "deviated" | null
 export type ExpectationConfidence = "low" | "medium" | "high"
 export type ExpectationDeadlinePreset = "next_trading_day" | "five_trading_days" | null
 export type ExpectationEditResponse = { "id": string; "observationUpdateId": string; "marketObservationId": string; "journalDay": string; "expectedBehavior": string; "deadline": string; "invalidationCondition": string; "confidence": ExpectationConfidence; "market": string; "invalidatedAt": null | string; "readiness": ExpectationReadiness; "deadlineElapsed": boolean; "createdAt": string; "updatedAt": string; "honestyReminderRequired": boolean }
+export type ExpectationOutcome = "confirmed" | "partially_confirmed" | "invalidated" | "indeterminate"
 export type ExpectationReadiness = "active" | "ready_for_review" | "reviewed"
 export type ExpectationResponse = { "id": string; "observationUpdateId": string; "marketObservationId": string; "journalDay": string; "expectedBehavior": string; "deadline": string; "invalidationCondition": string; "confidence": ExpectationConfidence; "market": string; "invalidatedAt": null | string; "readiness": ExpectationReadiness; "deadlineElapsed": boolean; "createdAt": string; "updatedAt": string }
+export type ExpectationReviewResponse = { "id": string; "expectationId": string; "outcome": ExpectationOutcome; "reasoningQuality": ReasoningQuality; "explanation": null | string; "labels": Array<ReasoningLabelResponse>; "createdAt": string; "updatedAt": string }
+export type ExpectationReviewWrite = { "outcome": ExpectationOutcome; "reasoningQuality": ReasoningQuality; "explanation": null | string; "systemIssueKeys"?: null | Array<string>; "systemStrengthKeys"?: null | Array<string>; "customLabelIds"?: null | Array<string> }
 export type ExpectationWrite = { "expectedBehavior": string; "deadline": null | string; "invalidationCondition": string; "confidence": ExpectationConfidence; "market": string; "deadlinePreset"?: null | ExpectationDeadlinePreset }
-export type HealthWrite = { "serviceName": string; "status": string }
-export type InvitationCreatedResponse = { "id": string; "code": string; "expiresAt": string }
-export type InvitationListItem = { "id": string; "status": string; "expiresAt": string; "createdAt": string }
-export type JobAcceptedResponse = { "id": string; "status": string }
-export type JobResponse = { "id": string; "jobType": string; "status": string; "requestedBy": string; "createdAt": string; "updatedAt": string }
-export type JobWrite = { "jobType": string; "payload": JsonElement }
+export type GrantedChangePage = { "items": Array<unknown>; "nextCursor": string; "hasMore": boolean }
+export type GrantedObservationResponse = { "marketObservationId": string; "ownerId": string; "journalDay": string; "records": Array<GrantedRecordResponse> }
+export type GrantedRecordPage = { "items": Array<GrantedObservationResponse>; "nextCursor": null | string; "syncCursor": string }
+export type GrantedRecordResponse = { "recordType": string; "id": string; "ownerId": string; "updatedAt": string; "content": JsonElement }
 export type JsonElement = unknown
 export type LoginRequest = { "email": string; "password": string }
 export type MarketObservationResponse = { "id": string; "journalDay": string; "timezone": string; "rollover": string; "updates": Array<ObservationUpdateResponse> }
-export type MistakeTagCountResponse = { "tag": string; "count": number | string }
-export type MonitorMarketState = { "state": null | string; "breadthPercent": number | null; "benchmarkAboveMa200": null | boolean; "status": string }
-export type MonitorResponse = { "universe": MonitorUniverse; "snapshotDate": null | string; "formulaVersion": string; "status": string; "marketState": MonitorMarketState; "sectorBreadth": Array<SectorBreadthResponse>; "etfs": Array<EtfSnapshotResponse> }
-export type MonitorUniverse = { "id": string; "code": string; "name": string; "rankScope": string }
-export type MonthSummaryResponse = { "year": number | string; "month": number | string; "total": number; "recordedDays": number | string; "profitDays": number | string; "lossDays": number | string; "flatDays": number | string; "bestDay": number | null; "worstDay": number | null }
-export type NoteResponse = { "stockId": string; "content": string; "createdAt": string; "updatedAt": string }
-export type NoteWrite = { "content": null | string }
 export type ObservationEvidenceResponse = { "url": string; "title": null | string; "quote": null | string }
 export type ObservationEvidenceWrite = { "url": string; "title"?: null | string; "quote"?: null | string }
 export type ObservationSearchItemResponse = { "marketObservationId": string; "journalDay": string; "authorId": string; "update": ObservationUpdateResponse }
 export type ObservationSearchPage = { "items": Array<ObservationSearchItemResponse>; "nextCursor": null | string }
-export type ObservationSubjectResponse = { "type": ObservationSubjectType; "name": null | string; "instrumentId": null | string; "market": null | string; "symbol": null | string; "displayName": null | string; "dailyCloseAvailable": boolean }
+export type ObservationSubjectResponse = { "type": ObservationSubjectType; "name": null | string; "instrumentId": null | string; "market": null | string; "symbol": null | string; "displayName": null | string; "dailyCloseAvailable": boolean; "dailyCloseStatus"?: DailyCloseStatus; "dailyClose"?: null | DailyCloseEvidenceResponse }
 export type ObservationSubjectType = "broad_market" | "sector" | "theme" | "instrument"
 export type ObservationSubjectWrite = { "type": ObservationSubjectType; "name"?: null | string; "instrumentId"?: null | string; "market"?: null | string; "symbol"?: null | string; "displayName"?: null | string }
 export type ObservationUpdateEditResponse = { "id": string; "content": string; "recordedAt": string; "updatedAt": string; "honestyReminderRequired": boolean; "signal": null | string; "interpretation": null | string; "mentalState": null | string; "tags": Array<string>; "primarySubject": null | ObservationSubjectResponse; "relatedSubjects": Array<ObservationSubjectResponse>; "evidence": null | ObservationEvidenceResponse }
 export type ObservationUpdateResponse = { "id": string; "content": string; "recordedAt": string; "updatedAt": string; "signal": null | string; "interpretation": null | string; "mentalState": null | string; "tags": Array<string>; "primarySubject": null | ObservationSubjectResponse; "relatedSubjects": Array<ObservationSubjectResponse>; "evidence": null | ObservationEvidenceResponse }
-export type ObservationUpdateWrite = { "content": string; "signal"?: null | string; "interpretation"?: null | string; "mentalState"?: null | string; "tags"?: null | Array<string>; "primarySubject"?: null | ObservationSubjectWrite; "relatedSubjects"?: null | Array<ObservationSubjectWrite>; "evidence"?: null | ObservationEvidenceWrite }
-export type PartnerCompareCapabilitiesResponse = { "partnerDiaries": PartnerDiaryCapability }
-export type PartnerCompareDayResponse = { "localDate": string; "mine": Array<PartnerCompareDiaryItem>; "partner": Array<PartnerCompareDiaryItem> }
-export type PartnerCompareDiaryItem = { "id": string; "localDate": string; "title": string; "content": string; "tags": Array<string> }
-export type PartnerCompareResponse = { "linkId": string; "partnerDisplayName": string | null; "from": string; "to": string; "days": Array<PartnerCompareDayResponse>; "capabilities": PartnerCompareCapabilitiesResponse }
-export type PartnerDiaryCapability = "available" | "not_shared" | "unavailable"
-export type PartnerLinkBrowserCollectionResponse = { "items": Array<PartnerLinkBrowserResponse> }
-export type PartnerLinkBrowserResponse = { "id": string; "partnerType": string; "status": string; "createdAt": string; "updatedAt": string; "acceptedAt": string | null; "initiatedByMe": boolean; "myShareDiaries": boolean; "partnerShareDiaries": boolean; "partnerDisplayName": string | null }
-export type PerformanceResponse = { "localDate": string; "pnlAmount": number; "capitalBase": number | null; "pnlPercent": number | null; "note": string }
-export type PerformanceWrite = { "pnlAmount": number; "capitalBase": number | null; "note": null | string }
-export type PositionSizing = { "accountValue": number; "riskPercent": number; "entryPrice": number; "stopPrice": number }
-export type PositionSizingResponse = { "quantity": number; "plannedLoss": number; "riskBudget": number; "positionValue": number; "perUnitRisk": number }
-export type PostResponse = { "id": string; "slug": string; "title": string; "body": string; "publishedAt": string }
-export type PostWrite = { "slug": string; "title": string; "body": null | string; "status": string }
-export type PresetWrite = { "name": string; "toolType": string; "inputs": JsonElement; "currency": null | string }
-export type PriceAlertResponse = { "id": string; "symbol": string; "conditionType": string; "threshold": number; "lookbackDays": null | number | string; "direction": null | string; "evaluationPrice": EvaluationPrice; "status": PriceAlertStatus; "baselineClose": number | null; "lastEvaluatedDate": null | string; "createdAt": string; "updatedAt": string }
-export type PriceAlertStatus = "active" | "triggered" | "dismissed"
-export type PriceAlertWrite = { "symbol": string; "conditionType": string; "threshold": number; "lookbackDays": null | number | string; "direction": null | string; "evaluationPrice"?: null | EvaluationPrice }
-export type ProfitLoss = { "side": string; "entryPrice": number; "exitPrice": number; "quantity": number; "entryFee": number; "exitFee": number }
-export type ProfitLossResponse = { "netPnl": number; "returnPercent": number; "grossPnl": number; "totalFees": number; "exitValue": number }
+export type ObservationUpdateWrite = { "content": string; "signal"?: null | string; "interpretation"?: null | string; "mentalState"?: null | string; "tags"?: null | Array<string>; "primarySubject"?: null | ObservationSubjectWrite; "relatedSubjects"?: null | Array<ObservationSubjectWrite>; "evidence"?: null | ObservationEvidenceWrite; "sourceLabel"?: null | string }
+export type OwnerComparisonResponse = { "human": ComparisonOwnerResponse; "agent": ComparisonOwnerResponse; "difference": ComparisonDifferenceResponse }
+export type PatternEvidenceResponse = { "expectationId": string; "url": string }
+export type PatternLabelResponse = { "kind": ReasoningLabelKind; "key": string; "name": string; "system": boolean; "count": number | string; "denominator": number | string; "evidence": Array<PatternEvidenceResponse> }
+export type PatternReviewResponse = { "from": string; "to": string; "reviewedExpectationCount": number | string; "labels": Array<PatternLabelResponse> }
 export type ProviderHealthResponse = { "provider": string; "lastSuccessAt": string; "healthy": boolean }
 export type ProvidersHealthResponse = { "contractVersion": number | string; "healthy": boolean; "items": Array<ProviderHealthResponse> }
-export type PublishedBarResponse = { "tradingDate": string; "open": number; "high": number; "low": number; "close": number; "volume": number; "provider": string; "publishedAt": string }
+export type PublishedBarResponse = { "tradingDate": string; "open": number; "high": number; "low": number; "close": number; "rawClose": number; "adjustedClose": number; "volume": number; "provider": string; "publishedAt": string }
 export type PublishedSymbolResponse = { "instrumentId": string; "symbol": string; "name": string; "exchange": string; "currency": string; "timezone": string }
-export type QuickNote = { "localDate": string; "content": string; "targetDiaryId": null | string }
-export type QuickNoteResponse = { "diaryId": null | string; "appended": boolean }
 export type QuickObservationResponse = { "marketObservationId": string; "observationUpdateId": string; "journalDay": string; "recordedAt": string; "appended": boolean }
-export type QuickObservationWrite = { "content": string }
-export type RedeemInvitation = { "code": string }
-export type RedeemInvitationResponse = { "linkId": string }
+export type QuickObservationWrite = { "content": string; "sourceLabel"?: null | string }
+export type ReasoningLabelKind = "issue" | "strength"
+export type ReasoningLabelResponse = { "id": null | string; "kind": ReasoningLabelKind; "key": string; "name": string; "isSystem": boolean }
+export type ReasoningLabelWrite = { "kind": ReasoningLabelKind; "name": string }
+export type ReasoningQuality = "sound" | "mixed" | "weak"
 export type RegisterRequest = { "email": string; "password": string; "displayName": string; "timezone": string; "baseCurrency": string }
 export type RegisterResponse = { "id": string; "email": string; "displayName": string; "timezone": string; "baseCurrency": string }
-export type RiskReward = { "entryPrice": number; "stopPrice": number; "targetPrice": number }
-export type RiskRewardResponse = { "ratio": number; "riskPerUnit": number; "rewardPerUnit": number; "breakevenWinRate": number }
-export type SavedCalculationWrite = { "toolType": string; "inputs": JsonElement; "currency": string; "symbol": null | string; "sourceDiaryId": null | string; "sourceTransactionId": null | string; "note": null | string }
-export type SectorBreadthResponse = { "sector": string; "memberCount": number | string; "availableCount": number | string; "aboveMa20Percent": number | null; "aboveMa50Percent": number | null; "aboveMa200Percent": number | null; "status": string }
 export type SessionTokens = { "accessToken": string; "expiresAt": string }
-export type SharePolicyWrite = { "shareDiaries": boolean }
-export type StockPageResponse = { "stock": StockResponse; "bars": BarsResponse | null; "capabilities": { "marketData": CapabilityStatus } }
-export type StockResponse = { "id": string; "symbol": string; "name": string; "exchange": string; "assetType": string; "createdAt": string }
-export type StockWrite = { "symbol": null | string; "name": null | string; "exchange": null | string; "assetType": null | string }
 export type SymbolsResponse = { "contractVersion": number | string; "items": Array<PublishedSymbolResponse> }
-export type TimelineResponse = { "id": string; "stockId": string; "eventTime": string; "sourceType": string; "title": string; "content": string; "diaryId": null | string; "correctionOfId": null | string; "createdAt": string }
-export type TimelineWrite = { "eventTime": null | string; "sourceType": null | string; "title": null | string; "content": null | string; "diaryId": null | string }
-export type TransactionResponse = { "id": string; "diaryId": string; "symbol": string; "side": string; "quantity": number; "price": number; "currency": string; "tradedAt": string; "notes": string; "createdAt": string; "updatedAt": string }
-export type TransactionWrite = { "symbol": string; "side": string; "quantity": number; "price": number; "currency": string; "tradedAt": string; "notes": null | string }
-export type TriggerResponse = { "id": string; "tradingDate": string; "observedClose": number; "observedPrice": number; "priceType": EvaluationPrice; "triggeredAt": string; "dismissedAt": null | string }
-export type UniverseCreatedResponse = { "id": string; "code": string; "name": string; "rankScope": string }
-export type UniverseResponse = { "id": string; "code": string; "name": string; "rankScope": string; "createdAt": string; "updatedAt": string }
-export type UniverseSymbolWrite = { "symbol": string; "label": string; "sector": null | string; "sortOrder": null | number | string }
-export type UniverseWrite = { "code": string; "name": string; "rankScope": null | string }
+export type TradeEvidenceResponse = { "id": string; "actionDecisionId": string; "symbol": string; "side": TradeSide; "quantity": number; "price": number; "currency": string; "executedAt": string; "note": null | string; "createdAt": string; "updatedAt": string }
+export type TradeEvidenceWrite = { "symbol": string; "side": TradeSide; "quantity": number; "price": number; "currency": string; "executedAt": string; "note"?: null | string }
+export type TradeSide = "buy" | "sell"
 export type UserSettingsResponse = { "email": string; "displayName": string; "timezone": string; "journalDayRollover": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string; "updatedAt": string }
 export type UserSettingsWrite = { "displayName": string; "timezone": string; "journalDayRollover": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string }
-export type WatchlistItemCreatedResponse = { "stockId": string }
-export type WatchlistResponse = { "stock": StockResponse; "currentNote": null | string; "noteUpdatedAt": null | string; "timelineCount": number | string }
+export type WatchlistItemResponse = { "instrumentId": string; "note": null | string; "createdAt": string; "updatedAt": string }
+export type WatchlistNoteWrite = { "note": null | string }
 
 export type RequestOptions = { baseUrl?: string; token?: string | null; refresh?: () => Promise<string | null>; onUnauthorized?: () => void }
 export class ApiError extends Error {
@@ -168,110 +127,66 @@ const withQuery = (query: Record<string, unknown>) => {
   return params.size ? `?${params}` : ''
 }
 
-export const postApiAppToolsPositionSizing = (body: PositionSizing, extra?: RequestInit) => request<PositionSizingResponse>("/api/app/tools/position-sizing", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppToolsRiskReward = (body: RiskReward, extra?: RequestInit) => request<RiskRewardResponse>("/api/app/tools/risk-reward", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppToolsAverageCost = (body: AverageCost, extra?: RequestInit) => request<AverageCostResponse>("/api/app/tools/average-cost", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppToolsProfitLoss = (body: ProfitLoss, extra?: RequestInit) => request<ProfitLossResponse>("/api/app/tools/profit-loss", { method: "POST", body: JSON.stringify(body), ...extra })
-export const getApiAppToolPresets = (extra?: RequestInit) => request<unknown>("/api/app/tool-presets", { method: "GET", ...extra })
-export const postApiAppToolPresets = (body: PresetWrite, extra?: RequestInit) => request<unknown>("/api/app/tool-presets", { method: "POST", body: JSON.stringify(body), ...extra })
-export const putApiAppToolPresetsId = (id: string, body: PresetWrite, extra?: RequestInit) => request<unknown>(`/api/app/tool-presets/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const deleteApiAppToolPresetsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/tool-presets/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const postApiAppToolPresetsIdUse = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/tool-presets/${encodeURIComponent(String(id))}/use`, { method: "POST", ...extra })
-export const getApiAppSavedCalculations = (query: { "limit"?: number | string }, extra?: RequestInit) => request<unknown>("/api/app/saved-calculations" + withQuery(query), { method: "GET", ...extra })
-export const postApiAppSavedCalculations = (body: SavedCalculationWrite, extra?: RequestInit) => request<unknown>("/api/app/saved-calculations", { method: "POST", body: JSON.stringify(body), ...extra })
-export const deleteApiAppSavedCalculationsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/saved-calculations/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const postApiAdminPosts = (body: PostWrite, extra?: RequestInit) => request<CreatedResponse>("/api/admin/posts", { method: "POST", body: JSON.stringify(body), ...extra })
-export const putApiAdminPostsId = (id: string, body: PostWrite, extra?: RequestInit) => request<unknown>(`/api/admin/posts/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const deleteApiAdminPostsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/admin/posts/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const getApiAdminOperationsAudit = (query: { "limit"?: number | string }, extra?: RequestInit) => request<CollectionResponseOfAuditResponse>("/api/admin/operations/audit" + withQuery(query), { method: "GET", ...extra })
-export const getApiAdminOperationsJobs = (extra?: RequestInit) => request<CollectionResponseOfJobResponse>("/api/admin/operations/jobs", { method: "GET", ...extra })
-export const postApiAdminOperationsJobs = (body: JobWrite, extra?: RequestInit) => request<JobAcceptedResponse>("/api/admin/operations/jobs", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAdminOperationsHealth = (body: HealthWrite, extra?: RequestInit) => request<unknown>("/api/admin/operations/health", { method: "POST", body: JSON.stringify(body), ...extra })
-export const getApiContentPosts = (extra?: RequestInit) => request<CollectionResponseOfPostResponse>("/api/content/posts", { method: "GET", ...extra })
-export const getApiContentPostsSlug = (slug: string, extra?: RequestInit) => request<PostResponse>(`/api/content/posts/${encodeURIComponent(String(slug))}`, { method: "GET", ...extra })
 export const postApiAuthRegister = (body: RegisterRequest, extra?: RequestInit) => request<RegisterResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAuthApiKeyToken = (body: ApiKeyTokenRequest, extra?: RequestInit) => request<ApiKeyTokenResponse>("/api/auth/api-key/token", { method: "POST", body: JSON.stringify(body), ...extra })
-export const postApiAppAgents = (body: AgentRequest, extra?: RequestInit) => request<AgentResponse>("/api/app/agents", { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppAgents = (extra?: RequestInit) => request<CollectionResponseOfAgentManagementResponse>("/api/app/agents", { method: "GET", ...extra })
+export const postApiAppAgents = (body: AgentRequest, extra?: RequestInit) => request<AgentProvisionResponse>("/api/app/agents", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppAgentsIdToken = (id: string, body: AgentTokenRequest, extra?: RequestInit) => request<AgentTokenResponse>(`/api/app/agents/${encodeURIComponent(String(id))}/token`, { method: "POST", body: JSON.stringify(body), ...extra })
+export const deleteApiAppAgentsIdToken = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/agents/${encodeURIComponent(String(id))}/token`, { method: "DELETE", ...extra })
+export const getApiAppAccessGrants = (extra?: RequestInit) => request<CollectionResponseOfAccessGrantResponse>("/api/app/access-grants", { method: "GET", ...extra })
+export const postApiAppAccessGrants = (body: AccessGrantWrite, extra?: RequestInit) => request<AccessGrantResponse>("/api/app/access-grants", { method: "POST", body: JSON.stringify(body), ...extra })
+export const deleteApiAppAccessGrantsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/access-grants/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const getApiAgentJournalRecords = (query: { "from"?: string; "to"?: string; "subjectType"?: string; "subject"?: string; "instrumentId"?: string; "tag"?: string; "reviewReadiness"?: string; "author"?: string; "cursor"?: string; "limit"?: number | string }, extra?: RequestInit) => request<GrantedRecordPage>("/api/agent/journal-records" + withQuery(query), { method: "GET", ...extra })
+export const getApiAgentJournalChanges = (query: { "cursor": string; "from"?: string; "to"?: string; "subjectType"?: string; "subject"?: string; "instrumentId"?: string; "tag"?: string; "reviewReadiness"?: string; "author"?: string; "limit"?: number | string }, extra?: RequestInit) => request<GrantedChangePage>("/api/agent/journal-changes" + withQuery(query), { method: "GET", ...extra })
 export const deleteApiAppApiKeysId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/api-keys/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const putApiAppDailyPerformanceDate = (date: string, body: PerformanceWrite, extra?: RequestInit) => request<PerformanceResponse>(`/api/app/daily-performance/${encodeURIComponent(String(date))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const getApiAppDisciplines = (extra?: RequestInit) => request<CollectionResponseOfDisciplineResponse>("/api/app/disciplines", { method: "GET", ...extra })
-export const postApiAppDisciplines = (body: DisciplineWrite, extra?: RequestInit) => request<DisciplineResponse>("/api/app/disciplines", { method: "POST", body: JSON.stringify(body), ...extra })
-export const putApiAppDisciplinesId = (id: string, body: DisciplineWrite, extra?: RequestInit) => request<unknown>(`/api/app/disciplines/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const deleteApiAppDisciplinesId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/disciplines/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const getApiAppDiaryAlerts = (extra?: RequestInit) => request<CollectionResponseOfDiaryAlertResponse>("/api/app/diary-alerts", { method: "GET", ...extra })
-export const postApiAppDiaryAlerts = (body: DiaryAlertWrite, extra?: RequestInit) => request<DiaryAlertResponse>("/api/app/diary-alerts", { method: "POST", body: JSON.stringify(body), ...extra })
-export const deleteApiAppDiaryAlertsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diary-alerts/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const postApiAppDiaryAlertsIdDismiss = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diary-alerts/${encodeURIComponent(String(id))}/dismiss`, { method: "POST", ...extra })
-export const postApiAppQuickNote = (body: QuickNote, extra?: RequestInit) => request<QuickNoteResponse>("/api/app/quick-note", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAppQuickObservations = (body: QuickObservationWrite, extra?: RequestInit) => request<QuickObservationResponse>("/api/app/quick-observations", { method: "POST", body: JSON.stringify(body), ...extra })
 export const getApiAppMarketObservations = (query: { "query"?: string; "from"?: string; "to"?: string; "subjectType"?: ObservationSubjectType; "subject"?: string; "instrumentId"?: string; "market"?: string; "symbol"?: string; "tag"?: string; "author"?: string; "cursor"?: string; "limit"?: number | string }, extra?: RequestInit) => request<ObservationSearchPage>("/api/app/market-observations" + withQuery(query), { method: "GET", ...extra })
+export const deleteApiAppMarketObservationsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/market-observations/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const getApiAppMarketObservationsToday = (extra?: RequestInit) => request<MarketObservationResponse>("/api/app/market-observations/today", { method: "GET", ...extra })
 export const putApiAppObservationUpdatesId = (id: string, body: ObservationUpdateWrite, extra?: RequestInit) => request<ObservationUpdateEditResponse>(`/api/app/observation-updates/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const deleteApiAppObservationUpdatesId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/observation-updates/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const postApiAppObservationUpdatesUpdateIdExpectations = (updateId: string, body: ExpectationWrite, extra?: RequestInit) => request<ExpectationResponse>(`/api/app/observation-updates/${encodeURIComponent(String(updateId))}/expectations`, { method: "POST", body: JSON.stringify(body), ...extra })
 export const getApiAppExpectations = (query: { "observationUpdateId"?: string }, extra?: RequestInit) => request<CollectionResponseOfExpectationResponse>("/api/app/expectations" + withQuery(query), { method: "GET", ...extra })
 export const getApiAppExpectationsId = (id: string, extra?: RequestInit) => request<ExpectationResponse>(`/api/app/expectations/${encodeURIComponent(String(id))}`, { method: "GET", ...extra })
 export const putApiAppExpectationsId = (id: string, body: ExpectationWrite, extra?: RequestInit) => request<ExpectationEditResponse>(`/api/app/expectations/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const deleteApiAppExpectationsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/expectations/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const postApiAppExpectationsIdInvalidate = (id: string, extra?: RequestInit) => request<ExpectationResponse>(`/api/app/expectations/${encodeURIComponent(String(id))}/invalidate`, { method: "POST", ...extra })
-export const getApiAppDiaries = (query: { "query"?: string; "from"?: string; "to"?: string; "reviewStatus"?: string; "symbol"?: string; "tag"?: string; "cursor"?: string; "limit"?: number | string }, extra?: RequestInit) => request<DiaryPage>("/api/app/diaries" + withQuery(query), { method: "GET", ...extra })
-export const postApiAppDiaries = (body: DiaryWrite, extra?: RequestInit) => request<DiaryResponse>("/api/app/diaries", { method: "POST", body: JSON.stringify(body), ...extra })
-export const getApiAppDiariesId = (id: string, extra?: RequestInit) => request<DiaryResponse>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "GET", ...extra })
-export const putApiAppDiariesId = (id: string, body: DiaryWrite, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const deleteApiAppDiariesId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const getApiAppDiariesDiaryIdTransactions = (diaryId: string, extra?: RequestInit) => request<CollectionResponseOfTransactionResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions`, { method: "GET", ...extra })
-export const postApiAppDiariesDiaryIdTransactions = (diaryId: string, body: TransactionWrite, extra?: RequestInit) => request<TransactionResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions`, { method: "POST", body: JSON.stringify(body), ...extra })
-export const getApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: string, extra?: RequestInit) => request<TransactionResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions/${encodeURIComponent(String(id))}`, { method: "GET", ...extra })
-export const putApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: string, body: TransactionWrite, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const deleteApiAppDiariesDiaryIdTransactionsId = (diaryId: string, id: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/transactions/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const deleteApiAppDiariesDiaryIdReview = (diaryId: string, extra?: RequestInit) => request<unknown>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/review`, { method: "DELETE", ...extra })
-export const getApiAppDiariesDiaryIdReview = (diaryId: string, extra?: RequestInit) => request<DiaryReviewResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/review`, { method: "GET", ...extra })
-export const putApiAppDiariesDiaryIdReview = (diaryId: string, body: DiaryReviewWrite, extra?: RequestInit) => request<DiaryReviewResponse>(`/api/app/diaries/${encodeURIComponent(String(diaryId))}/review`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const deleteApiAppPartnersId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/partners/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const postApiAppPartnersIdAccept = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/partners/${encodeURIComponent(String(id))}/accept`, { method: "POST", ...extra })
-export const putApiAppPartnersIdSharePolicy = (id: string, body: SharePolicyWrite, extra?: RequestInit) => request<unknown>(`/api/app/partners/${encodeURIComponent(String(id))}/share-policy`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const getApiAppPartnersInvitations = (extra?: RequestInit) => request<CollectionResponseOfInvitationListItem>("/api/app/partners/invitations", { method: "GET", ...extra })
-export const postApiAppPartnersInvitations = (extra?: RequestInit) => request<InvitationCreatedResponse>("/api/app/partners/invitations", { method: "POST", ...extra })
-export const deleteApiAppPartnersInvitationsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/partners/invitations/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const postApiAppPartnersInvitationsRedeem = (body: RedeemInvitation, extra?: RequestInit) => request<RedeemInvitationResponse>("/api/app/partners/invitations/redeem", { method: "POST", body: JSON.stringify(body), ...extra })
-export const getApiAppStocks = (query: { "query"?: string }, extra?: RequestInit) => request<CollectionResponseOfStockResponse>("/api/app/stocks" + withQuery(query), { method: "GET", ...extra })
-export const postApiAppStocks = (body: StockWrite, extra?: RequestInit) => request<StockResponse>("/api/app/stocks", { method: "POST", body: JSON.stringify(body), ...extra })
-export const getApiAppStocksSymbol = (symbol: string, extra?: RequestInit) => request<StockResponse>(`/api/app/stocks/${encodeURIComponent(String(symbol))}`, { method: "GET", ...extra })
-export const getApiAppWatchlist = (extra?: RequestInit) => request<CollectionResponseOfWatchlistResponse>("/api/app/watchlist", { method: "GET", ...extra })
-export const postApiAppWatchlistStockId = (stockId: string, extra?: RequestInit) => request<WatchlistItemCreatedResponse>(`/api/app/watchlist/${encodeURIComponent(String(stockId))}`, { method: "POST", ...extra })
-export const deleteApiAppWatchlistStockId = (stockId: string, extra?: RequestInit) => request<unknown>(`/api/app/watchlist/${encodeURIComponent(String(stockId))}`, { method: "DELETE", ...extra })
-export const getApiAppStocksStockIdNote = (stockId: string, extra?: RequestInit) => request<NoteResponse>(`/api/app/stocks/${encodeURIComponent(String(stockId))}/note`, { method: "GET", ...extra })
-export const putApiAppStocksStockIdNote = (stockId: string, body: NoteWrite, extra?: RequestInit) => request<NoteResponse>(`/api/app/stocks/${encodeURIComponent(String(stockId))}/note`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const getApiAppStocksStockIdTimeline = (stockId: string, extra?: RequestInit) => request<CollectionResponseOfTimelineResponse>(`/api/app/stocks/${encodeURIComponent(String(stockId))}/timeline`, { method: "GET", ...extra })
-export const postApiAppStocksStockIdTimeline = (stockId: string, body: TimelineWrite, extra?: RequestInit) => request<TimelineResponse>(`/api/app/stocks/${encodeURIComponent(String(stockId))}/timeline`, { method: "POST", body: JSON.stringify(body), ...extra })
-export const getApiAppTimelineId = (id: string, extra?: RequestInit) => request<TimelineResponse>(`/api/app/timeline/${encodeURIComponent(String(id))}`, { method: "GET", ...extra })
-export const postApiAppTimelineOriginalIdCorrections = (originalId: string, body: TimelineWrite, extra?: RequestInit) => request<TimelineResponse>(`/api/app/timeline/${encodeURIComponent(String(originalId))}/corrections`, { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppExpectationsIdReview = (id: string, extra?: RequestInit) => request<ExpectationReviewResponse>(`/api/app/expectations/${encodeURIComponent(String(id))}/review`, { method: "GET", ...extra })
+export const putApiAppExpectationsIdReview = (id: string, body: ExpectationReviewWrite, extra?: RequestInit) => request<ExpectationReviewResponse>(`/api/app/expectations/${encodeURIComponent(String(id))}/review`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const deleteApiAppExpectationsIdReview = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/expectations/${encodeURIComponent(String(id))}/review`, { method: "DELETE", ...extra })
+export const getApiAppReasoningLabels = (extra?: RequestInit) => request<CollectionResponseOfReasoningLabelResponse>("/api/app/reasoning-labels", { method: "GET", ...extra })
+export const postApiAppReasoningLabels = (body: ReasoningLabelWrite, extra?: RequestInit) => request<ReasoningLabelResponse>("/api/app/reasoning-labels", { method: "POST", body: JSON.stringify(body), ...extra })
+export const putApiAppReasoningLabelsId = (id: string, body: ReasoningLabelWrite, extra?: RequestInit) => request<ReasoningLabelResponse>(`/api/app/reasoning-labels/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const deleteApiAppReasoningLabelsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/reasoning-labels/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const getApiAppObservationUpdatesUpdateIdActionDecisions = (updateId: string, extra?: RequestInit) => request<CollectionResponseOfActionDecisionResponse>(`/api/app/observation-updates/${encodeURIComponent(String(updateId))}/action-decisions`, { method: "GET", ...extra })
+export const postApiAppObservationUpdatesUpdateIdActionDecisions = (updateId: string, body: ActionDecisionWrite, extra?: RequestInit) => request<ActionDecisionResponse>(`/api/app/observation-updates/${encodeURIComponent(String(updateId))}/action-decisions`, { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppActionDecisionsId = (id: string, extra?: RequestInit) => request<ActionDecisionResponse>(`/api/app/action-decisions/${encodeURIComponent(String(id))}`, { method: "GET", ...extra })
+export const putApiAppActionDecisionsId = (id: string, body: ActionDecisionWrite, extra?: RequestInit) => request<ActionDecisionEditResponse>(`/api/app/action-decisions/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const deleteApiAppActionDecisionsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/action-decisions/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const getApiAppActionDecisionsDecisionIdTrades = (decisionId: string, extra?: RequestInit) => request<CollectionResponseOfTradeEvidenceResponse>(`/api/app/action-decisions/${encodeURIComponent(String(decisionId))}/trades`, { method: "GET", ...extra })
+export const postApiAppActionDecisionsDecisionIdTrades = (decisionId: string, body: TradeEvidenceWrite, extra?: RequestInit) => request<TradeEvidenceResponse>(`/api/app/action-decisions/${encodeURIComponent(String(decisionId))}/trades`, { method: "POST", body: JSON.stringify(body), ...extra })
+export const putApiAppActionDecisionsDecisionIdTradesId = (decisionId: string, id: string, body: TradeEvidenceWrite, extra?: RequestInit) => request<TradeEvidenceResponse>(`/api/app/action-decisions/${encodeURIComponent(String(decisionId))}/trades/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const deleteApiAppActionDecisionsDecisionIdTradesId = (decisionId: string, id: string, extra?: RequestInit) => request<unknown>(`/api/app/action-decisions/${encodeURIComponent(String(decisionId))}/trades/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const getApiAppWatchlist = (extra?: RequestInit) => request<CollectionResponseOfWatchlistItemResponse>("/api/app/watchlist", { method: "GET", ...extra })
+export const postApiAppWatchlistInstrumentId = (instrumentId: string, extra?: RequestInit) => request<WatchlistItemResponse>(`/api/app/watchlist/${encodeURIComponent(String(instrumentId))}`, { method: "POST", ...extra })
+export const deleteApiAppWatchlistInstrumentId = (instrumentId: string, extra?: RequestInit) => request<unknown>(`/api/app/watchlist/${encodeURIComponent(String(instrumentId))}`, { method: "DELETE", ...extra })
+export const putApiAppWatchlistInstrumentIdNote = (instrumentId: string, body: WatchlistNoteWrite, extra?: RequestInit) => request<WatchlistItemResponse>(`/api/app/watchlist/${encodeURIComponent(String(instrumentId))}/note`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const getApiAppPatternReview = (query: { "range": string; "from"?: string; "to"?: string }, extra?: RequestInit) => request<PatternReviewResponse>("/api/app/pattern-review" + withQuery(query), { method: "GET", ...extra })
+export const getApiAppComparison = (query: { "agentUserId": string; "from": string; "to": string; "subjectType"?: string; "subject"?: string; "instrumentId"?: string }, extra?: RequestInit) => request<OwnerComparisonResponse>("/api/app/comparison" + withQuery(query), { method: "GET", ...extra })
+export const getApiAppDisciplinePrinciples = (extra?: RequestInit) => request<CollectionResponseOfDisciplinePrincipleResponse>("/api/app/discipline-principles", { method: "GET", ...extra })
+export const postApiAppDisciplinePrinciples = (body: DisciplinePrincipleCreate, extra?: RequestInit) => request<DisciplinePrincipleResponse>("/api/app/discipline-principles", { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppDisciplinePrinciplesToday = (extra?: RequestInit) => request<DisciplinePrincipleResponse>("/api/app/discipline-principles/today", { method: "GET", ...extra })
+export const putApiAppDisciplinePrinciplesId = (id: string, body: DisciplinePrincipleUpdate, extra?: RequestInit) => request<unknown>(`/api/app/discipline-principles/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const postApiAppDisciplinePrinciplesIdSelect = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/discipline-principles/${encodeURIComponent(String(id))}/select`, { method: "POST", ...extra })
 export const getApiAppMarketSymbols = (extra?: RequestInit) => request<SymbolsResponse>("/api/app/market/symbols", { method: "GET", ...extra })
 export const getApiAppMarketBarsSymbol = (symbol: string, query: { "from"?: string; "to"?: string }, extra?: RequestInit) => request<BarsResponse>(`/api/app/market/bars/${encodeURIComponent(String(symbol))}` + withQuery(query), { method: "GET", ...extra })
 export const getApiAppMarketProvidersHealth = (extra?: RequestInit) => request<ProvidersHealthResponse>("/api/app/market/providers/health", { method: "GET", ...extra })
-export const getApiAppPriceAlerts = (extra?: RequestInit) => request<CollectionResponseOfPriceAlertResponse>("/api/app/price-alerts", { method: "GET", ...extra })
-export const postApiAppPriceAlerts = (body: PriceAlertWrite, extra?: RequestInit) => request<PriceAlertResponse>("/api/app/price-alerts", { method: "POST", body: JSON.stringify(body), ...extra })
-export const putApiAppPriceAlertsId = (id: string, body: PriceAlertWrite, extra?: RequestInit) => request<unknown>(`/api/app/price-alerts/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const deleteApiAppPriceAlertsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/price-alerts/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const postApiAppPriceAlertsIdDismiss = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/price-alerts/${encodeURIComponent(String(id))}/dismiss`, { method: "POST", ...extra })
-export const postApiAppPriceAlertsIdReactivate = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/price-alerts/${encodeURIComponent(String(id))}/reactivate`, { method: "POST", ...extra })
-export const getApiAppPriceAlertsIdTriggers = (id: string, extra?: RequestInit) => request<CollectionResponseOfTriggerResponse>(`/api/app/price-alerts/${encodeURIComponent(String(id))}/triggers`, { method: "GET", ...extra })
-export const getApiAppRotationUniverses = (extra?: RequestInit) => request<CollectionResponseOfUniverseResponse>("/api/app/rotation/universes", { method: "GET", ...extra })
-export const postApiAppRotationUniverses = (body: UniverseWrite, extra?: RequestInit) => request<UniverseCreatedResponse>("/api/app/rotation/universes", { method: "POST", body: JSON.stringify(body), ...extra })
-export const putApiAppRotationUniversesId = (id: string, body: UniverseWrite, extra?: RequestInit) => request<unknown>(`/api/app/rotation/universes/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const deleteApiAppRotationUniversesId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/rotation/universes/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
-export const putApiAppRotationUniversesIdSymbols = (id: string, body: Array<UniverseSymbolWrite>, extra?: RequestInit) => request<unknown>(`/api/app/rotation/universes/${encodeURIComponent(String(id))}/symbols`, { method: "PUT", body: JSON.stringify(body), ...extra })
-export const postApiAppRotationUniversesIdCalculate = (id: string, query: { "date": string }, extra?: RequestInit) => request<CalculateResponse>(`/api/app/rotation/universes/${encodeURIComponent(String(id))}/calculate` + withQuery(query), { method: "POST", ...extra })
-export const getApiAppDiaryReviewSummary = (query: { "from": string; "to": string }, extra?: RequestInit) => request<DiaryReviewSummaryResponse>("/api/app/diary-review-summary" + withQuery(query), { method: "GET", ...extra })
-export const getApiAppDiaryReviewItems = (query: { "from": string; "to": string; "status"?: DiaryReviewFilterStatus; "assessment"?: DiaryReviewAssessmentFilter; "tag"?: string; "cursor"?: string; "limit"?: number | string }, extra?: RequestInit) => request<DiaryReviewItemsResponse>("/api/app/diary-review-items" + withQuery(query), { method: "GET", ...extra })
-export const getApiAppRotationMonitor = (query: { "universe": string; "date"?: string }, extra?: RequestInit) => request<MonitorResponse>("/api/app/rotation/monitor" + withQuery(query), { method: "GET", ...extra })
 export const getApiAppBootstrap = (extra?: RequestInit) => request<AppBootstrapResponse>("/api/app/bootstrap", { method: "GET", ...extra })
-export const getApiAppDashboard = (extra?: RequestInit) => request<DashboardResponse>("/api/app/dashboard", { method: "GET", ...extra })
 export const getApiAppCalendar = (query: { "year": number; "month": number }, extra?: RequestInit) => request<CalendarResponse>("/api/app/calendar" + withQuery(query), { method: "GET", ...extra })
-export const getApiAppStocksSymbolPage = (symbol: string, extra?: RequestInit) => request<StockPageResponse>(`/api/app/stocks/${encodeURIComponent(String(symbol))}/page`, { method: "GET", ...extra })
-export const getApiAppPartnersLinkIdCompare = (linkId: string, query: { "from"?: string; "to"?: string }, extra?: RequestInit) => request<PartnerCompareResponse>(`/api/app/partners/${encodeURIComponent(String(linkId))}/compare` + withQuery(query), { method: "GET", ...extra })
-export const getApiAppPartners = (extra?: RequestInit) => request<PartnerLinkBrowserCollectionResponse>("/api/app/partners", { method: "GET", ...extra })
-export const getApiAppPartnersIdSummary = (id: string, extra?: RequestInit) => request<PartnerLinkBrowserResponse>(`/api/app/partners/${encodeURIComponent(String(id))}/summary`, { method: "GET", ...extra })
 export const getApiAppSettings = (extra?: RequestInit) => request<UserSettingsResponse>("/api/app/settings", { method: "GET", ...extra })
 export const putApiAppSettings = (body: UserSettingsWrite, extra?: RequestInit) => request<UserSettingsResponse>("/api/app/settings", { method: "PUT", body: JSON.stringify(body), ...extra })
+export const getApiAppAccountExport = (extra?: RequestInit) => request<AccountExportResponse>("/api/app/account-export", { method: "GET", ...extra })
+export const deleteApiAppAccount = (body: AccountDeletionWrite, extra?: RequestInit) => request<unknown>("/api/app/account", { method: "DELETE", body: JSON.stringify(body), ...extra })
 export const postApiAuthLogin = (body: LoginRequest, extra?: RequestInit) => request<SessionTokens>("/api/auth/login", { method: "POST", body: JSON.stringify(body), ...extra })
 export const postApiAuthRefresh = (extra?: RequestInit) => request<SessionTokens>("/api/auth/refresh", { method: "POST", ...extra })
 export const postApiAuthLogout = (extra?: RequestInit) => request<unknown>("/api/auth/logout", { method: "POST", ...extra })

@@ -20,8 +20,7 @@ services:
       POSTGRES_USER: trade_diary
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
     ports: ["127.0.0.1:5433:5432"]
-    volumes:
-      - trade-diary-data:/var/lib/postgresql/data
+    volumes: [trade-diary-data:/var/lib/postgresql/data]
     networks: [backend]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U trade_diary -d trade_diary"]
@@ -30,9 +29,7 @@ services:
       retries: 10
 
   db-role-bootstrap:
-    build:
-      context: .
-      dockerfile: platform/postgres/Dockerfile
+    build: { context: ., dockerfile: platform/postgres/Dockerfile }
     restart: "no"
     environment:
       PGHOST: postgres
@@ -42,27 +39,15 @@ services:
       MIGRATOR_DB_PASSWORD: ${MIGRATOR_DB_PASSWORD:?set MIGRATOR_DB_PASSWORD}
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?set IDENTITY_DB_PASSWORD}
       JOURNAL_DB_PASSWORD: ${JOURNAL_DB_PASSWORD:?set JOURNAL_DB_PASSWORD}
-      PERFORMANCE_DB_PASSWORD: ${PERFORMANCE_DB_PASSWORD:?set PERFORMANCE_DB_PASSWORD}
-      DISCIPLINE_DB_PASSWORD: ${DISCIPLINE_DB_PASSWORD:?set DISCIPLINE_DB_PASSWORD}
-      REMINDER_DB_PASSWORD: ${REMINDER_DB_PASSWORD:?set REMINDER_DB_PASSWORD}
       MARKET_DATA_DB_PASSWORD: ${MARKET_DATA_DB_PASSWORD:?set MARKET_DATA_DB_PASSWORD}
-      PRICE_ALERT_DB_PASSWORD: ${PRICE_ALERT_DB_PASSWORD:?set PRICE_ALERT_DB_PASSWORD}
-      ROTATION_DB_PASSWORD: ${ROTATION_DB_PASSWORD:?set ROTATION_DB_PASSWORD}
-      STOCK_RESEARCH_DB_PASSWORD: ${STOCK_RESEARCH_DB_PASSWORD:?set STOCK_RESEARCH_DB_PASSWORD}
-      PARTNER_DB_PASSWORD: ${PARTNER_DB_PASSWORD:?set PARTNER_DB_PASSWORD}
-      CONTENT_DB_PASSWORD: ${CONTENT_DB_PASSWORD:?set CONTENT_DB_PASSWORD}
       TOOL_DB_PASSWORD: ${TOOL_DB_PASSWORD:?set TOOL_DB_PASSWORD}
-      OPERATIONS_DB_PASSWORD: ${OPERATIONS_DB_PASSWORD:?set OPERATIONS_DB_PASSWORD}
     entrypoint: ["/roles/apply.sh"]
     command: ["bootstrap"]
     networks: [backend]
-    depends_on:
-      postgres: { condition: service_healthy }
+    depends_on: { postgres: { condition: service_healthy } }
 
   db-migrate:
-    build:
-      context: .
-      dockerfile: platform/postgres/Dockerfile
+    build: { context: ., dockerfile: platform/postgres/Dockerfile }
     restart: "no"
     environment:
       PGHOST: postgres
@@ -72,13 +57,10 @@ services:
       RELEASE_SHA: compose-development
     command: ["migrate"]
     networks: [backend]
-    depends_on:
-      db-role-bootstrap: { condition: service_completed_successfully }
+    depends_on: { db-role-bootstrap: { condition: service_completed_successfully } }
 
   db-role-finalize:
-    build:
-      context: .
-      dockerfile: platform/postgres/Dockerfile
+    build: { context: ., dockerfile: platform/postgres/Dockerfile }
     restart: "no"
     environment:
       PGHOST: postgres
@@ -88,92 +70,22 @@ services:
     entrypoint: ["/roles/apply.sh"]
     command: ["finalize"]
     networks: [backend]
-    depends_on:
-      db-migrate: { condition: service_completed_successfully }
+    depends_on: { db-migrate: { condition: service_completed_successfully } }
 
   identity:
     <<: *dotnet
-    build:
-      context: .
-      dockerfile: services/identity-service/src/TradeDiary.Identity/Dockerfile
+    build: { context: ., dockerfile: services/identity-service/src/TradeDiary.Identity/Dockerfile }
     environment:
       <<: *dotnet-env
       ConnectionStrings__Identity: Host=postgres;Database=trade_diary;Username=identity_service;Password=${IDENTITY_DB_PASSWORD:?set IDENTITY_DB_PASSWORD}
       Auth__AllowPublicRegistration: ${ALLOW_PUBLIC_REGISTRATION:-false}
       Auth__LocalRegistrationKey: ${LOCAL_REGISTRATION_KEY:?set LOCAL_REGISTRATION_KEY}
+      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
       Jwt__Issuer: trade-diary-identity
       Jwt__Audience: trade-diary-services
       Jwt__PrivateKeyPath: /keys/signing-key.pem
-    volumes:
-      - identity-keys:/keys
-    depends_on:
-      db-role-finalize: { condition: service_completed_successfully }
-
-  journal:
-    <<: *dotnet
-    build:
-      context: .
-      dockerfile: services/journal-service/src/TradeDiary.Journal/Dockerfile
-    environment:
-      <<: *dotnet-env
-      ConnectionStrings__Journal: Host=postgres;Database=trade_diary;Username=journal_service;Password=${JOURNAL_DB_PASSWORD:?set JOURNAL_DB_PASSWORD}
-      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
-      Services__Reminder: http://reminder:8080
-      Services__Partner: http://partner:8080
-      Services__MarketData: http://market-data:8080
-      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
-    depends_on:
-      identity: { condition: service_healthy }
-      partner: { condition: service_healthy }
-      market-data: { condition: service_healthy }
-
-  performance:
-    <<: *dotnet
-    build:
-      context: .
-      dockerfile: services/performance-service/src/TradeDiary.Performance/Dockerfile
-    environment:
-      <<: *dotnet-env
-      ConnectionStrings__Performance: Host=postgres;Database=trade_diary;Username=performance_service;Password=${PERFORMANCE_DB_PASSWORD:?set PERFORMANCE_DB_PASSWORD}
-      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
-    depends_on:
-      identity: { condition: service_healthy }
-
-  discipline:
-    <<: *dotnet
-    build:
-      context: .
-      dockerfile: services/discipline-service/src/TradeDiary.Discipline/Dockerfile
-    environment:
-      <<: *dotnet-env
-      ConnectionStrings__Discipline: Host=postgres;Database=trade_diary;Username=discipline_service;Password=${DISCIPLINE_DB_PASSWORD:?set DISCIPLINE_DB_PASSWORD}
-      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
-    depends_on:
-      identity: { condition: service_healthy }
-
-  reminder:
-    <<: *dotnet
-    build:
-      context: .
-      dockerfile: services/reminder-service/src/TradeDiary.Reminder/Dockerfile
-    environment:
-      <<: *dotnet-env
-      ConnectionStrings__Reminder: Host=postgres;Database=trade_diary;Username=reminder_service;Password=${REMINDER_DB_PASSWORD:?set REMINDER_DB_PASSWORD}
-      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
-      Services__Journal: http://journal:8080
-      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
-    depends_on:
-      identity: { condition: service_healthy }
-      journal: { condition: service_healthy }
-
-  stock-research:
-    <<: *dotnet
-    build: { context: ., dockerfile: services/stock-research-service/src/TradeDiary.StockResearch/Dockerfile }
-    environment:
-      <<: *dotnet-env
-      ConnectionStrings__StockResearch: Host=postgres;Database=trade_diary;Username=stock_research_service;Password=${STOCK_RESEARCH_DB_PASSWORD:?set STOCK_RESEARCH_DB_PASSWORD}
-      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
-    depends_on: { identity: { condition: service_healthy } }
+    volumes: [identity-keys:/keys]
+    depends_on: { db-role-finalize: { condition: service_completed_successfully } }
 
   market-data:
     <<: *dotnet
@@ -184,47 +96,19 @@ services:
       Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
     depends_on: { db-role-finalize: { condition: service_completed_successfully } }
 
-  price-alert:
+  journal:
     <<: *dotnet
-    build: { context: ., dockerfile: services/price-alert-service/src/TradeDiary.PriceAlert/Dockerfile }
+    build: { context: ., dockerfile: services/journal-service/src/TradeDiary.Journal/Dockerfile }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__PriceAlert: Host=postgres;Database=trade_diary;Username=price_alert_service;Password=${PRICE_ALERT_DB_PASSWORD:?set PRICE_ALERT_DB_PASSWORD}
-      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
-      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
-    depends_on:
-      identity: { condition: service_healthy }
-      market-data: { condition: service_healthy }
-
-  rotation:
-    <<: *dotnet
-    build: { context: ., dockerfile: services/rotation-service/src/TradeDiary.Rotation/Dockerfile }
-    environment:
-      <<: *dotnet-env
-      ConnectionStrings__Rotation: Host=postgres;Database=trade_diary;Username=rotation_service;Password=${ROTATION_DB_PASSWORD:?set ROTATION_DB_PASSWORD}
-      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
-    depends_on:
-      identity: { condition: service_healthy }
-      market-data: { condition: service_healthy }
-
-  partner:
-    <<: *dotnet
-    build: { context: ., dockerfile: services/partner-service/src/TradeDiary.Partner/Dockerfile }
-    environment:
-      <<: *dotnet-env
-      ConnectionStrings__Partner: Host=postgres;Database=trade_diary;Username=partner_service;Password=${PARTNER_DB_PASSWORD:?set PARTNER_DB_PASSWORD}
+      ConnectionStrings__Journal: Host=postgres;Database=trade_diary;Username=journal_service;Password=${JOURNAL_DB_PASSWORD:?set JOURNAL_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
       Services__Identity: http://identity:8080
-    depends_on: { identity: { condition: service_healthy } }
-
-  content:
-    <<: *dotnet
-    build: { context: ., dockerfile: services/content-service/src/TradeDiary.Content/Dockerfile }
-    environment:
-      <<: *dotnet-env
-      ConnectionStrings__Content: Host=postgres;Database=trade_diary;Username=content_service;Password=${CONTENT_DB_PASSWORD:?set CONTENT_DB_PASSWORD}
-      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
-    depends_on: { identity: { condition: service_healthy } }
+      Services__MarketData: http://market-data:8080
+      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
+    depends_on:
+      identity: { condition: service_healthy }
+      market-data: { condition: service_healthy }
 
   tool:
     <<: *dotnet
@@ -233,67 +117,34 @@ services:
       <<: *dotnet-env
       ConnectionStrings__Tool: Host=postgres;Database=trade_diary;Username=tool_service;Password=${TOOL_DB_PASSWORD:?set TOOL_DB_PASSWORD}
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
-      Services__Journal: http://journal:8080
-    depends_on: { identity: { condition: service_healthy }, journal: { condition: service_healthy } }
-
-  operations:
-    <<: *dotnet
-    build: { context: ., dockerfile: services/operations-service/src/TradeDiary.Operations/Dockerfile }
-    environment:
-      <<: *dotnet-env
-      ConnectionStrings__Operations: Host=postgres;Database=trade_diary;Username=operations_service;Password=${OPERATIONS_DB_PASSWORD:?set OPERATIONS_DB_PASSWORD}
-      Internal__ServiceKey: ${INTERNAL_SERVICE_KEY:?set INTERNAL_SERVICE_KEY}
-      Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
     depends_on: { identity: { condition: service_healthy } }
 
   edge:
     <<: *dotnet
-    build:
-      context: .
-      dockerfile: gateway/TradeDiary.EdgeApi/Dockerfile
+    build: { context: ., dockerfile: gateway/TradeDiary.EdgeApi/Dockerfile }
     environment:
       <<: *dotnet-env
       Auth__MetadataAddress: http://identity:8080/.well-known/openid-configuration
       Services__Identity: http://identity:8080
       Services__Journal: http://journal:8080
-      Services__Performance: http://performance:8080
-      Services__Discipline: http://discipline:8080
-      Services__Reminder: http://reminder:8080
-      Services__StockResearch: http://stock-research:8080
       Services__MarketData: http://market-data:8080
-      Services__PriceAlert: http://price-alert:8080
-      Services__Rotation: http://rotation:8080
-      Services__Partner: http://partner:8080
-      Services__Content: http://content:8080
       Services__Tool: http://tool:8080
-      Services__Operations: http://operations:8080
     ports: ["5099:8080"]
     networks: [backend, public]
     depends_on:
       journal: { condition: service_healthy }
-      performance: { condition: service_healthy }
-      discipline: { condition: service_healthy }
-      reminder: { condition: service_healthy }
-      stock-research: { condition: service_healthy }
       market-data: { condition: service_healthy }
-      price-alert: { condition: service_healthy }
-      rotation: { condition: service_healthy }
-      partner: { condition: service_healthy }
-      content: { condition: service_healthy }
       tool: { condition: service_healthy }
-      operations: { condition: service_healthy }
 
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-      args:
-        VITE_API_URL: ""
+      args: { VITE_API_URL: "" }
     restart: unless-stopped
     ports: ["8080:8080"]
     networks: [backend, public]
-    depends_on:
-      edge: { condition: service_healthy }
+    depends_on: { edge: { condition: service_healthy } }
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/"]
       interval: 10s
@@ -301,8 +152,7 @@ services:
       retries: 5
 
 networks:
-  backend:
-    internal: true
+  backend: { internal: true }
   public:
 
 volumes:

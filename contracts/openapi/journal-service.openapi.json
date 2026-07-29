@@ -46,19 +46,46 @@
         }
       }
     },
-    "/internal/diaries": {
+    "/internal/v1/tracked-us-instruments": {
       "get": {
         "tags": [
           "TradeDiary.Journal"
         ],
-        "parameters": [
-          {
-            "name": "query",
-            "in": "query",
-            "schema": {
-              "type": "string"
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackedInstrumentSetResponse"
+                }
+              }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "serviceKey": []
+          }
+        ]
+      }
+    },
+    "/internal/agent/granted-records": {
+      "get": {
+        "tags": [
+          "AccessGrantEndpoints"
+        ],
+        "parameters": [
           {
             "name": "from",
             "in": "query",
@@ -76,18 +103,25 @@
             }
           },
           {
-            "name": "reviewStatus",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "all"
-            }
-          },
-          {
-            "name": "symbol",
+            "name": "subjectType",
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "instrumentId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -95,6 +129,21 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "reviewReadiness",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "author",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -124,7 +173,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DiaryPage"
+                  "$ref": "#/components/schemas/GrantedRecordPage"
                 }
               }
             }
@@ -135,6 +184,197 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/agent/journal-changes": {
+      "get": {
+        "tags": [
+          "AccessGrantEndpoints"
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "subjectType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "instrumentId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reviewReadiness",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "author",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantedChangePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/access-grants": {
+      "get": {
+        "tags": [
+          "AccessGrantEndpoints"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionResponseOfAccessGrantResponse"
                 }
               }
             }
@@ -158,23 +398,13 @@
       },
       "post": {
         "tags": [
-          "TradeDiary.Journal"
-        ],
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "schema": {
-              "maxLength": 200,
-              "type": "string"
-            }
-          }
+          "AccessGrantEndpoints"
         ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DiaryWrite"
+                "$ref": "#/components/schemas/AccessGrantWrite"
               }
             }
           },
@@ -186,7 +416,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DiaryResponse"
+                  "$ref": "#/components/schemas/AccessGrantResponse"
                 }
               }
             }
@@ -211,8 +441,8 @@
               }
             }
           },
-          "409": {
-            "description": "Conflict",
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -229,129 +459,10 @@
         ]
       }
     },
-    "/internal/diaries/{id}": {
-      "get": {
-        "tags": [
-          "TradeDiary.Journal"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DiaryResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      },
-      "put": {
-        "tags": [
-          "TradeDiary.Journal"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DiaryWrite"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      },
+    "/internal/access-grants/{id}": {
       "delete": {
         "tags": [
-          "TradeDiary.Journal"
+          "AccessGrantEndpoints"
         ],
         "parameters": [
           {
@@ -380,415 +491,6 @@
           },
           "404": {
             "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/internal/diary-day-summary": {
-      "get": {
-        "tags": [
-          "TradeDiary.Journal"
-        ],
-        "parameters": [
-          {
-            "name": "from",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          {
-            "name": "to",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CollectionResponseOfDiaryDaySummaryItem"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/internal/diaries/{diaryId}/review": {
-      "get": {
-        "tags": [
-          "TradeDiary.Journal"
-        ],
-        "parameters": [
-          {
-            "name": "diaryId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DiaryReviewResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      },
-      "put": {
-        "tags": [
-          "TradeDiary.Journal"
-        ],
-        "parameters": [
-          {
-            "name": "diaryId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DiaryReviewWrite"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DiaryReviewResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      },
-      "delete": {
-        "tags": [
-          "TradeDiary.Journal"
-        ],
-        "parameters": [
-          {
-            "name": "diaryId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/internal/diary-review-summary": {
-      "get": {
-        "tags": [
-          "TradeDiary.Journal"
-        ],
-        "parameters": [
-          {
-            "name": "from",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          {
-            "name": "to",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DiaryReviewSummaryResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/internal/diary-review-items": {
-      "get": {
-        "tags": [
-          "TradeDiary.Journal"
-        ],
-        "parameters": [
-          {
-            "name": "from",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          {
-            "name": "to",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "default": "all",
-              "$ref": "#/components/schemas/DiaryReviewFilterStatus"
-            }
-          },
-          {
-            "name": "assessment",
-            "in": "query",
-            "schema": {
-              "default": "all",
-              "$ref": "#/components/schemas/DiaryReviewAssessmentFilter"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32",
-              "default": 50
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DiaryReviewItemsResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1219,6 +921,100 @@
             "bearerAuth": []
           }
         ]
+      },
+      "delete": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/market-observations/{id}": {
+      "delete": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/internal/observation-updates/{updateId}/expectations": {
@@ -1484,6 +1280,52 @@
             "bearerAuth": []
           }
         ]
+      },
+      "delete": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/internal/expectations/{id}/invalidate": {
@@ -1541,18 +1383,115 @@
         ]
       }
     },
-    "/internal/quick-note": {
+    "/internal/reasoning-labels": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionResponseOfReasoningLabelResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
       "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasoningLabelWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReasoningLabelResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/reasoning-labels/{id}": {
+      "put": {
         "tags": [
           "TradeDiary.Journal"
         ],
         "parameters": [
           {
-            "name": "Idempotency-Key",
-            "in": "header",
+            "name": "id",
+            "in": "path",
+            "required": true,
             "schema": {
-              "maxLength": 200,
-              "type": "string"
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -1560,7 +1499,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/QuickNote"
+                "$ref": "#/components/schemas/ReasoningLabelWrite"
               }
             }
           },
@@ -1572,17 +1511,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QuickNoteResponse"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QuickNoteResponse"
+                  "$ref": "#/components/schemas/ReasoningLabelResponse"
                 }
               }
             }
@@ -1633,16 +1562,62 @@
             "bearerAuth": []
           }
         ]
+      },
+      "delete": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
-    "/internal/diaries/{diaryId}/transactions": {
+    "/internal/expectations/{id}/review": {
       "get": {
         "tags": [
           "TradeDiary.Journal"
         ],
         "parameters": [
           {
-            "name": "diaryId",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1657,7 +1632,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CollectionResponseOfTransactionResponse"
+                  "$ref": "#/components/schemas/ExpectationReviewResponse"
                 }
               }
             }
@@ -1689,26 +1664,64 @@
           }
         ]
       },
-      "post": {
+      "delete": {
         "tags": [
           "TradeDiary.Journal"
         ],
         "parameters": [
           {
-            "name": "diaryId",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
               "format": "uuid"
             }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
           },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
           {
-            "name": "Idempotency-Key",
-            "in": "header",
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
             "schema": {
-              "maxLength": 200,
-              "type": "string"
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -1716,19 +1729,19 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TransactionWrite"
+                "$ref": "#/components/schemas/ExpectationReviewWrite"
               }
             }
           },
           "required": true
         },
         "responses": {
-          "201": {
-            "description": "Created",
+          "200": {
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TransactionResponse"
+                  "$ref": "#/components/schemas/ExpectationReviewResponse"
                 }
               }
             }
@@ -1781,21 +1794,225 @@
         ]
       }
     },
-    "/internal/diaries/{diaryId}/transactions/{id}": {
+    "/internal/comparison": {
       "get": {
         "tags": [
-          "TradeDiary.Journal"
+          "ComparisonEndpoints"
         ],
         "parameters": [
           {
-            "name": "diaryId",
-            "in": "path",
+            "name": "agentUserId",
+            "in": "query",
             "required": true,
             "schema": {
               "type": "string",
               "format": "uuid"
             }
           },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "subjectType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "instrumentId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerComparisonResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/observation-updates/{updateId}/action-decisions": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "updateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionResponseOfActionDecisionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "updateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionDecisionWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionDecisionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/action-decisions/{id}": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
           {
             "name": "id",
             "in": "path",
@@ -1812,7 +2029,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TransactionResponse"
+                  "$ref": "#/components/schemas/ActionDecisionResponse"
                 }
               }
             }
@@ -1850,15 +2067,6 @@
         ],
         "parameters": [
           {
-            "name": "diaryId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "id",
             "in": "path",
             "required": true,
@@ -1872,15 +2080,22 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TransactionWrite"
+                "$ref": "#/components/schemas/ActionDecisionWrite"
               }
             }
           },
           "required": true
         },
         "responses": {
-          "204": {
-            "description": "No Content"
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionDecisionEditResponse"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -1925,7 +2140,255 @@
         ],
         "parameters": [
           {
-            "name": "diaryId",
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/action-decisions/{decisionId}/trades": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "decisionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionResponseOfTradeEvidenceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "decisionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeEvidenceWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeEvidenceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/action-decisions/{decisionId}/trades/{id}": {
+      "put": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "decisionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeEvidenceWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeEvidenceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "decisionId",
             "in": "path",
             "required": true,
             "schema": {
@@ -1975,39 +2438,10 @@
         ]
       }
     },
-    "/internal/partner-diaries": {
+    "/internal/watchlist": {
       "get": {
         "tags": [
           "TradeDiary.Journal"
-        ],
-        "parameters": [
-          {
-            "name": "ownerId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "from",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          {
-            "name": "to",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          }
         ],
         "responses": {
           "200": {
@@ -2015,13 +2449,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CollectionResponseOfPartnerDiaryItem"
+                  "$ref": "#/components/schemas/CollectionResponseOfWatchlistItemResponse"
                 }
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
+          "401": {
+            "description": "Unauthorized",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2029,6 +2463,44 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/watchlist/{instrumentId}": {
+      "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "instrumentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistItemResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized",
@@ -2066,12 +2538,868 @@
             "bearerAuth": []
           }
         ]
+      },
+      "delete": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "instrumentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/watchlist/{instrumentId}/note": {
+      "put": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "instrumentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistNoteWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/pattern-review": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatternReviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/discipline-principles": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionResponseOfDisciplinePrincipleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisciplinePrincipleCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisciplinePrincipleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/discipline-principles/today": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisciplinePrincipleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/discipline-principles/{id}": {
+      "put": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisciplinePrincipleUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/discipline-principles/{id}/select": {
+      "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/account-export": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountJournalExport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/account-data": {
+      "delete": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     }
   },
   "components": {
     "schemas": {
-      "CollectionResponseOfDiaryDaySummaryItem": {
+      "AccessGrantMode": {
+        "enum": [
+          "fixed",
+          "ongoing"
+        ]
+      },
+      "AccessGrantResponse": {
+        "required": [
+          "id",
+          "agentUserId",
+          "mode",
+          "from",
+          "to",
+          "subjectType",
+          "subject",
+          "instrumentId",
+          "expiresAt",
+          "revokedAt",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agentUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/AccessGrantMode"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "subjectType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subject": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "expiresAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "revokedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AccessGrantWrite": {
+        "required": [
+          "agentUserId",
+          "mode",
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "agentUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/AccessGrantMode"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "subjectType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subject": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "expiresAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "AccountJournalExport": {
+        "required": [
+          "marketObservations",
+          "observationUpdates",
+          "expectations",
+          "expectationReviews",
+          "expectationReviewLabels",
+          "reasoningLabels",
+          "actionDecisions",
+          "trades",
+          "watchlistItems",
+          "disciplinePrinciples",
+          "accessGrants",
+          "accessGrantRecords"
+        ],
+        "type": "object",
+        "properties": {
+          "marketObservations": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "observationUpdates": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "expectations": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "expectationReviews": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "expectationReviewLabels": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "reasoningLabels": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "actionDecisions": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "trades": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "watchlistItems": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "disciplinePrinciples": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "accessGrants": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "accessGrantRecords": {
+            "$ref": "#/components/schemas/JsonElement"
+          }
+        }
+      },
+      "ActionDecisionEditResponse": {
+        "required": [
+          "id",
+          "observationUpdateId",
+          "expectationId",
+          "intent",
+          "reason",
+          "recordedAt",
+          "executionReview",
+          "updatedAt",
+          "honestyReminderRequired"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observationUpdateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "intent": {
+            "$ref": "#/components/schemas/ActionDecisionIntent"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "executionReview": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExecutionReview"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "honestyReminderRequired": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ActionDecisionIntent": {
+        "enum": [
+          "trade",
+          "continue_observing",
+          "avoid_trade"
+        ]
+      },
+      "ActionDecisionResponse": {
+        "required": [
+          "id",
+          "observationUpdateId",
+          "expectationId",
+          "intent",
+          "reason",
+          "recordedAt",
+          "executionReview",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observationUpdateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "intent": {
+            "$ref": "#/components/schemas/ActionDecisionIntent"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "executionReview": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExecutionReview"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ActionDecisionWrite": {
+        "required": [
+          "intent",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "intent": {
+            "$ref": "#/components/schemas/ActionDecisionIntent"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "expectationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "executionReview": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExecutionReview"
+              }
+            ]
+          }
+        }
+      },
+      "CollectionResponseOfAccessGrantResponse": {
         "required": [
           "items"
         ],
@@ -2080,7 +3408,35 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/DiaryDaySummaryItem"
+              "$ref": "#/components/schemas/AccessGrantResponse"
+            }
+          }
+        }
+      },
+      "CollectionResponseOfActionDecisionResponse": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActionDecisionResponse"
+            }
+          }
+        }
+      },
+      "CollectionResponseOfDisciplinePrincipleResponse": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DisciplinePrincipleResponse"
             }
           }
         }
@@ -2113,7 +3469,7 @@
           }
         }
       },
-      "CollectionResponseOfPartnerDiaryItem": {
+      "CollectionResponseOfReasoningLabelResponse": {
         "required": [
           "items"
         ],
@@ -2122,12 +3478,12 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PartnerDiaryItem"
+              "$ref": "#/components/schemas/ReasoningLabelResponse"
             }
           }
         }
       },
-      "CollectionResponseOfTransactionResponse": {
+      "CollectionResponseOfTradeEvidenceResponse": {
         "required": [
           "items"
         ],
@@ -2136,71 +3492,67 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/TransactionResponse"
+              "$ref": "#/components/schemas/TradeEvidenceResponse"
             }
           }
         }
       },
-      "DiaryDaySummaryItem": {
+      "CollectionResponseOfWatchlistItemResponse": {
         "required": [
-          "localDate",
-          "diaryCount",
-          "transactionCount"
-        ],
-        "type": "object",
-        "properties": {
-          "localDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "diaryCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int64"
-          },
-          "transactionCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int64"
-          }
-        }
-      },
-      "DiaryPage": {
-        "required": [
-          "items",
-          "nextCursor"
+          "items"
         ],
         "type": "object",
         "properties": {
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/DiaryResponse"
+              "$ref": "#/components/schemas/WatchlistItemResponse"
             }
-          },
-          "nextCursor": {
+          }
+        }
+      },
+      "ComparisonAvailability": {
+        "enum": [
+          "available",
+          "empty",
+          "unavailable"
+        ]
+      },
+      "ComparisonDifferenceResponse": {
+        "required": [
+          "outcomeConsistent",
+          "confidenceDifference"
+        ],
+        "type": "object",
+        "properties": {
+          "outcomeConsistent": {
             "type": [
               "null",
-              "string"
+              "boolean"
             ]
+          },
+          "confidenceDifference": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
-      "DiaryResponse": {
+      "ComparisonExpectationResponse": {
         "required": [
           "id",
-          "localDate",
-          "title",
-          "content",
-          "createdAt",
-          "updatedAt",
-          "tags"
+          "expectedBehavior",
+          "deadline",
+          "invalidationCondition",
+          "confidence",
+          "market",
+          "outcome",
+          "reasoningQuality",
+          "reviewExplanation"
         ],
         "type": "object",
         "properties": {
@@ -2208,259 +3560,187 @@
             "type": "string",
             "format": "uuid"
           },
-          "localDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "title": {
+          "expectedBehavior": {
             "type": "string"
           },
-          "content": {
-            "type": "string"
-          },
-          "createdAt": {
+          "deadline": {
             "type": "string",
             "format": "date-time"
           },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "tags": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "DiaryReviewAssessmentFilter": {
-        "enum": [
-          "all",
-          "good",
-          "mixed",
-          "poor"
-        ]
-      },
-      "DiaryReviewFilterStatus": {
-        "enum": [
-          "all",
-          "reviewed",
-          "unreviewed"
-        ]
-      },
-      "DiaryReviewItemResponse": {
-        "required": [
-          "diaryId",
-          "localDate",
-          "title",
-          "contentPreview",
-          "reviewStatus",
-          "processAssessment",
-          "emotion",
-          "disciplineScore",
-          "executionScore",
-          "mistakeTags",
-          "lesson",
-          "nextAction",
-          "reviewUpdatedAt"
-        ],
-        "type": "object",
-        "properties": {
-          "diaryId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "localDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "title": {
+          "invalidationCondition": {
             "type": "string"
           },
-          "contentPreview": {
+          "confidence": {
+            "$ref": "#/components/schemas/ExpectationConfidence"
+          },
+          "market": {
             "type": "string"
           },
-          "reviewStatus": {
-            "$ref": "#/components/schemas/DiaryReviewStatus"
-          },
-          "processAssessment": {
+          "outcome": {
             "oneOf": [
               {
                 "type": "null"
               },
               {
-                "$ref": "#/components/schemas/DiaryReviewProcessAssessment"
+                "$ref": "#/components/schemas/ExpectationOutcome"
               }
             ]
           },
-          "emotion": {
+          "reasoningQuality": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReasoningQuality"
+              }
+            ]
+          },
+          "reviewExplanation": {
             "type": [
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "ComparisonObservationResponse": {
+        "required": [
+          "journalDay",
+          "update",
+          "expectations"
+        ],
+        "type": "object",
+        "properties": {
+          "journalDay": {
+            "type": "string",
+            "format": "date"
           },
-          "disciplineScore": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int16"
+          "update": {
+            "$ref": "#/components/schemas/ObservationUpdateResponse"
           },
-          "executionScore": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int16"
-          },
-          "mistakeTags": {
+          "expectations": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/ComparisonExpectationResponse"
             }
+          }
+        }
+      },
+      "ComparisonOwnerResponse": {
+        "required": [
+          "ownerId",
+          "ownerType",
+          "availability",
+          "observations"
+        ],
+        "type": "object",
+        "properties": {
+          "ownerId": {
+            "type": "string",
+            "format": "uuid"
           },
-          "lesson": {
-            "type": [
-              "null",
-              "string"
-            ]
+          "ownerType": {
+            "$ref": "#/components/schemas/ComparisonOwnerType"
           },
-          "nextAction": {
-            "type": [
-              "null",
-              "string"
-            ]
+          "availability": {
+            "$ref": "#/components/schemas/ComparisonAvailability"
           },
-          "reviewUpdatedAt": {
+          "observations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComparisonObservationResponse"
+            }
+          }
+        }
+      },
+      "ComparisonOwnerType": {
+        "enum": [
+          "human",
+          "agent"
+        ]
+      },
+      "DailyCloseEvidenceResponse": {
+        "required": [
+          "tradingDate",
+          "rawClose",
+          "adjustedClose",
+          "provider",
+          "publishedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "tradingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "rawClose": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
-              "null",
+              "number",
               "string"
             ],
+            "format": "double"
+          },
+          "adjustedClose": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string",
             "format": "date-time"
           }
         }
       },
-      "DiaryReviewItemsResponse": {
+      "DailyCloseStatus": {
+        "enum": [
+          "available",
+          "unavailable",
+          "unsupported"
+        ],
+        "default": "unsupported"
+      },
+      "DisciplinePrincipleCreate": {
         "required": [
-          "items",
-          "nextCursor"
+          "content"
         ],
         "type": "object",
         "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DiaryReviewItemResponse"
-            }
-          },
-          "nextCursor": {
-            "type": [
-              "null",
-              "string"
-            ]
+          "content": {
+            "type": "string"
           }
         }
       },
-      "DiaryReviewProcessAssessment": {
-        "enum": [
-          "good",
-          "mixed",
-          "poor",
-          null
-        ]
-      },
-      "DiaryReviewResponse": {
+      "DisciplinePrincipleResponse": {
         "required": [
-          "diaryId",
-          "thesis",
-          "plannedAction",
-          "actualAction",
-          "emotion",
-          "disciplineScore",
-          "executionScore",
-          "processAssessment",
-          "mistakeTags",
-          "lesson",
-          "nextAction",
+          "id",
+          "content",
+          "status",
+          "selectedForToday",
           "createdAt",
           "updatedAt"
         ],
         "type": "object",
         "properties": {
-          "diaryId": {
+          "id": {
             "type": "string",
             "format": "uuid"
           },
-          "thesis": {
-            "type": [
-              "null",
-              "string"
-            ]
+          "content": {
+            "type": "string"
           },
-          "plannedAction": {
-            "type": [
-              "null",
-              "string"
-            ]
+          "status": {
+            "$ref": "#/components/schemas/DisciplinePrincipleStatus"
           },
-          "actualAction": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "emotion": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "disciplineScore": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int16"
-          },
-          "executionScore": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int16"
-          },
-          "processAssessment": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "mistakeTags": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "lesson": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "nextAction": {
-            "type": [
-              "null",
-              "string"
-            ]
+          "selectedForToday": {
+            "type": "boolean"
           },
           "createdAt": {
             "type": "string",
@@ -2472,196 +3752,35 @@
           }
         }
       },
-      "DiaryReviewStatus": {
+      "DisciplinePrincipleStatus": {
         "enum": [
-          "reviewed",
-          "unreviewed"
+          "active",
+          "disabled",
+          "archived"
         ]
       },
-      "DiaryReviewSummaryResponse": {
+      "DisciplinePrincipleUpdate": {
         "required": [
-          "reviewedCount",
-          "averageDisciplineScore",
-          "averageExecutionScore",
-          "emotionCounts",
-          "processAssessmentCounts",
-          "topMistakeTags"
+          "content",
+          "status"
         ],
         "type": "object",
         "properties": {
-          "reviewedCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int64"
-          },
-          "averageDisciplineScore": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "averageExecutionScore": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "emotionCounts": {
-            "type": "object",
-            "additionalProperties": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int64"
-            }
-          },
-          "processAssessmentCounts": {
-            "type": "object",
-            "additionalProperties": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int64"
-            }
-          },
-          "topMistakeTags": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MistakeTagCountResponse"
-            }
-          }
-        }
-      },
-      "DiaryReviewWrite": {
-        "required": [
-          "thesis",
-          "plannedAction",
-          "actualAction",
-          "emotion",
-          "disciplineScore",
-          "executionScore",
-          "processAssessment",
-          "mistakeTags",
-          "lesson",
-          "nextAction"
-        ],
-        "type": "object",
-        "properties": {
-          "thesis": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "plannedAction": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "actualAction": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "emotion": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "disciplineScore": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int16"
-          },
-          "executionScore": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int16"
-          },
-          "processAssessment": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "mistakeTags": {
-            "type": [
-              "null",
-              "array"
-            ],
-            "items": {
-              "type": "string"
-            }
-          },
-          "lesson": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "nextAction": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
-      "DiaryWrite": {
-        "required": [
-          "localDate",
-          "title",
-          "content"
-        ],
-        "type": "object",
-        "properties": {
-          "localDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "title": {
+          "content": {
             "type": "string"
           },
-          "content": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "tags": {
-            "type": [
-              "null",
-              "array"
-            ],
-            "items": {
-              "type": "string"
-            }
+          "status": {
+            "$ref": "#/components/schemas/DisciplinePrincipleStatus"
           }
         }
+      },
+      "ExecutionReview": {
+        "enum": [
+          "followed",
+          "partially_followed",
+          "deviated",
+          null
+        ]
       },
       "ExpectationConfidence": {
         "enum": [
@@ -2755,6 +3874,14 @@
           }
         }
       },
+      "ExpectationOutcome": {
+        "enum": [
+          "confirmed",
+          "partially_confirmed",
+          "invalidated",
+          "indeterminate"
+        ]
+      },
       "ExpectationReadiness": {
         "enum": [
           "active",
@@ -2836,6 +3963,105 @@
           }
         }
       },
+      "ExpectationReviewResponse": {
+        "required": [
+          "id",
+          "expectationId",
+          "outcome",
+          "reasoningQuality",
+          "explanation",
+          "labels",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ExpectationOutcome"
+          },
+          "reasoningQuality": {
+            "$ref": "#/components/schemas/ReasoningQuality"
+          },
+          "explanation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReasoningLabelResponse"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpectationReviewWrite": {
+        "required": [
+          "outcome",
+          "reasoningQuality",
+          "explanation"
+        ],
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/ExpectationOutcome"
+          },
+          "reasoningQuality": {
+            "$ref": "#/components/schemas/ReasoningQuality"
+          },
+          "explanation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "systemIssueKeys": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "systemStrengthKeys": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "customLabelIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "ExpectationWrite": {
         "required": [
           "expectedBehavior",
@@ -2877,6 +4103,110 @@
           }
         }
       },
+      "GrantedChangePage": {
+        "required": [
+          "items",
+          "nextCursor",
+          "hasMore"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "GrantedObservationResponse": {
+        "required": [
+          "marketObservationId",
+          "ownerId",
+          "journalDay",
+          "records"
+        ],
+        "type": "object",
+        "properties": {
+          "marketObservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "journalDay": {
+            "type": "string",
+            "format": "date"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantedRecordResponse"
+            }
+          }
+        }
+      },
+      "GrantedRecordPage": {
+        "required": [
+          "items",
+          "nextCursor",
+          "syncCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantedObservationResponse"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "syncCursor": {
+            "type": "string"
+          }
+        }
+      },
+      "GrantedRecordResponse": {
+        "required": [
+          "recordType",
+          "id",
+          "ownerId",
+          "updatedAt",
+          "content"
+        ],
+        "type": "object",
+        "properties": {
+          "recordType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "content": {
+            "$ref": "#/components/schemas/JsonElement"
+          }
+        }
+      },
+      "JsonElement": {},
       "MarketObservationDaySummaryItem": {
         "required": [
           "date",
@@ -2942,26 +4272,6 @@
             "items": {
               "$ref": "#/components/schemas/ObservationUpdateResponse"
             }
-          }
-        }
-      },
-      "MistakeTagCountResponse": {
-        "required": [
-          "tag",
-          "count"
-        ],
-        "type": "object",
-        "properties": {
-          "tag": {
-            "type": "string"
-          },
-          "count": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int64"
           }
         }
       },
@@ -3108,6 +4418,19 @@
           },
           "dailyCloseAvailable": {
             "type": "boolean"
+          },
+          "dailyCloseStatus": {
+            "$ref": "#/components/schemas/DailyCloseStatus"
+          },
+          "dailyClose": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DailyCloseEvidenceResponse"
+              }
+            ]
           }
         }
       },
@@ -3395,37 +4718,127 @@
                 "$ref": "#/components/schemas/ObservationEvidenceWrite"
               }
             ]
+          },
+          "sourceLabel": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
-      "PartnerDiaryItem": {
+      "OwnerComparisonResponse": {
         "required": [
-          "id",
-          "localDate",
-          "title",
-          "content",
-          "tags"
+          "human",
+          "agent",
+          "difference"
         ],
         "type": "object",
         "properties": {
-          "id": {
+          "human": {
+            "$ref": "#/components/schemas/ComparisonOwnerResponse"
+          },
+          "agent": {
+            "$ref": "#/components/schemas/ComparisonOwnerResponse"
+          },
+          "difference": {
+            "$ref": "#/components/schemas/ComparisonDifferenceResponse"
+          }
+        }
+      },
+      "PatternEvidenceResponse": {
+        "required": [
+          "expectationId",
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "expectationId": {
             "type": "string",
             "format": "uuid"
           },
-          "localDate": {
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "PatternLabelResponse": {
+        "required": [
+          "kind",
+          "key",
+          "name",
+          "system",
+          "count",
+          "denominator",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ReasoningLabelKind"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "system": {
+            "type": "boolean"
+          },
+          "count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "denominator": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PatternEvidenceResponse"
+            }
+          }
+        }
+      },
+      "PatternReviewResponse": {
+        "required": [
+          "from",
+          "to",
+          "reviewedExpectationCount",
+          "labels"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
             "type": "string",
             "format": "date"
           },
-          "title": {
-            "type": "string"
+          "to": {
+            "type": "string",
+            "format": "date"
           },
-          "content": {
-            "type": "string"
+          "reviewedExpectationCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           },
-          "tags": {
+          "labels": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/PatternLabelResponse"
             }
           }
         }
@@ -3468,49 +4881,6 @@
           }
         }
       },
-      "QuickNote": {
-        "required": [
-          "localDate",
-          "content",
-          "targetDiaryId"
-        ],
-        "type": "object",
-        "properties": {
-          "localDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "content": {
-            "type": "string"
-          },
-          "targetDiaryId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          }
-        }
-      },
-      "QuickNoteResponse": {
-        "required": [
-          "diaryId",
-          "appended"
-        ],
-        "type": "object",
-        "properties": {
-          "diaryId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "appended": {
-            "type": "boolean"
-          }
-        }
-      },
       "QuickObservationResponse": {
         "required": [
           "marketObservationId",
@@ -3550,20 +4920,125 @@
         "properties": {
           "content": {
             "type": "string"
+          },
+          "sourceLabel": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
-      "TransactionResponse": {
+      "ReasoningLabelKind": {
+        "enum": [
+          "issue",
+          "strength"
+        ]
+      },
+      "ReasoningLabelResponse": {
         "required": [
           "id",
-          "diaryId",
+          "kind",
+          "key",
+          "name",
+          "isSystem"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ReasoningLabelKind"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isSystem": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReasoningLabelWrite": {
+        "required": [
+          "kind",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ReasoningLabelKind"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ReasoningQuality": {
+        "enum": [
+          "sound",
+          "mixed",
+          "weak"
+        ]
+      },
+      "TrackedInstrumentResponse": {
+        "required": [
+          "instrumentId"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "TrackedInstrumentSetResponse": {
+        "required": [
+          "contractVersion",
+          "generatedAt",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "contractVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackedInstrumentResponse"
+            }
+          }
+        }
+      },
+      "TradeEvidenceResponse": {
+        "required": [
+          "id",
+          "actionDecisionId",
           "symbol",
           "side",
           "quantity",
           "price",
           "currency",
-          "tradedAt",
-          "notes",
+          "executedAt",
+          "note",
           "createdAt",
           "updatedAt"
         ],
@@ -3573,7 +5048,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "diaryId": {
+          "actionDecisionId": {
             "type": "string",
             "format": "uuid"
           },
@@ -3581,7 +5056,7 @@
             "type": "string"
           },
           "side": {
-            "type": "string"
+            "$ref": "#/components/schemas/TradeSide"
           },
           "quantity": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
@@ -3602,12 +5077,15 @@
           "currency": {
             "type": "string"
           },
-          "tradedAt": {
+          "executedAt": {
             "type": "string",
             "format": "date-time"
           },
-          "notes": {
-            "type": "string"
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "createdAt": {
             "type": "string",
@@ -3619,15 +5097,14 @@
           }
         }
       },
-      "TransactionWrite": {
+      "TradeEvidenceWrite": {
         "required": [
           "symbol",
           "side",
           "quantity",
           "price",
           "currency",
-          "tradedAt",
-          "notes"
+          "executedAt"
         ],
         "type": "object",
         "properties": {
@@ -3635,7 +5112,7 @@
             "type": "string"
           },
           "side": {
-            "type": "string"
+            "$ref": "#/components/schemas/TradeSide"
           },
           "quantity": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
@@ -3656,11 +5133,60 @@
           "currency": {
             "type": "string"
           },
-          "tradedAt": {
+          "executedAt": {
             "type": "string",
             "format": "date-time"
           },
-          "notes": {
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "TradeSide": {
+        "enum": [
+          "buy",
+          "sell"
+        ]
+      },
+      "WatchlistItemResponse": {
+        "required": [
+          "instrumentId",
+          "note",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WatchlistNoteWrite": {
+        "required": [
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "note": {
             "type": [
               "null",
               "string"
@@ -3685,6 +5211,12 @@
   "tags": [
     {
       "name": "TradeDiary.Journal"
+    },
+    {
+      "name": "AccessGrantEndpoints"
+    },
+    {
+      "name": "ComparisonEndpoints"
     }
   ]
 }

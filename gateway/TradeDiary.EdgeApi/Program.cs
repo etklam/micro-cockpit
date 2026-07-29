@@ -47,16 +47,9 @@ HealthEndpoints.Map(app);
 AuthenticationEndpoints.Map(app);
 BootstrapEndpoints.Map(app);
 SettingsEndpoints.Map(app);
-DashboardEndpoints.Map(app);
 CalendarEndpoints.Map(app);
 JournalEndpoints.Map(app);
-PerformanceEndpoints.Map(app);
-DisciplineEndpoints.Map(app);
-ReminderEndpoints.Map(app);
 ResearchEndpoints.Map(app);
-AdminEndpoints.Map(app);
-PartnerEndpoints.Map(app);
-CompositionEndpoints.Map(app);
 
 app.Run();
 

@@ -6,10 +6,10 @@ import { TOOL_CATALOG } from './features/toolsCatalog'
 import type { MessageKey } from './i18n'
 
 const FEATURES: { titleKey: MessageKey; bodyKey: MessageKey }[] = [
-  { titleKey: 'landing.feature.diary.title', bodyKey: 'landing.feature.diary.body' },
-  { titleKey: 'landing.feature.calendar.title', bodyKey: 'landing.feature.calendar.body' },
-  { titleKey: 'landing.feature.discipline.title', bodyKey: 'landing.feature.discipline.body' },
-  { titleKey: 'landing.feature.review.title', bodyKey: 'landing.feature.review.body' },
+  { titleKey: 'landing.feature.observations.title', bodyKey: 'landing.feature.observations.body' },
+  { titleKey: 'landing.feature.expectations.title', bodyKey: 'landing.feature.expectations.body' },
+  { titleKey: 'landing.feature.evidence.title', bodyKey: 'landing.feature.evidence.body' },
+  { titleKey: 'landing.feature.comparison.title', bodyKey: 'landing.feature.comparison.body' },
 ]
 
 const WORKFLOW: { titleKey: MessageKey; bodyKey: MessageKey }[] = [
@@ -27,24 +27,24 @@ const CAPABILITY_GROUPS: {
   {
     titleKey: 'landing.capability.reflect',
     badgeKey: 'landing.capability.account',
-    items: ['landing.capability.diary', 'landing.capability.discipline', 'landing.capability.private'],
+    items: ['landing.capability.observations', 'landing.capability.evidence', 'landing.capability.private'],
   },
   {
     titleKey: 'landing.capability.review',
     badgeKey: 'landing.capability.account',
-    items: ['landing.capability.calendar', 'landing.capability.monthly', 'landing.capability.alerts'],
+    items: ['landing.capability.expectations', 'landing.capability.comparison', 'landing.capability.patterns'],
   },
   {
     titleKey: 'landing.capability.decide',
-    badgeKey: 'landing.capability.public',
-    items: ['landing.capability.tools'],
+    badgeKey: 'landing.capability.account',
+    items: ['landing.capability.watchlist', 'landing.capability.dailyClose'],
   },
 ]
 
 const TRUST: MessageKey[] = [
-  'landing.trust.journalFirst',
+  'landing.trust.observationFirst',
   'landing.trust.private',
-  'landing.trust.sharing',
+  'landing.trust.grants',
   'landing.trust.noBroker',
   'landing.trust.noHoldings',
   'landing.trust.notAdvice',
@@ -73,16 +73,16 @@ export function LandingPage() {
             <strong>{t('landing.preview.quickNoteValue')}</strong>
           </div>
           <div className="landing__preview-row">
-            <span className="landing__preview-label">{t('landing.preview.diary')}</span>
-            <strong>{t('landing.preview.diaryValue')}</strong>
+            <span className="landing__preview-label">{t('landing.preview.observation')}</span>
+            <strong>{t('landing.preview.observationValue')}</strong>
           </div>
           <div className="landing__preview-row">
-            <span className="landing__preview-label">{t('landing.preview.pnl')}</span>
-            <strong className="num gain">+1,240</strong>
+            <span className="landing__preview-label">{t('landing.preview.confidence')}</span>
+            <strong className="num">72%</strong>
           </div>
           <div className="landing__preview-row">
-            <span className="landing__preview-label">{t('landing.preview.discipline')}</span>
-            <em className="landing__preview-quote">{t('landing.preview.disciplineValue')}</em>
+            <span className="landing__preview-label">{t('landing.preview.evidence')}</span>
+            <em className="landing__preview-quote">{t('landing.preview.evidenceValue')}</em>
           </div>
         </aside>
       </section>

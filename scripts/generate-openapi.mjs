@@ -14,18 +14,8 @@ const check = process.argv.includes('--check')
 const documentationEnvironment = {
   ConnectionStrings__Identity: 'Host=127.0.0.1;Database=trade_diary;Username=identity_service',
   ConnectionStrings__Journal: 'Host=127.0.0.1;Database=trade_diary;Username=journal_service',
-  ConnectionStrings__Performance: 'Host=127.0.0.1;Database=trade_diary;Username=performance_service',
-  ConnectionStrings__Discipline: 'Host=127.0.0.1;Database=trade_diary;Username=discipline_service',
-  ConnectionStrings__Reminder: 'Host=127.0.0.1;Database=trade_diary;Username=reminder_service',
-  ConnectionStrings__StockResearch: 'Host=127.0.0.1;Database=trade_diary;Username=stock_research_service',
   ConnectionStrings__MarketData: 'Host=127.0.0.1;Database=trade_diary;Username=market_data_service',
-  ConnectionStrings__PriceAlert: 'Host=127.0.0.1;Database=trade_diary;Username=price_alert_service',
-  ConnectionStrings__Rotation: 'Host=127.0.0.1;Database=trade_diary;Username=rotation_service',
-  ConnectionStrings__Partner: 'Host=127.0.0.1;Database=trade_diary;Username=partner_service',
-  ConnectionStrings__Content: 'Host=127.0.0.1;Database=trade_diary;Username=content_service',
   ConnectionStrings__Tool: 'Host=127.0.0.1;Database=trade_diary;Username=tool_service',
-  Services__Journal: 'http://127.0.0.1:5101',
-  ConnectionStrings__Operations: 'Host=127.0.0.1;Database=trade_diary;Username=operations_service',
   Auth__LocalRegistrationKey: 'TEST-ONLY-NOT-A-SECRET',
   Internal__ServiceKey: 'TEST-ONLY-NOT-A-SECRET',
 }
@@ -34,17 +24,8 @@ const documentationEnvironment = {
 const services = [
   ['identity-service', 'services/identity-service/src/TradeDiary.Identity', 5600],
   ['journal-service', 'services/journal-service/src/TradeDiary.Journal', 5601],
-  ['performance-service', 'services/performance-service/src/TradeDiary.Performance', 5602],
-  ['discipline-service', 'services/discipline-service/src/TradeDiary.Discipline', 5603],
-  ['reminder-service', 'services/reminder-service/src/TradeDiary.Reminder', 5604],
-  ['stock-research-service', 'services/stock-research-service/src/TradeDiary.StockResearch', 5605],
   ['market-data-service', 'services/market-data-service/src/TradeDiary.MarketData', 5606],
-  ['price-alert-service', 'services/price-alert-service/src/TradeDiary.PriceAlert', 5607],
-  ['rotation-service', 'services/rotation-service/src/TradeDiary.Rotation', 5608],
-  ['partner-service', 'services/partner-service/src/TradeDiary.Partner', 5609],
-  ['content-service', 'services/content-service/src/TradeDiary.Content', 5610],
   ['tool-service', 'services/tool-service/src/TradeDiary.Tool', 5611],
-  ['operations-service', 'services/operations-service/src/TradeDiary.Operations', 5612],
 ].map(([name, project, port]) => ({ name, project: resolve(root, project), port }))
 
 // Keep generation deterministic on constrained runners: service startup only needs one compiled

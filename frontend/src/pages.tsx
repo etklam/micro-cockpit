@@ -1,25 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import type { Alert, Discipline, Expectation, ExpectationConfidence, ExpectationDeadlinePreset, InstrumentDirectoryItem, ObservationSearchFilters, ObservationSubjectWrite, ObservationUpdate } from './features/api'
+import type { ActionDecision, ActionDecisionIntent, ComparisonQuery, Discipline, DisciplinePrincipleStatus, ExecutionReview, Expectation, ExpectationConfidence, ExpectationDeadlinePreset, ExpectationReviewWrite, InstrumentDirectoryItem, ObservationSearchFilters, ObservationSubjectWrite, ObservationUpdate, OwnerComparison, ReasoningLabelKind } from './features/api'
 import { useIdempotencyKey } from './features/api'
 import {
-  useAlertsQuery, useBootstrapQuery, useCalendarQuery, useCreateAlertMutation, useCreateDisciplineMutation,
-  useDashboardQuery, useDeleteAlertMutation, useDeleteDisciplineMutation, useDiaryPickerQuery, useDiaryQuery,
-  useDismissAlertMutation, useExpectationsQuery, useInstrumentDirectoryQuery, useInvalidateExpectationMutation, useObservationHistoryQuery, useQuickObservationMutation,
-  useCreateExpectationMutation, useDisciplinesQuery, useTodayObservationQuery, useUpdateExpectationMutation, useUpdateObservationMutation,
+  useActionDecisionsQuery, useAgentsQuery, useBootstrapQuery, useCalendarQuery, useComparisonQuery, useCreateActionDecisionMutation, useCreateDisciplineMutation,
+  useCreateTradeEvidenceMutation, useDeleteActionDecisionMutation,
+  useExpectationsQuery, useInstrumentDirectoryQuery, useInvalidateExpectationMutation, useObservationHistoryQuery, useQuickObservationMutation,
+  useCreateExpectationMutation, useCreateReasoningLabelMutation, useDisciplinesQuery, useExpectationReviewQuery, useReasoningLabelsQuery,
+  usePatternReviewQuery, useSaveExpectationReviewMutation, useSelectDisciplineMutation, useTodayDisciplineQuery, useTodayObservationQuery, useTradeEvidenceQuery,
+  useUpdateActionDecisionMutation, useUpdateDisciplineMutation, useUpdateExpectationMutation, useUpdateObservationMutation,
 } from './features/queries'
 import { Badge, Button, Card, EmptyBox, Field, IconButton, PageHeader, SelectBox, TextArea, TextInput } from './ui'
 import { Icon } from './icons'
 import { PageSkeleton, SectionError, useCockpit } from './shell'
-import { cx, formatDate, formatLongDate, formatTime, monthLabel, pct, repeatLabel, signed } from './format'
+import { cx, formatDate, formatLongDate, monthLabel } from './format'
 import { accountDateTimeLocalToUtc, formatTimezoneLabel, utcToAccountDateTimeLocal } from './features/accountTime'
 import { useI18n } from './i18n'
-
-export { DiaryDetailPage, DiaryPage } from './screens/diary'
-
-const pnlTone = (n: number | null | undefined): 'gain' | 'loss' | 'muted' =>
-  n == null ? 'muted' : n > 0 ? 'gain' : n < 0 ? 'loss' : 'muted'
 
 const PanelLink = ({ children, onClick }: { children: ReactNode; onClick: () => void }) => (
   <Button variant="ghost" size="sm" icon="arrow" onClick={onClick} className="panel__link">{children}</Button>
@@ -65,6 +62,20 @@ const subjectHistoryHref = (subject: NonNullable<ObservationUpdate['primarySubje
   return `/today/observations?${params}`
 }
 
+function DailyCloseEvidence({ subject }: { subject: NonNullable<ObservationUpdate['primarySubject']> }) {
+  const { t } = useI18n()
+  if (subject.type !== 'instrument') return null
+  if (subject.dailyCloseStatus === 'available' && subject.dailyClose)
+    return <span> · {t('today.observations.dailyCloseEvidence', {
+      date: subject.dailyClose.tradingDate,
+      raw: subject.dailyClose.rawClose,
+      adjusted: subject.dailyClose.adjustedClose,
+    })}</span>
+  return <span> · {subject.dailyCloseStatus === 'unsupported'
+    ? t('today.observations.dailyCloseUnsupported')
+    : t('today.observations.dailyCloseUnavailable')}</span>
+}
+
 function SubjectFields({ subject, onChange, instruments, prefix }: { subject: SubjectDraft; onChange: (subject: SubjectDraft) => void; instruments: InstrumentDirectoryItem[]; prefix: string }) {
   const { t } = useI18n()
   const set = (patch: Partial<SubjectDraft>) => onChange({ ...subject, ...patch })
@@ -101,9 +112,10 @@ function SubjectFields({ subject, onChange, instruments, prefix }: { subject: Su
 /* =============================== TODAY ============================== */
 export function TodayPage() {
   const { go } = useCockpit()
-  const { t, format, locale } = useI18n()
-  const { data, isLoading: loading, isError: error, refetch: reload } = useDashboardQuery()
+  const { t, locale } = useI18n()
+  const bootstrap = useBootstrapQuery()
   const observation = useTodayObservationQuery()
+  const todayDiscipline = useTodayDisciplineQuery()
   const expectations = useExpectationsQuery()
   const instruments = useInstrumentDirectoryQuery()
   const [note, setNote] = useState('')
@@ -129,6 +141,7 @@ export function TodayPage() {
   const [expectationDeadlineMode, setExpectationDeadlineMode] = useState<'custom' | ExpectationDeadlinePreset>('custom')
   const [expectationDeadline, setExpectationDeadline] = useState('')
   const [expectationError, setExpectationError] = useState<string | null>(null)
+  const [reviewExpectationId, setReviewExpectationId] = useState<string | null>(null)
   const idem = useIdempotencyKey()
   const expectationIdem = useIdempotencyKey()
   const saveQuickObservation = useQuickObservationMutation()
@@ -141,7 +154,9 @@ export function TodayPage() {
   }), [locale, observation.data?.timezone])
   const expectationItems = expectations.data ?? []
   const readyExpectations = expectationItems.filter(item => item.readiness === 'ready_for_review')
-  const renderExpectation = (item: Expectation, actions = false) => <article className="stack">
+  const renderExpectation = (item: Expectation, actions = false) => {
+    const sourceSubject = observation.data?.updates.find(update => update.id === item.observationUpdateId)?.primarySubject
+    return <article className="stack">
     <h3>{item.expectedBehavior}</h3>
     <p><strong>{t('today.expectations.invalidation')}:</strong> {item.invalidationCondition}</p>
     <p><strong>{t('today.expectations.confidence')}:</strong> {item.confidence}</p>
@@ -152,11 +167,14 @@ export function TodayPage() {
       ready_for_review: t('today.expectations.readiness.ready'),
       reviewed: t('today.expectations.readiness.reviewed'),
     }[item.readiness]}</p>
+    {sourceSubject ? <p><strong>{t('today.observations.dailyClose')}:</strong><DailyCloseEvidence subject={sourceSubject} /></p> : null}
     {actions ? <div className="form-actions">
       <Button variant="ghost" size="sm" onClick={() => beginExpectationEdit(item)}>{t('today.expectations.edit')}</Button>
       {item.readiness === 'active' ? <Button variant="ghost" size="sm" loading={invalidateExpectation.isPending} onClick={() => invalidateExpectation.mutate(item.id)}>{t('today.expectations.invalidate')}</Button> : null}
+      {item.readiness !== 'active' ? <Button variant="ghost" size="sm" onClick={() => setReviewExpectationId(item.id)}>{item.readiness === 'reviewed' ? t('today.review.edit') : t('today.review.open')}</Button> : null}
     </div> : null}
   </article>
+  }
 
   async function saveNote() {
     if (!note.trim()) return
@@ -262,20 +280,9 @@ export function TodayPage() {
         ? t('today.greeting.afternoon')
         : t('today.greeting.evening')
 
-  const perf = data?.performance
-  const cap = data?.capabilities
-
   return (
     <>
-      <PageHeader title={greeting} subtitle={data ? formatLongDate(data.localDate) : undefined} />
-
-      {data && cap?.alerts === 'available' && data.pendingAlerts && data.pendingAlerts > 0 ? (
-        <button className="reminder-banner" onClick={() => go('alerts')}>
-          <Icon name="bell" size={16} />
-          <span>{t('today.reminders', { count: data.pendingAlerts })}</span>
-          <Icon name="right" size={16} />
-        </button>
-      ) : null}
+      <PageHeader title={greeting} subtitle={bootstrap.data ? formatLongDate(bootstrap.data.currentLocalDate) : undefined} />
 
       <Card className="quick-note" as="section">
         <label className="quick-note__label" htmlFor="qn">{t('today.quickNote.label')}</label>
@@ -335,8 +342,8 @@ export function TodayPage() {
                     {update.signal ? <p><strong>{t('today.observations.signal')}:</strong> {update.signal}</p> : null}
                     {update.interpretation ? <p><strong>{t('today.observations.interpretation')}:</strong> {update.interpretation}</p> : null}
                     {update.mentalState ? <p><strong>{t('today.observations.mentalState')}:</strong> {update.mentalState}</p> : null}
-                    {update.primarySubject ? <p><strong>{t('today.observations.primarySubject')}:</strong> <Link className="text-link" to={subjectHistoryHref(update.primarySubject)}>{subjectLabel(update.primarySubject)}</Link>{update.primarySubject.type === 'instrument' && !update.primarySubject.dailyCloseAvailable ? ` · ${t('today.observations.dailyCloseUnavailable')}` : ''}</p> : null}
-                    {update.relatedSubjects.map((subject, index) => <p key={`${subject.type}-${index}`}><strong>{t('today.observations.relatedSubject')}:</strong> <Link className="text-link" to={subjectHistoryHref(subject)}>{subjectLabel(subject)}</Link>{subject.type === 'instrument' && !subject.dailyCloseAvailable ? ` · ${t('today.observations.dailyCloseUnavailable')}` : ''}</p>)}
+                    {update.primarySubject ? <p><strong>{t('today.observations.primarySubject')}:</strong> <Link className="text-link" to={subjectHistoryHref(update.primarySubject)}>{subjectLabel(update.primarySubject)}</Link><DailyCloseEvidence subject={update.primarySubject} /></p> : null}
+                    {update.relatedSubjects.map((subject, index) => <p key={`${subject.type}-${index}`}><strong>{t('today.observations.relatedSubject')}:</strong> <Link className="text-link" to={subjectHistoryHref(subject)}>{subjectLabel(subject)}</Link><DailyCloseEvidence subject={subject} /></p>)}
                     {update.tags.length ? <p><strong>{t('today.observations.tags')}:</strong> {update.tags.join(' · ')}</p> : null}
                     {update.evidence ? <><p><a href={update.evidence.url} target="_blank" rel="noreferrer">{update.evidence.title || update.evidence.url}</a></p>{update.evidence.quote ? <blockquote><strong>{t('today.observations.evidenceQuote')}:</strong> {update.evidence.quote}</blockquote> : null}</> : null}
                     <Button variant="ghost" size="sm" onClick={() => beginEdit(update)}>{t('today.observations.edit')}</Button>
@@ -377,6 +384,7 @@ export function TodayPage() {
                 {expectationItems.some(item => item.observationUpdateId === update.id) ? <ul className="stack" aria-label={t('today.expectations.title')}>
                   {expectationItems.filter(item => item.observationUpdateId === update.id).map(item => <li key={item.id}>{renderExpectation(item, true)}</li>)}
                 </ul> : null}
+                <ActionDecisionPanel updateId={update.id} expectations={expectationItems.filter(item => item.observationUpdateId === update.id)} />
               </li>
             ))}
           </ol>
@@ -385,78 +393,236 @@ export function TodayPage() {
 
       {readyExpectations.length ? <section className="recent" aria-labelledby="ready-expectations-h">
         <div className="recent__head"><h2 id="ready-expectations-h">{t('today.expectations.ready')}</h2></div>
-        <ul className="stack">{readyExpectations.map(item => <li key={item.id}>{renderExpectation(item)}</li>)}</ul>
+        <ul className="stack">{readyExpectations.map(item => <li key={item.id}>{renderExpectation(item, true)}</li>)}</ul>
       </section> : null}
 
-      {data ? (
-        <>
-          <div className="card-grid">
-            <Card className="panel" as="section">
-              <span className="panel__label">{t('today.diary.label')}</span>
-              <div className="panel__body">
-                <p className="panel__title">{data.diary.writtenToday ? t('today.diary.written') : t('today.diary.empty')}</p>
-                <p className="panel__sub">{t('today.diary.count', { count: data.diary.count })}</p>
-              </div>
-              <PanelLink onClick={() => go('diary')}>{data.diary.writtenToday ? t('today.diary.keepWriting') : t('today.diary.open')}</PanelLink>
-            </Card>
+      {reviewExpectationId ? <ExpectationReviewForm expectationId={reviewExpectationId} onClose={() => setReviewExpectationId(null)} /> : null}
 
-            <Card className="panel" as="section">
-              <span className="panel__label">{t('today.pnl.label')}</span>
-              <div className="panel__body">
-                <span className={cx('pnl-value', 'num', `is-${pnlTone(perf?.pnlAmount)}`)}>
-                  {perf ? signed(perf.pnlAmount) : format.empty}
-                </span>
-                {perf?.pnlPercent != null ? (
-                  <span className={cx('pnl-sub', 'num', `is-${pnlTone(perf.pnlAmount)}`)}>{pct(perf.pnlPercent)}</span>
-                ) : (
-                  <span className="pnl-sub is-muted">{t('today.pnl.none')}</span>
-                )}
-              </div>
-              <PanelLink onClick={() => go('calendar')}>{t('today.pnl.openCalendar')}</PanelLink>
-            </Card>
+      <Card className="panel" as="section">
+        <span className="panel__label">{t("today.discipline.label")}</span>
+        <div className="panel__body">
+          {todayDiscipline.data ? <blockquote className="panel__quote">{todayDiscipline.data.content}</blockquote> :
+            !todayDiscipline.isError ? <p className="panel__sub">{t("today.discipline.empty")}</p> :
+              <p className="panel__sub is-muted">{t("common.unavailable")}</p>}
+        </div>
+        <PanelLink onClick={() => go("review")}>{t("today.discipline.manage")}</PanelLink>
+      </Card>
 
-            <Card className="panel" as="section">
-              <span className="panel__label">{t('today.discipline.label')}</span>
-              <div className="panel__body">
-                {data.discipline ? (
-                  <blockquote className="panel__quote">{data.discipline.content}</blockquote>
-                ) : cap?.discipline === 'empty' ? (
-                  <p className="panel__sub">{t('today.discipline.empty')}</p>
-                ) : (
-                  <p className="panel__sub is-muted">{t('common.unavailable')}</p>
-                )}
-              </div>
-              <PanelLink onClick={() => go('discipline')}>{t('today.discipline.manage')}</PanelLink>
-            </Card>
-          </div>
-
-          <section className="recent" aria-labelledby="recent-h">
-            <div className="recent__head">
-              <h2 id="recent-h">{t('today.recent.title')}</h2>
-              <Button variant="ghost" size="sm" icon="arrow" onClick={() => go('diary')}>{t('today.recent.all')}</Button>
-            </div>
-            {(data.recentDiaries ?? []).length === 0 ? (
-              <EmptyBox icon="diary" title={t('today.recent.emptyTitle')} hint={t('today.recent.emptyHint')} />
-            ) : (
-              <ul className="recent__list">
-                {(data.recentDiaries ?? []).map((d) => (
-                  <li key={d.id}>
-                    <button className="recent__item" onClick={() => go('diary')}>
-                      <span className="recent__date">{d.localDate}</span>
-                      <span className="recent__title">{d.title}</span>
-                      <span className="recent__arrow"><Icon name="right" size={16} /></span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </>
-      ) : loading ? <PageSkeleton rows={3} /> : null}
-
-      {error || observation.isError || expectations.isError ? <SectionError onRetry={() => { void reload(); void observation.refetch(); void expectations.refetch() }} /> : null}
+      {bootstrap.isError || observation.isError || expectations.isError ? <SectionError onRetry={() => { void bootstrap.refetch(); void observation.refetch(); void expectations.refetch() }} /> : null}
     </>
   )
+}
+
+function ActionDecisionPanel({ updateId, expectations }: { updateId: string; expectations: Expectation[] }) {
+  const { t } = useI18n()
+  const decisions = useActionDecisionsQuery(updateId)
+  const create = useCreateActionDecisionMutation(updateId)
+  const update = useUpdateActionDecisionMutation(updateId)
+  const remove = useDeleteActionDecisionMutation(updateId)
+  const [editing, setEditing] = useState<string | 'new' | null>(null)
+  const [intent, setIntent] = useState<ActionDecisionIntent>('continue_observing')
+  const [reason, setReason] = useState('')
+  const [expectationId, setExpectationId] = useState('')
+  const [executionReview, setExecutionReview] = useState<'' | NonNullable<ExecutionReview>>('')
+  const [honestyReminder, setHonestyReminder] = useState(false)
+  const [tradeDecisionId, setTradeDecisionId] = useState<string | null>(null)
+
+  function begin(item?: ActionDecision) {
+    setEditing(item?.id ?? 'new')
+    setIntent(item?.intent ?? 'continue_observing')
+    setReason(item?.reason ?? '')
+    setExpectationId(item?.expectationId ?? '')
+    setExecutionReview(item?.executionReview ?? '')
+    setHonestyReminder(!!item)
+  }
+
+  async function save() {
+    if (!reason.trim()) return
+    const body = { intent, reason: reason.trim(), expectationId: expectationId || null, executionReview: executionReview || null }
+    if (editing === 'new') await create.mutateAsync(body)
+    else if (editing) await update.mutateAsync({ id: editing, body })
+    setEditing(null)
+  }
+
+  return <section className="stack" aria-label={t('today.decisions.title')}>
+    <div className="form-actions">
+      <strong>{t('today.decisions.title')}</strong>
+      {!editing ? <Button variant="ghost" size="sm" onClick={() => begin()}>{t('today.decisions.add')}</Button> : null}
+    </div>
+    {editing ? <div className="stack">
+      {honestyReminder ? <p className="form-hint" role="note">{t('today.decisions.honestyReminder')}</p> : null}
+      <Field label={t('today.decisions.intent')}><SelectBox value={intent} onChange={event => setIntent(event.target.value as ActionDecisionIntent)}>
+        <option value="trade">{t('today.decisions.intent.trade')}</option>
+        <option value="continue_observing">{t('today.decisions.intent.continueObserving')}</option>
+        <option value="avoid_trade">{t('today.decisions.intent.avoidTrade')}</option>
+      </SelectBox></Field>
+      <Field label={t('today.decisions.reason')}><TextArea value={reason} onChange={event => setReason(event.target.value)} /></Field>
+      <Field label={t('today.decisions.expectation')}><SelectBox value={expectationId} onChange={event => setExpectationId(event.target.value)}>
+        <option value="">{t('common.optional')}</option>
+        {expectations.map(item => <option key={item.id} value={item.id}>{item.expectedBehavior}</option>)}
+      </SelectBox></Field>
+      {editing !== 'new' ? <Field label={t('today.decisions.execution')}><SelectBox value={executionReview} onChange={event => setExecutionReview(event.target.value as '' | NonNullable<ExecutionReview>)}>
+        <option value="">{t('common.optional')}</option>
+        <option value="followed">{t('today.decisions.execution.followed')}</option>
+        <option value="partially_followed">{t('today.decisions.execution.partiallyFollowed')}</option>
+        <option value="deviated">{t('today.decisions.execution.deviated')}</option>
+      </SelectBox></Field> : null}
+      <div className="form-actions">
+        <Button variant="primary" size="sm" loading={create.isPending || update.isPending} disabled={!reason.trim()} onClick={save}>{t('common.save')}</Button>
+        <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>{t('common.cancel')}</Button>
+      </div>
+    </div> : null}
+    {(decisions.data ?? []).map(item => <article className="stack" key={item.id}>
+      <p><strong>{{
+        trade: t('today.decisions.intent.trade'),
+        continue_observing: t('today.decisions.intent.continueObserving'),
+        avoid_trade: t('today.decisions.intent.avoidTrade'),
+      }[item.intent]}</strong> · <time dateTime={item.recordedAt}>{new Date(item.recordedAt).toLocaleString()}</time></p>
+      <p>{item.reason}</p>
+      {item.executionReview ? <p>{t('today.decisions.execution')}: {{
+        followed: t('today.decisions.execution.followed'),
+        partially_followed: t('today.decisions.execution.partiallyFollowed'),
+        deviated: t('today.decisions.execution.deviated'),
+      }[item.executionReview]}</p> : null}
+      <TradeEvidenceList decisionId={item.id} />
+      <div className="form-actions">
+        <Button variant="ghost" size="sm" onClick={() => begin(item)}>{t('common.edit')}</Button>
+        <Button variant="ghost" size="sm" onClick={() => setTradeDecisionId(item.id)}>{t('today.decisions.addTrade')}</Button>
+        <Button variant="danger" size="sm" loading={remove.isPending} onClick={() => remove.mutate(item.id)}>{t('common.delete')}</Button>
+      </div>
+      {tradeDecisionId === item.id ? <TradeEvidenceForm decisionId={item.id} onClose={() => setTradeDecisionId(null)} /> : null}
+    </article>)}
+  </section>
+}
+
+function TradeEvidenceList({ decisionId }: { decisionId: string }) {
+  const { t } = useI18n()
+  const trades = useTradeEvidenceQuery(decisionId)
+  return (trades.data ?? []).length ? <ul>
+    {trades.data!.map(item => <li key={item.id}>{t('today.decisions.tradeSummary', { side: item.side, quantity: item.quantity, symbol: item.symbol, price: item.price, currency: item.currency })}</li>)}
+  </ul> : null
+}
+
+function TradeEvidenceForm({ decisionId, onClose }: { decisionId: string; onClose: () => void }) {
+  const { t } = useI18n()
+  const create = useCreateTradeEvidenceMutation(decisionId)
+  const [symbol, setSymbol] = useState('')
+  const [side, setSide] = useState<'buy' | 'sell'>('buy')
+  const [quantity, setQuantity] = useState('')
+  const [price, setPrice] = useState('')
+  const [currency, setCurrency] = useState('USD')
+  const [executedAt, setExecutedAt] = useState('')
+  const [note, setNote] = useState('')
+
+  async function save() {
+    if (!symbol.trim() || !quantity || !price || !executedAt) return
+    await create.mutateAsync({
+      symbol: symbol.trim(), side, quantity: Number(quantity), price: Number(price), currency: currency.trim(),
+      executedAt: new Date(executedAt).toISOString(), note: note.trim() || null,
+    })
+    onClose()
+  }
+
+  return <div className="stack">
+    <p className="form-hint">{t('today.decisions.tradeHint')}</p>
+    <Field label={t('today.decisions.symbol')}><TextInput value={symbol} onChange={event => setSymbol(event.target.value)} /></Field>
+    <Field label={t('today.decisions.side')}><SelectBox value={side} onChange={event => setSide(event.target.value as 'buy' | 'sell')}>
+      <option value="buy">{t('today.decisions.side.buy')}</option><option value="sell">{t('today.decisions.side.sell')}</option>
+    </SelectBox></Field>
+    <Field label={t('today.decisions.quantity')}><TextInput type="number" min="0" step="any" value={quantity} onChange={event => setQuantity(event.target.value)} /></Field>
+    <Field label={t('today.decisions.price')}><TextInput type="number" min="0" step="any" value={price} onChange={event => setPrice(event.target.value)} /></Field>
+    <Field label={t('today.decisions.currency')}><TextInput value={currency} onChange={event => setCurrency(event.target.value)} /></Field>
+    <Field label={t('today.decisions.executedAt')}><TextInput type="datetime-local" value={executedAt} onChange={event => setExecutedAt(event.target.value)} /></Field>
+    <Field label={t('today.decisions.note')}><TextArea value={note} onChange={event => setNote(event.target.value)} /></Field>
+    <div className="form-actions">
+      <Button variant="primary" size="sm" loading={create.isPending} disabled={!symbol.trim() || !quantity || !price || !executedAt} onClick={save}>{t('common.save')}</Button>
+      <Button variant="ghost" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
+    </div>
+  </div>
+}
+
+function ExpectationReviewForm({ expectationId, onClose }: { expectationId: string; onClose: () => void }) {
+  const { t } = useI18n()
+  const existing = useExpectationReviewQuery(expectationId)
+  const labels = useReasoningLabelsQuery()
+  const save = useSaveExpectationReviewMutation(expectationId)
+  const createLabel = useCreateReasoningLabelMutation()
+  const [outcome, setOutcome] = useState<ExpectationReviewWrite['outcome']>('confirmed')
+  const [quality, setQuality] = useState<ExpectationReviewWrite['reasoningQuality']>('sound')
+  const [explanation, setExplanation] = useState('')
+  const [selected, setSelected] = useState<string[]>([])
+  const [customKind, setCustomKind] = useState<ReasoningLabelKind>('issue')
+  const [customName, setCustomName] = useState('')
+
+  useEffect(() => {
+    if (!existing.data) return
+    setOutcome(existing.data.outcome)
+    setQuality(existing.data.reasoningQuality)
+    setExplanation(existing.data.explanation ?? '')
+    setSelected(existing.data.labels.map(label => label.id ?? label.key))
+  }, [existing.data])
+
+  const needsExplanation = outcome === 'partially_confirmed' || outcome === 'indeterminate'
+  const toggle = (key: string) => setSelected(current => current.includes(key) ? current.filter(item => item !== key) : [...current, key])
+
+  async function submit() {
+    if (needsExplanation && !explanation.trim()) return
+    const chosen = (labels.data ?? []).filter(label => selected.includes(label.id ?? label.key))
+    await save.mutateAsync({
+      outcome,
+      reasoningQuality: quality,
+      explanation: explanation.trim() || null,
+      systemIssueKeys: chosen.filter(label => label.isSystem && label.kind === 'issue').map(label => label.key),
+      systemStrengthKeys: chosen.filter(label => label.isSystem && label.kind === 'strength').map(label => label.key),
+      customLabelIds: chosen.filter(label => !label.isSystem).map(label => label.id!),
+    })
+    onClose()
+  }
+
+  async function addCustomLabel() {
+    if (!customName.trim()) return
+    const created = await createLabel.mutateAsync({ kind: customKind, name: customName.trim() })
+    setSelected(current => [...current, created.id!])
+    setCustomName('')
+  }
+
+  return <Card as="section" className="stack">
+    <h2>{t('today.review.title')}</h2>
+    <Field label={t('today.review.outcome')}><SelectBox value={outcome} onChange={event => setOutcome(event.target.value as ExpectationReviewWrite['outcome'])}>
+      <option value="confirmed">{t('today.review.outcome.confirmed')}</option>
+      <option value="partially_confirmed">{t('today.review.outcome.partiallyConfirmed')}</option>
+      <option value="invalidated">{t('today.review.outcome.invalidated')}</option>
+      <option value="indeterminate">{t('today.review.outcome.indeterminate')}</option>
+    </SelectBox></Field>
+    <Field label={t('today.review.quality')}><SelectBox value={quality} onChange={event => setQuality(event.target.value as ExpectationReviewWrite['reasoningQuality'])}>
+      <option value="sound">{t('today.review.quality.sound')}</option>
+      <option value="mixed">{t('today.review.quality.mixed')}</option>
+      <option value="weak">{t('today.review.quality.weak')}</option>
+    </SelectBox></Field>
+    <Field label={`${t('today.review.explanation')}${needsExplanation ? '' : ` (${t('common.optional')})`}`}>
+      <TextArea value={explanation} onChange={event => setExplanation(event.target.value)} />
+    </Field>
+    {needsExplanation && !explanation.trim() ? <p role="alert">{t('today.review.explanationRequired')}</p> : null}
+    {(['issue', 'strength'] as const).map(kind => <fieldset className="stack" key={kind}>
+      <legend>{kind === 'issue' ? t('today.review.issues') : t('today.review.strengths')}</legend>
+      {(labels.data ?? []).filter(label => label.kind === kind).map(label => <label key={label.id ?? label.key}>
+        <input type="checkbox" checked={selected.includes(label.id ?? label.key)} onChange={() => toggle(label.id ?? label.key)} /> {label.isSystem ? t(`reasoning.${label.key}` as Parameters<typeof t>[0]) : label.name}
+      </label>)}
+    </fieldset>)}
+    <div className="stack">
+      <h3>{t('today.review.customLabel')}</h3>
+      <SelectBox value={customKind} onChange={event => setCustomKind(event.target.value as ReasoningLabelKind)}>
+        <option value="issue">{t('today.review.issues')}</option>
+        <option value="strength">{t('today.review.strengths')}</option>
+      </SelectBox>
+      <TextInput value={customName} onChange={event => setCustomName(event.target.value)} />
+      <Button variant="ghost" size="sm" disabled={!customName.trim()} loading={createLabel.isPending} onClick={addCustomLabel}>{t('common.add')}</Button>
+    </div>
+    <div className="form-actions">
+      <Button variant="primary" loading={save.isPending} disabled={needsExplanation && !explanation.trim()} onClick={submit}>{t('common.save')}</Button>
+      <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+    </div>
+  </Card>
 }
 
 export function ObservationHistoryPage() {
@@ -516,8 +682,8 @@ export function ObservationHistoryPage() {
       {items.map(item => <li key={item.update.id}>
         <time dateTime={item.update.recordedAt}>{item.journalDay}</time>
         <p>{item.update.content}</p>
-        {item.update.primarySubject ? <Link className="text-link" to={subjectHistoryHref(item.update.primarySubject)}>{subjectLabel(item.update.primarySubject)}</Link> : null}
-        {item.update.relatedSubjects.map((subject, index) => <Link className="text-link" key={`${subject.type}-${index}`} to={subjectHistoryHref(subject)}>{subjectLabel(subject)}</Link>)}
+        {item.update.primarySubject ? <p><Link className="text-link" to={subjectHistoryHref(item.update.primarySubject)}>{subjectLabel(item.update.primarySubject)}</Link><DailyCloseEvidence subject={item.update.primarySubject} /></p> : null}
+        {item.update.relatedSubjects.map((subject, index) => <p key={`${subject.type}-${index}`}><Link className="text-link" to={subjectHistoryHref(subject)}>{subjectLabel(subject)}</Link><DailyCloseEvidence subject={subject} /></p>)}
         {item.update.tags.length ? <p>{item.update.tags.join(' · ')}</p> : null}
       </li>)}
     </ol>}
@@ -558,7 +724,7 @@ export function CalendarPage() {
       <h2 className="cal-head__title">{monthLabel(cursor.year, cursor.month)}</h2>
       <IconButton icon="right" label={t('calendar.nextMonth')} onClick={() => shift(1)} />
     </div>
-    <Link className="text-link cal-review-link" to={`/review/${cursor.year}/${String(cursor.month).padStart(2, '0')}`}>{t('calendar.reviewMonth')}</Link>
+    <Link className="text-link cal-review-link" to="/review">{t('calendar.reviewMonth')}</Link>
     {error ? <SectionError onRetry={reload} /> : <Card flush as="section" className="cal">
       <div className="cal__weekdays">{WEEKDAYS.map(key => <span key={key}>{t(key)}</span>)}</div>
       <div className="cal__grid">
@@ -595,16 +761,23 @@ function validCalendarDay(value: string | null, year: number, month: number): bo
   return !Number.isNaN(date.getTime()) && date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.toISOString().slice(0, 10) === value
 }
 
-/* ============================ DISCIPLINE =========================== */
-export function DisciplinePage() {
-  const { confirm } = useCockpit()
+/* =============================== REVIEW ============================== */
+export function ReviewPage() {
   const { t } = useI18n()
   const { data, isLoading: loading, isError: error, refetch: reload } = useDisciplinesQuery()
   const items = data?.items ?? []
   const [content, setContent] = useState('')
   const [formError, setFormError] = useState('')
+  const [range, setRange] = useState<'weekly' | 'monthly' | 'custom'>('weekly')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [reviewExpectationId, setReviewExpectationId] = useState<string | null>(null)
+  const expectations = useExpectationsQuery()
+  const reviewable = (expectations.data ?? []).filter(item => item.readiness !== 'active')
+  const patterns = usePatternReviewQuery(range, from, to)
   const createDiscipline = useCreateDisciplineMutation()
-  const deleteDiscipline = useDeleteDisciplineMutation()
+  const updateDiscipline = useUpdateDisciplineMutation()
+  const selectDiscipline = useSelectDisciplineMutation()
 
   async function add(e: FormEvent) {
     e.preventDefault()
@@ -617,20 +790,58 @@ export function DisciplinePage() {
     }
   }
 
-  async function remove(d: Discipline) {
-    const ok = await confirm({
-      title: t('discipline.removeTitle'),
-      message: t('discipline.removeMessage'),
-      confirmText: t('discipline.remove'),
-      tone: 'danger',
-    })
-    if (!ok) return
-    await deleteDiscipline.mutateAsync(d.id)
-  }
+  const setStatus = (principle: Discipline, status: DisciplinePrincipleStatus) =>
+    updateDiscipline.mutate({ id: principle.id, content: principle.content, status })
 
   return (
     <>
-      <PageHeader title={t('discipline.title')} subtitle={t('discipline.subtitle')} />
+      <PageHeader title={t('review.title')} subtitle={t('review.subtitle')} />
+
+      <ComparisonPanel />
+
+      <Card as="section" className="stack">
+        <h2>{t('review.expectations')}</h2>
+        {expectations.isLoading ? <p>{t('common.loading')}</p> :
+          expectations.isError ? <SectionError onRetry={() => { void expectations.refetch() }} /> :
+          reviewable.length === 0 ? <p className="form-hint">{t('review.expectationsEmpty')}</p> :
+          <ol className="principle-list">{reviewable.map(expectation => <li key={expectation.id}>
+            <article className="stack">
+              <strong>{expectation.expectedBehavior}</strong>
+              <span>{t('today.expectations.confidence')}: {expectation.confidence}</span>
+              <span>{t('today.expectations.readiness')}: {expectation.readiness}</span>
+              <Button variant="ghost" size="sm" onClick={() => setReviewExpectationId(expectation.id)}>
+                {expectation.readiness === 'reviewed' ? t('today.review.edit') : t('today.review.open')}
+              </Button>
+            </article>
+          </li>)}</ol>}
+      </Card>
+
+      {reviewExpectationId ? <ExpectationReviewForm expectationId={reviewExpectationId} onClose={() => setReviewExpectationId(null)} /> : null}
+
+      <Card as="section" className="stack">
+        <h2>{t('discipline.patterns.title')}</h2>
+        <div className="form-actions">
+          {(['weekly', 'monthly', 'custom'] as const).map(value =>
+            <Button key={value} variant={range === value ? 'subtle' : 'ghost'} size="sm" onClick={() => setRange(value)}>
+              {t(`discipline.patterns.${value}`)}
+            </Button>)}
+        </div>
+        {range === 'custom' ? <div className="form-grid">
+          <Field label={t('discipline.patterns.from')}><TextInput type="date" value={from} onChange={event => setFrom(event.target.value)} /></Field>
+          <Field label={t('discipline.patterns.to')}><TextInput type="date" value={to} onChange={event => setTo(event.target.value)} /></Field>
+        </div> : null}
+        {patterns.isError ? <SectionError onRetry={() => { void patterns.refetch() }} /> : patterns.isLoading ? <p>{t('common.loading')}</p> : patterns.data ? <>
+          <p>{t('discipline.patterns.reviewed', { count: patterns.data.reviewedExpectationCount })}</p>
+          {Number(patterns.data.reviewedExpectationCount) === 0 ? <p className="form-hint">{t('discipline.patterns.empty')}</p> :
+            <ol className="principle-list">
+              {patterns.data.labels.filter(label => Number(label.count) > 0).map(label => <li key={`${label.kind}:${label.key}`}>
+                <strong>{label.name}</strong> · {label.count}/{label.denominator}
+                <span> {label.evidence.map((evidence, index) =>
+                  <Link key={evidence.expectationId} className="text-link" to={evidence.url}>{t('discipline.patterns.evidence', { count: index + 1 })}</Link>)}</span>
+              </li>)}
+            </ol>}
+        </> : null}
+      </Card>
 
       <Card as="section" className="inline-form-wrap">
         <form className="inline-form" onSubmit={add}>
@@ -652,7 +863,13 @@ export function DisciplinePage() {
             <li key={d.id}>
               <Card as="article" className="principle">
                 <blockquote className="principle__text">{d.content}</blockquote>
-                <IconButton icon="trash" label={t('discipline.removeLabel')} size={16} className="icon-btn--danger" onClick={() => remove(d)} />
+                <div className="form-actions">
+                  {d.status === 'active' && !d.selectedForToday ? <Button size="sm" variant="subtle" onClick={() => selectDiscipline.mutate(d.id)}>{t('discipline.select')}</Button> : null}
+                  {d.selectedForToday ? <Badge tone="gain">{t('discipline.selected')}</Badge> : null}
+                  {d.status === 'active' ? <Button size="sm" variant="ghost" onClick={() => setStatus(d, 'disabled')}>{t('discipline.disable')}</Button> : null}
+                  {d.status === 'disabled' ? <Button size="sm" variant="ghost" onClick={() => setStatus(d, 'active')}>{t('discipline.enable')}</Button> : null}
+                  {d.status !== 'archived' ? <Button size="sm" variant="danger" onClick={() => setStatus(d, 'archived')}>{t('discipline.archive')}</Button> : <Badge tone="muted">{t('discipline.archived')}</Badge>}
+                </div>
               </Card>
             </li>
           ))}
@@ -662,163 +879,113 @@ export function DisciplinePage() {
   )
 }
 
-/* ============================== ALERTS ============================= */
-export function AlertsPage() {
-  const { confirm } = useCockpit()
+function ComparisonPanel() {
   const { t } = useI18n()
-  const bootstrap = useBootstrapQuery()
-  const alertsQuery = useAlertsQuery()
-  const alerts = alertsQuery.data?.items ?? []
-  const [pickerQuery, setPickerQuery] = useState('')
-  const [debouncedQ, setDebouncedQ] = useState('')
-  useEffect(() => {
-    const handle = window.setTimeout(() => setDebouncedQ(pickerQuery.trim()), 250)
-    return () => window.clearTimeout(handle)
-  }, [pickerQuery])
-  const diariesQuery = useDiaryPickerQuery(debouncedQ)
-  const diaries = useMemo(() => diariesQuery.data?.items ?? [], [diariesQuery.data?.items])
-  const loading = alertsQuery.isLoading || bootstrap.isLoading
-  const error = alertsQuery.isError || diariesQuery.isError || bootstrap.isError
-  const reload = () => { void alertsQuery.refetch(); void diariesQuery.refetch(); void bootstrap.refetch() }
-  const [diaryId, setDiaryId] = useState('')
-  const [selectedTitle, setSelectedTitle] = useState('')
-  const [date, setDate] = useState('')
-  const [time, setTime] = useState('09:00')
-  const [repeat, setRepeat] = useState('none')
-  const [formError, setFormError] = useState('')
-  const timezone = bootstrap.data?.timezone ?? ''
-  const accountToday = bootstrap.data?.currentLocalDate ?? ''
-  const createAlert = useCreateAlertMutation()
-  const dismissAlert = useDismissAlertMutation()
-  const deleteAlert = useDeleteAlertMutation()
-  const selectedDiary = useDiaryQuery(diaryId)
+  const agents = useAgentsQuery()
+  const instruments = useInstrumentDirectoryQuery()
+  const today = new Date().toISOString().slice(0, 10)
+  const [agentUserId, setAgentUserId] = useState('')
+  const [subjectType, setSubjectType] = useState<'theme' | 'sector' | 'broad_market' | 'instrument'>('theme')
+  const [subject, setSubject] = useState('')
+  const [instrumentId, setInstrumentId] = useState('')
+  const [from, setFrom] = useState(`${today.slice(0, 7)}-01`)
+  const [to, setTo] = useState(today)
+  const [query, setQuery] = useState<ComparisonQuery | null>(null)
+  const comparison = useComparisonQuery(query)
+  const agentName = agents.data?.items.find(agent => agent.userId === query?.agentUserId)?.displayName ?? t('comparison.agent')
+  const valid = !!agentUserId && !!from && !!to && from <= to
+    && (subjectType === 'instrument' ? !!instrumentId : !!subject.trim())
 
-  useEffect(() => {
-    if (accountToday && !date) setDate(accountToday)
-  }, [accountToday, date])
-  useEffect(() => {
-    if (!diaryId && diaries.length) {
-      setDiaryId(diaries[0].id)
-      setSelectedTitle(diaries[0].title)
-    }
-  }, [diaryId, diaries])
-  useEffect(() => {
-    if (selectedDiary.data) setSelectedTitle(selectedDiary.data.title)
-  }, [selectedDiary.data])
-
-  // Keep titles for alert cards that fall outside the current picker page.
-  const titleCache = useMemo(() => {
-    const map = new Map<string, string>()
-    if (selectedTitle && diaryId) map.set(diaryId, selectedTitle)
-    for (const d of diaries) map.set(d.id, d.title)
-    return map
-  }, [diaries, diaryId, selectedTitle])
-
-  async function add(e: FormEvent) {
-    e.preventDefault()
-    setFormError('')
-    if (!timezone) { setFormError(t('alerts.timezoneLoading')); return }
-    if (!diaryId) { setFormError(t('alerts.chooseRequired')); return }
-    try {
-      await createAlert.mutateAsync({ diaryId, startLocalDate: date, localTime: time, timezone, repeatMode: repeat })
-    } catch {
-      setFormError(t('alerts.createError'))
-    }
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    if (!valid) return
+    setQuery(subjectType === 'instrument'
+      ? { agentUserId, from, to, instrumentId }
+      : { agentUserId, from, to, subjectType, subject: subject.trim() })
   }
 
-  async function dismiss(a: Alert) { await dismissAlert.mutateAsync(a.id) }
-  async function remove(a: Alert) {
-    const ok = await confirm({ title: t('alerts.deleteTitle'), confirmText: t('common.delete'), tone: 'danger' })
-    if (!ok) return
-    await deleteAlert.mutateAsync(a.id)
-  }
-
-  const titleFor = (id: string) => titleCache.get(id) ?? (selectedDiary.data?.id === id ? selectedDiary.data.title : null) ?? t('alerts.fallbackTitle')
-
-  return (
-    <>
-      <PageHeader title={t('alerts.title')} subtitle={t('alerts.subtitle')} />
-
-      <Card flush as="section" className="alert-form">
-        <form className="alert-form__body" onSubmit={add}>
-          <div className="form-row">
-            <Field label={t('alerts.findDiary')} className="field--grow" hint={t('alerts.findHint')}>
-              <TextInput value={pickerQuery} onChange={(e) => setPickerQuery(e.target.value)} placeholder={t('alerts.searchPlaceholder')} />
-            </Field>
-          </div>
-          <div className="form-row">
-            <Field label={t('alerts.diary')} className="field--grow">
-              <SelectBox required value={diaryId} onChange={(e) => {
-                setDiaryId(e.target.value)
-                const match = diaries.find(d => d.id === e.target.value)
-                if (match) setSelectedTitle(match.title)
-              }} disabled={!diaries.length && !diaryId}>
-                {diaryId && !diaries.some(d => d.id === diaryId) ? (
-                  <option value={diaryId}>{selectedTitle || t('alerts.selectedDiary')}</option>
-                ) : null}
-                <option value="" disabled>{t('alerts.chooseDiary')}</option>
-                {diaries.map((d) => <option key={d.id} value={d.id}>{d.title} · {d.localDate}</option>)}
-              </SelectBox>
-            </Field>
-            <Field label={t('alerts.date')}>
-              <TextInput type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-            </Field>
-          </div>
-          <div className="form-row">
-            <Field label={t('alerts.time')}>
-              <TextInput type="time" required value={time} onChange={(e) => setTime(e.target.value)} />
-            </Field>
-            <Field label={t('alerts.repeat')} className="field--grow">
-              <SelectBox value={repeat} onChange={(e) => setRepeat(e.target.value)}>
-                <option value="none">{t('alerts.repeat.once')}</option>
-                <option value="week">{t('alerts.repeat.week')}</option>
-                <option value="month">{t('alerts.repeat.month')}</option>
-              </SelectBox>
-            </Field>
-          </div>
-          {timezone ? <p className="form-hint">{t('alerts.timezoneHint', { timezone: formatTimezoneLabel(timezone) })}</p> : null}
-          {formError ? <p className="form-error" role="alert">{formError}</p> : null}
-          <div className="form-actions">
-            <Button variant="primary" type="submit" icon="bell" loading={createAlert.isPending} disabled={!diaryId || !timezone}>
-              {t('alerts.create')}
-            </Button>
-            {!diaries.length && !loading && !diaryId ? <span className="form-hint">{t('alerts.createFirst')}</span> : null}
-          </div>
-        </form>
-      </Card>
-
-      {error ? (
-        <SectionError onRetry={reload} />
-      ) : loading ? (
-        <ul className="alert-list">{Array.from({ length: 2 }, (_, i) => <li key={i}><Card className="alert"><div className="skel" style={{ height: 18, width: '60%' }} /></Card></li>)}</ul>
-      ) : alerts.length === 0 ? (
-        <EmptyBox icon="bell" title={t('alerts.emptyTitle')} hint={t('alerts.emptyHint')} />
-      ) : (
-        <ul className="alert-list">
-          {alerts.map((a) => (
-            <li key={a.id}>
-              <Card as="article" className="alert">
-                <div className="alert__main">
-                  <Badge tone={a.status === 'active' ? 'warn' : 'muted'}>{a.status}</Badge>
-                  <h3 className="alert__title"><AlertDiaryTitle diaryId={a.diaryId} fallback={titleFor(a.diaryId)} /></h3>
-                  <p className="alert__meta">
-                    {a.nextLocalDate ?? a.startLocalDate} · {formatTime(a.localTime)} · {repeatLabel(a.repeatMode)} · {a.timezone}
-                  </p>
-                </div>
-                <div className="alert__actions">
-                  {a.status === 'active' ? <Button size="sm" variant="ghost" icon="check" onClick={() => dismiss(a)}>{t('alerts.dismiss')}</Button> : null}
-                  <IconButton icon="trash" label={t('alerts.deleteLabel')} size={16} className="icon-btn--danger" onClick={() => remove(a)} />
-                </div>
-              </Card>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
-  )
+  return <Card as="section" className="stack" aria-labelledby="comparison-title">
+    <div>
+      <h2 id="comparison-title">{t('comparison.title')}</h2>
+      <p className="form-hint">{t('comparison.subtitle')}</p>
+    </div>
+    <form className="comparison-filters" onSubmit={submit}>
+      <Field label={t('comparison.agent')}>
+        <SelectBox value={agentUserId} onChange={event => setAgentUserId(event.target.value)} required>
+          <option value="">{t('comparison.chooseAgent')}</option>
+          {(agents.data?.items ?? []).map(agent => <option key={agent.userId} value={agent.userId}>{agent.displayName}</option>)}
+        </SelectBox>
+      </Field>
+      <Field label={t('comparison.subjectType')}>
+        <SelectBox value={subjectType} onChange={event => setSubjectType(event.target.value as typeof subjectType)}>
+          <option value="theme">{t('today.observations.subject.theme')}</option>
+          <option value="sector">{t('today.observations.subject.sector')}</option>
+          <option value="broad_market">{t('today.observations.subject.broadMarket')}</option>
+          <option value="instrument">{t('today.observations.subject.instrument')}</option>
+        </SelectBox>
+      </Field>
+      {subjectType === 'instrument' ? <Field label={t('comparison.instrument')}>
+        <SelectBox value={instrumentId} onChange={event => setInstrumentId(event.target.value)} required>
+          <option value="">{t('comparison.chooseInstrument')}</option>
+          {(instruments.data ?? []).map(instrument => <option key={instrument.instrumentId} value={instrument.instrumentId}>{instrument.symbol} · {instrument.name}</option>)}
+        </SelectBox>
+      </Field> : <Field label={t('comparison.subject')}>
+        <TextInput value={subject} onChange={event => setSubject(event.target.value)} required maxLength={120} />
+      </Field>}
+      <Field label={t('comparison.from')}><TextInput type="date" value={from} onChange={event => setFrom(event.target.value)} required /></Field>
+      <Field label={t('comparison.to')}><TextInput type="date" value={to} onChange={event => setTo(event.target.value)} required /></Field>
+      <Button variant="primary" type="submit" disabled={!valid}>{t('comparison.open')}</Button>
+    </form>
+    {agents.isError ? <p role="alert">{t('comparison.agentsUnavailable')}</p> : null}
+    {query && comparison.isLoading ? <p role="status">{t('common.loading')}</p> : null}
+    {comparison.isError ? <SectionError onRetry={() => { void comparison.refetch() }} /> : null}
+    {comparison.data ? <ComparisonResult comparison={comparison.data} agentName={agentName} /> : null}
+  </Card>
 }
 
-function AlertDiaryTitle({ diaryId, fallback }: { diaryId: string; fallback: string }) {
-  const diary = useDiaryQuery(diaryId)
-  return <>{diary.data?.title ?? fallback}</>
+function ComparisonResult({ comparison, agentName }: { comparison: OwnerComparison; agentName: string }) {
+  const { t } = useI18n()
+  const outcome = comparison.difference.outcomeConsistent == null
+    ? t('comparison.unavailable')
+    : comparison.difference.outcomeConsistent ? t('comparison.same') : t('comparison.different')
+  const confidence = comparison.difference.confidenceDifference == null
+    ? t('comparison.unavailable')
+    : Number(comparison.difference.confidenceDifference) === 0
+      ? t('comparison.same')
+      : t('comparison.confidenceDifference', { value: Number(comparison.difference.confidenceDifference) > 0
+        ? `+${comparison.difference.confidenceDifference}` : comparison.difference.confidenceDifference })
+  return <div className="stack">
+    <dl className="comparison-differences" aria-label={t('comparison.objectiveDifferences')}>
+      <div><dt>{t('comparison.outcomeConsistency')}</dt><dd>{outcome}</dd></div>
+      <div><dt>{t('comparison.confidence')}</dt><dd>{confidence}</dd></div>
+    </dl>
+    <div className="comparison-columns">
+      <ComparisonOwner title={t('comparison.human')} owner={comparison.human} />
+      <ComparisonOwner title={agentName} owner={comparison.agent} />
+    </div>
+  </div>
+}
+
+function ComparisonOwner({ title, owner }: { title: string; owner: OwnerComparison['human'] }) {
+  const { t } = useI18n()
+  return <section className="comparison-owner" aria-label={`${title} · ${t(`comparison.owner.${owner.ownerType}`)}`}>
+    <h3>{title}</h3>
+    <p className="comparison-owner__label">{t(`comparison.owner.${owner.ownerType}`)}</p>
+    {owner.availability === 'unavailable' ? <p className="form-hint">{t('comparison.grantUnavailable')}</p>
+      : owner.observations.length === 0 ? <p className="form-hint">{t('comparison.empty')}</p>
+        : <ol className="comparison-records">{owner.observations.map(observation => <li key={observation.update.id}>
+          <article className="stack">
+            <time dateTime={observation.update.recordedAt}>{observation.journalDay}</time>
+            <p>{observation.update.content}</p>
+            {observation.update.primarySubject ? <p>{subjectLabel(observation.update.primarySubject)}<DailyCloseEvidence subject={observation.update.primarySubject} /></p> : null}
+            {observation.expectations.length === 0 ? <p className="form-hint">{t('comparison.expectationUnavailable')}</p>
+              : observation.expectations.map(expectation => <dl key={expectation.id} className="comparison-expectation">
+                <div><dt>{t('today.expectations.expectedBehavior')}</dt><dd>{expectation.expectedBehavior}</dd></div>
+                <div><dt>{t('today.expectations.confidence')}</dt><dd>{expectation.confidence}</dd></div>
+                <div><dt>{t('today.review.outcome')}</dt><dd>{expectation.outcome ?? t('comparison.unavailable')}</dd></div>
+                <div><dt>{t('today.review.quality')}</dt><dd>{expectation.reasoningQuality ?? t('comparison.unavailable')}</dd></div>
+              </dl>)}
+          </article>
+        </li>)}</ol>}
+  </section>
 }

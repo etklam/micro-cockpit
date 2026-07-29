@@ -21,12 +21,22 @@ static class ObservationEndpoints
             string? tag = null,
             string? author = null,
             string? cursor = null,
-            int limit = 20) =>
+            int limit = 20,
+            IHttpClientFactory? httpFactory = null) =>
         {
             if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
             var error = ObservationQuery.Validate(query, from, to, subjectType, subject, instrumentId, market, symbol, tag, author, limit, cursor, out var parsed);
             if (error is not null) return Results.Problem(error, statusCode: 400);
-            return Results.Ok(await ObservationQuery.ReadAsync(db, userId, parsed));
+            var page = await ObservationQuery.ReadAsync(db, userId, parsed);
+            if (httpFactory is not null)
+            {
+                var enriched = new List<ObservationSearchItemResponse>();
+                foreach (var item in page.Items)
+                    enriched.Add(item with { Update = await ObservationInstruments.AttachDailyCloseAsync(
+                        httpFactory, item.Update, item.JournalDay, request.HttpContext.RequestAborted) });
+                page = page with { Items = enriched };
+            }
+            return Results.Ok(page);
         })
         .Produces<ObservationSearchPage>(200).ProducesProblem(400).ProducesProblem(401);
 
@@ -36,7 +46,10 @@ static class ObservationEndpoints
             if (to < from || to.DayNumber - from.DayNumber > 62) return Results.Problem("invalid_date_range", statusCode: 400);
             await using var command = db.CreateCommand("""
                 SELECT o.journal_day,o.id,count(DISTINCT u.id),
-                       count(DISTINCT e.id) FILTER (WHERE e.invalidated_at IS NOT NULL OR e.deadline <= $4)
+                       count(DISTINCT e.id) FILTER (
+                           WHERE (e.invalidated_at IS NOT NULL OR e.deadline <= $4)
+                           AND NOT EXISTS (SELECT 1 FROM journal.expectation_reviews r WHERE r.expectation_id=e.id AND r.deleted_at IS NULL)
+                       )
                 FROM journal.market_observations o
                 JOIN journal.observation_updates u ON u.market_observation_id=o.id AND u.user_id=o.user_id AND u.deleted_at IS NULL
                 LEFT JOIN journal.expectations e ON e.observation_update_id=u.id AND e.user_id=u.user_id AND e.deleted_at IS NULL
@@ -52,7 +65,7 @@ static class ObservationEndpoints
         })
         .Produces<CollectionResponse<MarketObservationDaySummaryItem>>(200).ProducesProblem(400).ProducesProblem(401);
 
-        journal.MapGet("/market-observations/today", async (HttpRequest request, NpgsqlDataSource db, TimeProvider timeProvider) =>
+        journal.MapGet("/market-observations/today", async (HttpRequest request, NpgsqlDataSource db, TimeProvider timeProvider, IHttpClientFactory httpFactory) =>
         {
             if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
             var timezone = request.HttpContext.User.FindFirst("timezone")?.Value ?? "UTC";
@@ -93,6 +106,9 @@ static class ObservationEndpoints
             var updates = new List<ObservationUpdateResponse>();
             await using (var reader = await updatesCommand.ExecuteReaderAsync())
                 while (await reader.ReadAsync()) updates.Add(ObservationEnrichment.Read(reader));
+            for (var index = 0; index < updates.Count; index++)
+                updates[index] = await ObservationInstruments.AttachDailyCloseAsync(
+                    httpFactory, updates[index], storedDay, request.HttpContext.RequestAborted);
             return Results.Ok(new MarketObservationResponse(observationId, storedDay, storedTimezone, storedRollover, updates));
         })
         .Produces<MarketObservationResponse>(200).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
@@ -101,6 +117,8 @@ static class ObservationEndpoints
         {
             if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
             if (string.IsNullOrWhiteSpace(input.Content)) return Results.Problem("content_required", statusCode: 400);
+            var sourceLabel = ObservationEnrichment.Trim(input.SourceLabel);
+            if (sourceLabel?.Length > 100) return Results.Problem("source_label_too_long", statusCode: 400);
             if (!JournalAccess.TryIdempotencyKey(request, out var key)) return Results.Problem("invalid_idempotency_key", statusCode: 400);
             var timezone = request.HttpContext.User.FindFirst("timezone")?.Value ?? "UTC";
             var rollover = request.HttpContext.User.FindFirst("journal_day_rollover")?.Value ?? "00:00";
@@ -142,14 +160,15 @@ static class ObservationEndpoints
 
                 var updateId = Guid.NewGuid();
                 await using var update = new NpgsqlCommand("""
-                    INSERT INTO journal.observation_updates (id, market_observation_id, user_id, content, recorded_at)
-                    VALUES ($1,$2,$3,$4,$5)
+                    INSERT INTO journal.observation_updates (id, market_observation_id, user_id, content, recorded_at, source_label)
+                    VALUES ($1,$2,$3,$4,$5,$6)
                     """, connection, tx);
                 update.Parameters.AddWithValue(updateId);
                 update.Parameters.AddWithValue(observationId);
                 update.Parameters.AddWithValue(userId);
                 update.Parameters.AddWithValue(input.Content.Trim());
                 update.Parameters.AddWithValue(recordedAt.UtcDateTime);
+                update.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Text, Value = (object?)sourceLabel ?? DBNull.Value });
                 await update.ExecuteNonQueryAsync();
                 await using var touch = new NpgsqlCommand("UPDATE journal.market_observations SET updated_at=now() WHERE id=$1 AND user_id=$2", connection, tx);
                 touch.Parameters.AddWithValue(observationId);
@@ -174,7 +193,7 @@ static class ObservationEndpoints
             await using var command = db.CreateCommand("""
                 UPDATE journal.observation_updates u
                 SET content=$3, signal=$4, interpretation=$5, mental_state=$6, tags=$7,
-                    primary_subject=$8, related_subjects=$9, evidence=$10, updated_at=now()
+                    primary_subject=$8, related_subjects=$9, evidence=$10, source_label=$11, updated_at=now()
                 FROM journal.market_observations o
                 WHERE u.id=$1 AND u.user_id=$2 AND u.deleted_at IS NULL
                   AND o.id=u.market_observation_id AND o.user_id=$2 AND o.deleted_at IS NULL
@@ -191,10 +210,83 @@ static class ObservationEndpoints
             command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = (object?)ObservationEnrichment.Json(value.PrimarySubject) ?? DBNull.Value });
             command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = ObservationEnrichment.Json(value.RelatedSubjects) ?? "[]" });
             command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Jsonb, Value = (object?)ObservationEnrichment.Json(value.Evidence) ?? DBNull.Value });
+            command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Text, Value = (object?)value.SourceLabel ?? DBNull.Value });
             await using var reader = await command.ExecuteReaderAsync();
             if (!await reader.ReadAsync()) return Results.Problem("not_found", statusCode: 404);
             return Results.Ok(ObservationEnrichment.ReadEdit(reader));
         })
         .Produces<ObservationUpdateEditResponse>(200).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
+
+        journal.MapDelete("/observation-updates/{id:guid}", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
+        {
+            if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
+            return !await DeleteClosure(db, userId, id, updateOnly: true)
+                ? Results.Problem("not_found", statusCode: 404)
+                : Results.NoContent();
+        }).Produces(204).ProducesProblem(401).ProducesProblem(404);
+
+        journal.MapDelete("/market-observations/{id:guid}", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
+        {
+            if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
+            return !await DeleteClosure(db, userId, id, updateOnly: false)
+                ? Results.Problem("not_found", statusCode: 404)
+                : Results.NoContent();
+        }).Produces(204).ProducesProblem(401).ProducesProblem(404);
+    }
+
+    private static async Task<bool> DeleteClosure(NpgsqlDataSource db, Guid userId, Guid id, bool updateOnly)
+    {
+        await using var connection = await db.OpenConnectionAsync();
+        await using var tx = await connection.BeginTransactionAsync();
+        var ownedSql = updateOnly
+            ? "SELECT 1 FROM journal.observation_updates WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL FOR UPDATE"
+            : "SELECT 1 FROM journal.market_observations WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL FOR UPDATE";
+        await using (var owned = new NpgsqlCommand(ownedSql, connection, tx))
+        {
+            owned.Parameters.AddWithValue(id); owned.Parameters.AddWithValue(userId);
+            if (await owned.ExecuteScalarAsync() is null) return false;
+        }
+        var scope = updateOnly ? "u.id=$1" : "u.market_observation_id=$1";
+        foreach (var sql in new[]
+        {
+            $"""
+             DELETE FROM journal.expectation_review_labels l
+             USING journal.expectation_reviews r,journal.expectations e,journal.observation_updates u
+             WHERE l.review_id=r.id AND r.expectation_id=e.id AND e.observation_update_id=u.id
+               AND {scope} AND r.user_id=$2
+             """,
+            $"""
+             DELETE FROM journal.trades t USING journal.action_decisions a,journal.observation_updates u
+             WHERE t.action_decision_id=a.id AND a.observation_update_id=u.id AND {scope} AND t.user_id=$2
+             """,
+            $"""
+             DELETE FROM journal.action_decisions a USING journal.observation_updates u
+             WHERE a.observation_update_id=u.id AND {scope} AND a.user_id=$2
+             """,
+            $"""
+             DELETE FROM journal.expectation_reviews r USING journal.expectations e,journal.observation_updates u
+             WHERE r.expectation_id=e.id AND e.observation_update_id=u.id AND {scope} AND r.user_id=$2
+             """,
+            $"""
+             DELETE FROM journal.expectations e USING journal.observation_updates u
+             WHERE e.observation_update_id=u.id AND {scope} AND e.user_id=$2
+             """,
+            updateOnly
+                ? "DELETE FROM journal.observation_updates WHERE id=$1 AND user_id=$2"
+                : "DELETE FROM journal.observation_updates WHERE market_observation_id=$1 AND user_id=$2",
+        })
+        {
+            await using var command = new NpgsqlCommand(sql, connection, tx);
+            command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(userId);
+            await command.ExecuteNonQueryAsync();
+        }
+        if (!updateOnly)
+        {
+            await using var observation = new NpgsqlCommand("DELETE FROM journal.market_observations WHERE id=$1 AND user_id=$2", connection, tx);
+            observation.Parameters.AddWithValue(id); observation.Parameters.AddWithValue(userId);
+            await observation.ExecuteNonQueryAsync();
+        }
+        await tx.CommitAsync();
+        return true;
     }
 }

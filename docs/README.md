@@ -12,7 +12,7 @@ This index separates system explanation from operational procedures. Start with 
 ## Modules
 
 - [Tools](modules/tools.md)
-- [Diary, transactions, and reviews](modules/diary-trades.md)
+- [Market Observations, Expectations, and review](modules/market-observations.md)
 - [Authentication, theme, shared UI, and API state](modules/platform-frontend.md)
 - [Backend service catalog](modules/backend-services.md)
 

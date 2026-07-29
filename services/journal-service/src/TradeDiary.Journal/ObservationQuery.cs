@@ -41,7 +41,7 @@ static class ObservationQuery
             return "invalid_instrument_filter";
 
         string? normalizedTag = null;
-        if (!string.IsNullOrWhiteSpace(tag) && !DiaryTags.TryNormalizeOne(tag, out normalizedTag, out var tagError)) return tagError;
+        if (!string.IsNullOrWhiteSpace(tag) && !ObservationTags.TryNormalizeOne(tag, out normalizedTag, out var tagError)) return tagError;
 
         Guid? authorId = null;
         var authorValue = Trim(author);

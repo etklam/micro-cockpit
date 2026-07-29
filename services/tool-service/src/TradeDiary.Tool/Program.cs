@@ -3,13 +3,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using Npgsql;
+using TradeDiary.Authorization;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton(_=>NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Tool") ?? throw new InvalidOperationException("Connection string 'Tool' is required.")));
-builder.Services.AddHttpClient("journal",client=>client.BaseAddress=new Uri(builder.Configuration["Services:Journal"]??"http://127.0.0.1:5101"));
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o => { o.MapInboundClaims=false; o.MetadataAddress=builder.Configuration["Auth:MetadataAddress"]??"http://127.0.0.1:5100/.well-known/openid-configuration"; o.RequireHttpsMetadata=false; o.Audience="trade-diary-services"; });
-builder.Services.AddAuthorization(o => { var humanOnly = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireAssertion(context => context.User.FindFirst("account_type")?.Value != "agent").Build(); o.DefaultPolicy = humanOnly; o.FallbackPolicy = humanOnly; });
+builder.Services.AddAuthorization(TradeDiaryPolicies.Configure);
 builder.Services.AddOpenApi(options=>{options.AddDocumentTransformer<SecuritySchemesTransformer>();options.AddOperationTransformer<SecurityRequirementTransformer>();});
 var app=builder.Build(); app.UseAuthentication(); app.UseAuthorization();
 app.MapOpenApi("/openapi.json").AllowAnonymous();
@@ -40,9 +40,24 @@ app.MapDelete("/internal/tool-presets/{id:guid}",async(Guid id,HttpRequest req,N
 app.MapGet("/internal/saved-calculations",async(HttpRequest req,NpgsqlDataSource db,int limit=10)=>{if(!ToolStore.TryUser(req,out var user))return Results.Unauthorized();if(limit is <1 or >50)return Results.Problem("invalid_limit",statusCode:400);return Results.Ok(new ToolCollection<SavedCalculationResponse>(await ToolStore.Recent(db,user,limit)));});
 // Persistence model: inputs are schema-v1 snapshots, but output is always recalculated here.
 // Frontend-provided result values are never accepted as authoritative.
-app.MapPost("/internal/saved-calculations",async(SavedCalculationWrite x,HttpRequest req,NpgsqlDataSource db,IHttpClientFactory clients)=>{if(!ToolStore.TryUser(req,out var user))return Results.Unauthorized();var key=req.Headers["Idempotency-Key"].FirstOrDefault();if(key is null||key.Length is <8 or >100||!ToolValidation.ValidCurrency(x.Currency)||!ToolValidation.ValidSymbol(x.Symbol)||x.Note?.Length>1000||x.SourceTransactionId is not null&&x.SourceDiaryId is null||!ToolValidation.TryCalculate(x.ToolType,x.Inputs,out var output))return Results.Problem("invalid_calculation",statusCode:400);if(x.SourceDiaryId is not null&&!await SourceReferenceValidator.Owns(clients.CreateClient("journal"),req,x.SourceDiaryId.Value,x.SourceTransactionId))return Results.Problem("source_not_found",statusCode:404);var saved=await ToolStore.Save(db,user,x,output!,key);return saved.Duplicate?Results.Ok(saved.Item):Results.Created($"/internal/saved-calculations/{saved.Item!.Id}",saved.Item);});
+app.MapPost("/internal/saved-calculations",async(SavedCalculationWrite x,HttpRequest req,NpgsqlDataSource db)=>{if(!ToolStore.TryUser(req,out var user))return Results.Unauthorized();var key=req.Headers["Idempotency-Key"].FirstOrDefault();if(key is null||key.Length is <8 or >100||!ToolValidation.ValidCurrency(x.Currency)||!ToolValidation.ValidSymbol(x.Symbol)||x.Note?.Length>1000||!ToolValidation.TryCalculate(x.ToolType,x.Inputs,out var output))return Results.Problem("invalid_calculation",statusCode:400);var saved=await ToolStore.Save(db,user,x,output!,key);return saved.Duplicate?Results.Ok(saved.Item):Results.Created($"/internal/saved-calculations/{saved.Item!.Id}",saved.Item);});
 app.MapDelete("/internal/saved-calculations/{id:guid}",async(Guid id,HttpRequest req,NpgsqlDataSource db)=>!ToolStore.TryUser(req,out var user)?Results.Unauthorized():await ToolStore.DeleteSaved(db,user,id)==0?Results.NotFound():Results.NoContent());
+app.MapGet("/internal/account-export",async(HttpRequest req,NpgsqlDataSource db)=>{
+  if(!ToolStore.TryUser(req,out var user))return Results.Unauthorized();
+  async Task<JsonElement> Rows(string sql){await using var command=db.CreateCommand($"SELECT COALESCE(jsonb_agg(to_jsonb(row_data)), '[]'::jsonb) FROM ({sql}) row_data");command.Parameters.AddWithValue(user);return JsonDocument.Parse((string)(await command.ExecuteScalarAsync())!).RootElement.Clone();}
+  return Results.Ok(new ToolAccountExport(
+    await Rows("SELECT * FROM tool.presets WHERE user_id=$1 ORDER BY created_at,id"),
+    await Rows("SELECT * FROM tool.saved_calculations WHERE user_id=$1 ORDER BY created_at,id")));
+}).Produces<ToolAccountExport>(200).ProducesProblem(401);
+app.MapDelete("/internal/account-data",async(HttpRequest req,NpgsqlDataSource db)=>{
+  if(!ToolStore.TryUser(req,out var user))return Results.Unauthorized();
+  await using var connection=await db.OpenConnectionAsync();await using var tx=await connection.BeginTransactionAsync();
+  foreach(var sql in new[]{"DELETE FROM tool.saved_calculations WHERE user_id=$1","DELETE FROM tool.presets WHERE user_id=$1"}){await using var command=new NpgsqlCommand(sql,connection,tx);command.Parameters.AddWithValue(user);await command.ExecuteNonQueryAsync();}
+  await tx.CommitAsync();return Results.NoContent();
+}).Produces(204).ProducesProblem(401);
 app.Run();
+
+record ToolAccountExport(JsonElement Presets,JsonElement SavedCalculations);
 
 // ponytail: shared OpenAPI security wiring — bearerAuth for user routes, serviceKey for internal admin/worker/events.
 sealed class SecuritySchemesTransformer : IOpenApiDocumentTransformer

@@ -2,8 +2,7 @@ internal static class BootstrapEndpoints
 {
     private static readonly string[] ProductAreas =
     [
-        "today", "diary", "calendar", "discipline", "alerts", "watchlist",
-        "price-alerts", "rotation", "partners", "articles", "tools"
+        "today", "review", "watchlist", "calendar", "tools", "settings"
     ];
 
     internal static void Map(WebApplication app)

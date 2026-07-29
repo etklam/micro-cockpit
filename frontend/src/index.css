@@ -39,7 +39,7 @@ html[data-theme="dark"] {
   --warn:        oklch(0.83 0.125 85);
   --warn-soft:   color-mix(in oklch, var(--warn) 14%, transparent);
 
-  /* Aliases used by charts / rotation (semantic parity) */
+  /* Semantic chart aliases */
   --success:      var(--gain);
   --success-soft: var(--gain-soft);
   --danger:       var(--loss);

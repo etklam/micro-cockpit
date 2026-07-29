@@ -8,7 +8,8 @@ static class ExpectationEndpoints
     private const string expectationSelect = """
         SELECT e.id, e.observation_update_id, o.id, o.journal_day,
                e.expected_behavior, e.deadline, e.invalidation_condition, e.confidence, e.market,
-               e.invalidated_at, e.created_at, e.updated_at
+               e.invalidated_at, e.created_at, e.updated_at,
+               EXISTS (SELECT 1 FROM journal.expectation_reviews r WHERE r.expectation_id=e.id AND r.deleted_at IS NULL)
         FROM journal.expectations e
         JOIN journal.observation_updates u ON u.id=e.observation_update_id AND u.user_id=e.user_id
         JOIN journal.market_observations o ON o.id=u.market_observation_id AND o.user_id=u.user_id
@@ -40,7 +41,7 @@ static class ExpectationEndpoints
                     )
                     SELECT inserted.id, inserted.observation_update_id, parent.observation_id, parent.journal_day,
                            inserted.expected_behavior, inserted.deadline, inserted.invalidation_condition, inserted.confidence, inserted.market,
-                           inserted.invalidated_at, inserted.created_at, inserted.updated_at
+                           inserted.invalidated_at, inserted.created_at, inserted.updated_at, false
                     FROM inserted JOIN parent ON parent.update_id = inserted.observation_update_id
                     """, connection, tx);
                 command.Parameters.AddWithValue(id);
@@ -67,7 +68,8 @@ static class ExpectationEndpoints
             await using var command = db.CreateCommand("""
                 SELECT e.id, e.observation_update_id, o.id, o.journal_day,
                        e.expected_behavior, e.deadline, e.invalidation_condition, e.confidence, e.market,
-                       e.invalidated_at, e.created_at, e.updated_at
+                       e.invalidated_at, e.created_at, e.updated_at,
+                       EXISTS (SELECT 1 FROM journal.expectation_reviews r WHERE r.expectation_id=e.id AND r.deleted_at IS NULL)
                 FROM journal.expectations e
                 JOIN journal.observation_updates u ON u.id=e.observation_update_id AND u.user_id=e.user_id
                 JOIN journal.market_observations o ON o.id=u.market_observation_id AND o.user_id=u.user_id
@@ -155,5 +157,31 @@ static class ExpectationEndpoints
             return Results.Ok(ExpectationRules.Read(reader, timeProvider.GetUtcNow()));
         })
         .Produces<ExpectationResponse>(200).ProducesProblem(401).ProducesProblem(404);
+
+        journal.MapDelete("/expectations/{id:guid}", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
+        {
+            if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
+            await using var connection = await db.OpenConnectionAsync();
+            await using var tx = await connection.BeginTransactionAsync();
+            await using (var labels = new NpgsqlCommand("""
+                DELETE FROM journal.expectation_review_labels l USING journal.expectation_reviews r
+                WHERE l.review_id=r.id AND r.expectation_id=$1 AND r.user_id=$2
+                """, connection, tx))
+            {
+                labels.Parameters.AddWithValue(id);
+                labels.Parameters.AddWithValue(userId);
+                await labels.ExecuteNonQueryAsync();
+            }
+            await using (var review = new NpgsqlCommand("DELETE FROM journal.expectation_reviews WHERE expectation_id=$1 AND user_id=$2", connection, tx))
+            { review.Parameters.AddWithValue(id); review.Parameters.AddWithValue(userId); await review.ExecuteNonQueryAsync(); }
+            await using (var unlink = new NpgsqlCommand("UPDATE journal.action_decisions SET expectation_id=NULL,updated_at=now() WHERE expectation_id=$1 AND user_id=$2", connection, tx))
+            { unlink.Parameters.AddWithValue(id); unlink.Parameters.AddWithValue(userId); await unlink.ExecuteNonQueryAsync(); }
+            await using var expectation = new NpgsqlCommand("DELETE FROM journal.expectations WHERE id=$1 AND user_id=$2", connection, tx);
+            expectation.Parameters.AddWithValue(id);
+            expectation.Parameters.AddWithValue(userId);
+            if (await expectation.ExecuteNonQueryAsync() == 0) return Results.Problem("not_found", statusCode: 404);
+            await tx.CommitAsync();
+            return Results.NoContent();
+        }).Produces(204).ProducesProblem(401).ProducesProblem(404);
     }
 }

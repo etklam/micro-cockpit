@@ -11,9 +11,9 @@
 - [x] journal-service 路由依 aggregate 拆為 endpoint 模組（`ObservationEndpoints`、`ExpectationEndpoints`、`LegacyDiaryEndpoints`），沿用 Edge API 既有的 `XxxEndpoints.Map(...)` 組織方式。`Program.cs` 786 → 65 行，純 composition root
 - [x] 純結構重構，對外 API 契約與行為不變（journal 整合測試 34/34 全綠，2026-07-27）
 - [x] legacy 路由（diaries／transactions／reviews／quick-note／partner-diaries 共 18 條）全數收進單一 `LegacyDiaryEndpoints.cs`，讓 issue 14 退役等同刪一個檔
-- [ ] 將 human-only／agent-read 授權抽成跨服務共用組件，取代各服務複製的 policy 定義 — **移交 issue 10–13**（見下）
-- [ ] 共用 policy 對齊 scope：人類 session `journal:read`／`journal:write`，Agent 唯讀 `journal:agent-read` — **移交 issue 10–13**
-- [ ] 至少 journal-service 與 content-service 改用共用組件，驗證 agent token 無法命中 write 端點 — **移交 issue 10–13**
+- [x] 將 human-only／agent-read 授權抽成跨服務共用組件，取代各服務複製的 policy 定義 — `TradeDiary.Authorization` 已由 Identity、Journal、Tool 與 Edge 共用
+- [x] 共用 policy 對齊 scope：Agent 自有紀錄使用 `journal:read`／`journal:write`，grant read 使用獨立 `agent:read`
+- [x] active services 改用共用組件並驗證 Agent token 無法透過 grant 修改其他 owner；content-service 已於 cutover 移除
 
 ## 執行修正（2026-07-27）
 

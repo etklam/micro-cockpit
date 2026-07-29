@@ -410,6 +410,54 @@
         }
       }
     },
+    "/internal/v1/instruments/{id}/daily-close": {
+      "get": {
+        "tags": [
+          "TradeDiary.MarketData"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "onOrBefore",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyCloseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/providers/health": {
       "get": {
         "tags": [
@@ -517,6 +565,15 @@
               "string"
             ],
             "format": "double"
+          },
+          "adjustedClose": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -535,6 +592,69 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "DailyCloseResponse": {
+        "required": [
+          "instrumentId",
+          "symbol",
+          "status",
+          "tradingDate",
+          "rawClose",
+          "adjustedClose",
+          "provider",
+          "publishedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tradingDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "rawClose": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "adjustedClose": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "publishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -653,6 +773,8 @@
           "high",
           "low",
           "close",
+          "rawClose",
+          "adjustedClose",
           "volume",
           "provider",
           "publishedAt"
@@ -688,6 +810,22 @@
             "format": "double"
           },
           "close": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "rawClose": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "adjustedClose": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",

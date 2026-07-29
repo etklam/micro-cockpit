@@ -43,7 +43,10 @@ public sealed record MigrationFile(
             if (id != match.Groups["id"].Value) throw new MigrationException($"Migration header ID differs from filename: {filename}");
             if (!ids.Add(id)) throw new MigrationException($"Duplicate migration ID: {id}");
             if (TransactionBreaking.IsMatch(text)) throw new MigrationException($"Migration contains transaction-breaking SQL: {filename}");
-            if (Destructive.IsMatch(text)) throw new MigrationException($"Migration contains destructive automatic DDL: {filename}");
+            var approvedCutover = filename == "0041_market_observation_cutover.sql"
+                && lines.Skip(3).Any(line => line == "-- destructive-approved: market-observation-cutover-unlaunched");
+            if (Destructive.IsMatch(text) && !approvedCutover)
+                throw new MigrationException($"Migration contains destructive automatic DDL: {filename}");
             result.Add(new MigrationFile(id, lines[2][16..].Trim(), lines[1][10..].Trim(), filename, path,
                 Convert.ToHexStringLower(SHA256.HashData(bytes)), bytes));
         }

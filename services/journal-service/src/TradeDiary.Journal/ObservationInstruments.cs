@@ -36,7 +36,65 @@ static class ObservationInstruments
         }
     }
 
+    internal static async Task<ObservationUpdateResponse> AttachDailyCloseAsync(
+        IHttpClientFactory factory,
+        ObservationUpdateResponse update,
+        DateOnly onOrBefore,
+        CancellationToken cancellationToken)
+    {
+        var client = factory.CreateClient("market-data");
+        var primary = await Attach(client, update.PrimarySubject, onOrBefore, cancellationToken);
+        var related = new List<ObservationSubjectResponse>();
+        foreach (var subject in update.RelatedSubjects)
+            related.Add((await Attach(client, subject, onOrBefore, cancellationToken))!);
+        return update with { PrimarySubject = primary, RelatedSubjects = related };
+    }
+
+    private static async Task<ObservationSubjectResponse?> Attach(
+        HttpClient client,
+        ObservationSubjectResponse? subject,
+        DateOnly onOrBefore,
+        CancellationToken cancellationToken)
+    {
+        if (subject is null) return null;
+        if (!subject.DailyCloseAvailable || subject.InstrumentId is null)
+            return subject with { DailyCloseStatus = DailyCloseStatus.unsupported, DailyClose = null };
+        try
+        {
+            using var response = await client.GetAsync(
+                $"/internal/v1/instruments/{subject.InstrumentId}/daily-close?onOrBefore={onOrBefore:yyyy-MM-dd}",
+                cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return subject with { DailyCloseStatus = DailyCloseStatus.unavailable, DailyClose = null };
+            var close = await response.Content.ReadFromJsonAsync<PublishedDailyClose>(cancellationToken);
+            if (close is null || close.Status != "available" || close.TradingDate is null
+                || close.RawClose is null || close.AdjustedClose is null
+                || close.Provider is null || close.PublishedAt is null)
+                return subject with { DailyCloseStatus = DailyCloseStatus.unavailable, DailyClose = null };
+            return subject with
+            {
+                DailyCloseStatus = DailyCloseStatus.available,
+                DailyClose = new(
+                    close.TradingDate.Value, close.RawClose.Value, close.AdjustedClose.Value,
+                    close.Provider, close.PublishedAt.Value),
+            };
+        }
+        catch (HttpRequestException)
+        {
+            return subject with { DailyCloseStatus = DailyCloseStatus.unavailable, DailyClose = null };
+        }
+    }
+
     private sealed record PublishedInstrument(Guid InstrumentId, string Symbol, string Name, string Exchange, string Currency, string Timezone);
+    private sealed record PublishedDailyClose(
+        Guid InstrumentId,
+        string Symbol,
+        string Status,
+        DateOnly? TradingDate,
+        decimal? RawClose,
+        decimal? AdjustedClose,
+        string? Provider,
+        DateTime? PublishedAt);
     private sealed record SubjectResolution(ObservationSubjectResponse? Subject, string? Error, int StatusCode);
 }
 

@@ -4,10 +4,12 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Npgsql;
+using TradeDiary.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 var issuer = builder.Configuration["Jwt:Issuer"] ?? "trade-diary-identity";
@@ -31,7 +33,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         ValidateLifetime = true, ClockSkew = TimeSpan.FromSeconds(30)
     };
 });
-builder.Services.AddAuthorization(options => { var humanOnly = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireAssertion(context => context.User.FindFirst("account_type")?.Value != "agent").Build(); options.DefaultPolicy = humanOnly; options.FallbackPolicy = humanOnly; });
+builder.Services.AddAuthorization(options =>
+{
+    TradeDiaryPolicies.Configure(options);
+    options.AddPolicy("serviceKey", policy => policy.RequireAssertion(context =>
+        context.Resource is HttpContext http && HasServiceKey(http, builder.Configuration)));
+});
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<SecuritySchemesTransformer>();
@@ -62,6 +69,20 @@ app.MapGet("/.well-known/jwks.json", () =>
     var p = rsa.ExportParameters(false);
     return Results.Ok(new { keys = new[] { new { kty = "RSA", use = "sig", alg = "RS256", kid = signingKey.KeyId, n = Base64UrlEncoder.Encode(p.Modulus), e = Base64UrlEncoder.Encode(p.Exponent) } } });
 }).AllowAnonymous();
+
+app.MapGet("/internal/auth/agents/{agentId:guid}/managed-by/{managerId:guid}", async (
+    Guid agentId, Guid managerId, NpgsqlDataSource db) =>
+{
+    await using var command = db.CreateCommand("""
+        SELECT 1 FROM identity.agent_managers
+        WHERE agent_user_id=$1 AND manager_type='human' AND manager_user_id=$2
+        """);
+    command.Parameters.AddWithValue(agentId);
+    command.Parameters.AddWithValue(managerId);
+    return await command.ExecuteScalarAsync() is null ? Results.NotFound() : Results.NoContent();
+})
+.RequireAuthorization("serviceKey")
+.Produces(204).Produces(404);
 
 app.MapPost("/internal/auth/register", async (RegisterRequest input, HttpRequest request, NpgsqlDataSource db, IConfiguration config) =>
 {
@@ -156,28 +177,132 @@ app.MapPost("/internal/auth/logout", async (RefreshRequest input, RefreshTokenFa
 app.MapPost("/internal/auth/agents", async (AgentRequest input, ClaimsPrincipal principal, NpgsqlDataSource db) =>
 {
     if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var creator)) return Results.Unauthorized();
-    if (string.IsNullOrWhiteSpace(input.DisplayName) || input.BaseCurrency.Length != 3 || input.Scopes.Count == 0 || input.Scopes.Any(s => s is not ("diary:read" or "diary:write" or "research:read")))
+    if (string.IsNullOrWhiteSpace(input.Name) || string.IsNullOrWhiteSpace(input.DisplayName)
+        || input.BaseCurrency.Length != 3 || input.ExpiresAt is not null || !TimeZoneInfo.TryFindSystemTimeZoneById(input.Timezone, out _)
+        || !ValidAgentScopes(input.Scopes))
         return Results.Problem("invalid_agent", statusCode: 400);
     var userId = Guid.NewGuid(); var keyId = Guid.NewGuid(); var raw = RandomNumberGenerator.GetBytes(32); var email = $"agent-{userId:N}@local.invalid";
     await using var connection = await db.OpenConnectionAsync(); await using var tx = await connection.BeginTransactionAsync();
     await using (var user = new NpgsqlCommand("INSERT INTO identity.users(id,email,display_name,timezone,base_currency,account_type) VALUES($1,$2,$3,$4,$5,'agent')", connection, tx))
     { user.Parameters.AddWithValue(userId); user.Parameters.AddWithValue(email); user.Parameters.AddWithValue(input.DisplayName.Trim()); user.Parameters.AddWithValue(input.Timezone); user.Parameters.AddWithValue(input.BaseCurrency.ToUpperInvariant()); await user.ExecuteNonQueryAsync(); }
-    await using (var key = new NpgsqlCommand("INSERT INTO identity.api_keys(id,user_id,created_by,name,key_hash,scopes,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)", connection, tx))
-    { key.Parameters.AddWithValue(keyId); key.Parameters.AddWithValue(userId); key.Parameters.AddWithValue(creator); key.Parameters.AddWithValue(input.Name.Trim()); key.Parameters.AddWithValue(SHA256.HashData(raw)); key.Parameters.AddWithValue(input.Scopes.ToArray()); key.Parameters.AddWithValue((object?)input.ExpiresAt?.ToUniversalTime() ?? DBNull.Value); await key.ExecuteNonQueryAsync(); }
-    await tx.CommitAsync(); return Results.Created($"/internal/auth/agents/{userId}", new AgentResponse(userId, keyId, Convert.ToBase64String(raw), input.Scopes));
+    await using (var manager = new NpgsqlCommand("INSERT INTO identity.agent_managers(agent_user_id,manager_type,manager_user_id) VALUES($1,'human',$2)", connection, tx))
+    { manager.Parameters.AddWithValue(userId); manager.Parameters.AddWithValue(creator); await manager.ExecuteNonQueryAsync(); }
+    await using (var key = new NpgsqlCommand("INSERT INTO identity.api_keys(id,user_id,created_by,name,key_hash,scopes) VALUES($1,$2,$3,$4,$5,$6) RETURNING created_at", connection, tx))
+    {
+        key.Parameters.AddWithValue(keyId); key.Parameters.AddWithValue(userId); key.Parameters.AddWithValue(creator);
+        key.Parameters.AddWithValue(input.Name.Trim()); key.Parameters.AddWithValue(SHA256.HashData(raw)); key.Parameters.AddWithValue(input.Scopes.Distinct().ToArray());
+        var createdAt = DateTime.SpecifyKind((DateTime)(await key.ExecuteScalarAsync())!, DateTimeKind.Utc);
+        await tx.CommitAsync();
+        return Results.Created($"/internal/auth/agents/{userId}", new AgentProvisionResponse(
+            userId, input.DisplayName.Trim(), keyId, Convert.ToBase64String(raw),
+            input.Scopes.Distinct().ToList(), createdAt, null, null));
+    }
 })
 .RequireAuthorization()
-.Produces<AgentResponse>(201).ProducesProblem(400).ProducesProblem(401);
+.Produces<AgentProvisionResponse>(201).ProducesProblem(400).ProducesProblem(401);
+
+app.MapGet("/internal/auth/agents", async (ClaimsPrincipal principal, NpgsqlDataSource db) =>
+{
+    if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var managerId)) return Results.Unauthorized();
+    await using var command = db.CreateCommand("""
+        SELECT u.id,u.display_name,u.timezone,u.base_currency,
+               k.id,k.scopes,k.created_at,k.last_used_at,k.last_successful_request_at
+        FROM identity.agent_managers m
+        JOIN identity.users u ON u.id=m.agent_user_id AND u.account_type='agent'
+        LEFT JOIN identity.api_keys k ON k.user_id=u.id AND k.revoked_at IS NULL
+        WHERE m.manager_type='human' AND m.manager_user_id=$1
+        ORDER BY lower(u.display_name),u.id
+        """);
+    command.Parameters.AddWithValue(managerId);
+    await using var reader = await command.ExecuteReaderAsync();
+    var items = new List<AgentManagementResponse>();
+    while (await reader.ReadAsync()) items.Add(new(
+        reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3).Trim(),
+        reader.IsDBNull(4) ? null : reader.GetGuid(4),
+        reader.IsDBNull(5) ? [] : reader.GetFieldValue<string[]>(5),
+        reader.IsDBNull(6) ? null : Utc(reader.GetDateTime(6)),
+        reader.IsDBNull(7) ? null : Utc(reader.GetDateTime(7)),
+        reader.IsDBNull(8) ? null : Utc(reader.GetDateTime(8))));
+    return Results.Ok(new CollectionResponse<AgentManagementResponse>(items));
+})
+.RequireAuthorization()
+.Produces<CollectionResponse<AgentManagementResponse>>(200).ProducesProblem(401);
+
+app.MapPost("/internal/auth/agents/{id:guid}/token", async (
+    Guid id, AgentTokenRequest input, ClaimsPrincipal principal, NpgsqlDataSource db) =>
+{
+    if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var managerId)) return Results.Unauthorized();
+    if (!ValidAgentScopes(input.Scopes)) return Results.Problem("invalid_scopes", statusCode: 400);
+    await using var connection = await db.OpenConnectionAsync(); await using var tx = await connection.BeginTransactionAsync();
+    await using var managed = new NpgsqlCommand("""
+        SELECT 1 FROM identity.agent_managers
+        WHERE agent_user_id=$1 AND manager_type='human' AND manager_user_id=$2
+        FOR UPDATE
+        """, connection, tx);
+    managed.Parameters.AddWithValue(id); managed.Parameters.AddWithValue(managerId);
+    if (await managed.ExecuteScalarAsync() is null) return Results.Problem("not_found", statusCode: 404);
+    await using (var revoke = new NpgsqlCommand("UPDATE identity.api_keys SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL", connection, tx))
+    { revoke.Parameters.AddWithValue(id); await revoke.ExecuteNonQueryAsync(); }
+    var keyId = Guid.NewGuid(); var raw = RandomNumberGenerator.GetBytes(32);
+    await using var insert = new NpgsqlCommand("""
+        INSERT INTO identity.api_keys(id,user_id,created_by,name,key_hash,scopes)
+        VALUES($1,$2,$3,'Agent API Token',$4,$5)
+        RETURNING created_at
+        """, connection, tx);
+    insert.Parameters.AddWithValue(keyId); insert.Parameters.AddWithValue(id); insert.Parameters.AddWithValue(managerId);
+    insert.Parameters.AddWithValue(SHA256.HashData(raw)); insert.Parameters.AddWithValue(input.Scopes.Distinct().ToArray());
+    var createdAt = Utc((DateTime)(await insert.ExecuteScalarAsync())!);
+    await tx.CommitAsync();
+    return Results.Ok(new AgentTokenResponse(keyId, Convert.ToBase64String(raw), input.Scopes.Distinct().ToList(), createdAt));
+})
+.RequireAuthorization()
+.Produces<AgentTokenResponse>(200).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
+
+app.MapDelete("/internal/auth/agents/{id:guid}/token", async (Guid id, ClaimsPrincipal principal, NpgsqlDataSource db) =>
+{
+    if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var managerId)) return Results.Unauthorized();
+    await using var command = db.CreateCommand("""
+        UPDATE identity.api_keys k SET revoked_at=now()
+        WHERE k.user_id=$1 AND k.revoked_at IS NULL
+          AND EXISTS (
+              SELECT 1 FROM identity.agent_managers m
+              WHERE m.agent_user_id=k.user_id AND m.manager_type='human' AND m.manager_user_id=$2
+          )
+        """);
+    command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(managerId);
+    return await command.ExecuteNonQueryAsync() == 0 ? Results.Problem("not_found", statusCode: 404) : Results.NoContent();
+})
+.RequireAuthorization()
+.Produces(204).ProducesProblem(401).ProducesProblem(404);
 
 app.MapPost("/internal/auth/api-key/token", async (ApiKeyTokenRequest input, NpgsqlDataSource db) =>
 {
     byte[] raw; try { raw = Convert.FromBase64String(input.ApiKey); } catch { return Results.Unauthorized(); }
-    await using var command = db.CreateCommand("""
-        SELECT u.id,u.email,u.display_name,u.timezone,u.journal_day_rollover,u.base_currency,u.role,u.account_type,u.status,u.status_version,k.scopes
+    if (raw.Length != 32) return Results.Unauthorized();
+    await using var connection = await db.OpenConnectionAsync(); await using var tx = await connection.BeginTransactionAsync();
+    await using var command = new NpgsqlCommand("""
+        SELECT u.id,u.email,u.display_name,u.timezone,u.journal_day_rollover,u.base_currency,u.role,u.account_type,u.status,u.status_version,
+               k.scopes,k.id,k.revoked_at,k.expires_at
         FROM identity.api_keys k JOIN identity.users u ON u.id=k.user_id
-        WHERE k.key_hash=$1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at>now()) AND u.status='active'
-        """); command.Parameters.AddWithValue(SHA256.HashData(raw)); await using var reader = await command.ExecuteReaderAsync(); if (!await reader.ReadAsync()) return Results.Unauthorized();
-    var user = ReadUser(reader); var scopes = reader.GetFieldValue<string[]>(10); return Results.Ok(new ApiKeyTokenResponse(IdentityAccessTokenIssuer.Create(user, signingKey, issuer, audience, scopes), DateTime.UtcNow.AddMinutes(15)));
+        WHERE k.key_hash=$1
+        FOR UPDATE
+        """, connection, tx);
+    command.Parameters.AddWithValue(SHA256.HashData(raw));
+    await using var reader = await command.ExecuteReaderAsync();
+    if (!await reader.ReadAsync()) return Results.Unauthorized();
+    var user = ReadUser(reader); var scopes = reader.GetFieldValue<string[]>(10); var keyId = reader.GetGuid(11);
+    var valid = reader.IsDBNull(12) && (reader.IsDBNull(13) || Utc(reader.GetDateTime(13)) > DateTime.UtcNow) && user.Status == "active";
+    await reader.CloseAsync();
+    await using var usage = new NpgsqlCommand("""
+        UPDATE identity.api_keys
+        SET last_used_at=now(),last_successful_request_at=CASE WHEN $2 THEN now() ELSE last_successful_request_at END
+        WHERE id=$1
+        """, connection, tx);
+    usage.Parameters.AddWithValue(keyId); usage.Parameters.AddWithValue(valid); await usage.ExecuteNonQueryAsync();
+    await tx.CommitAsync();
+    return valid
+        ? Results.Ok(new ApiKeyTokenResponse(IdentityAccessTokenIssuer.Create(user, signingKey, issuer, audience, scopes), DateTime.UtcNow.AddMinutes(15)))
+        : Results.Unauthorized();
 })
 .AllowAnonymous()
 .Produces<ApiKeyTokenResponse>(200).ProducesProblem(401);
@@ -246,6 +371,84 @@ app.MapPut("/internal/auth/settings", async (UserSettingsWrite input, ClaimsPrin
 })
 .RequireAuthorization()
 .Produces<UserSettingsResponse>(200).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
+
+app.MapGet("/internal/auth/account-export", async (ClaimsPrincipal principal, NpgsqlDataSource db) =>
+{
+    if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var userId)) return Results.Unauthorized();
+    await using var user = db.CreateCommand("""
+        SELECT id,email,display_name,timezone,journal_day_rollover,base_currency,appearance,locale,accent_theme,created_at,updated_at
+        FROM identity.users WHERE id=$1 AND status='active' AND account_type='human'
+        """);
+    user.Parameters.AddWithValue(userId);
+    await using var reader = await user.ExecuteReaderAsync();
+    if (!await reader.ReadAsync()) return Results.Problem("not_found", statusCode: 404);
+    var profile = new AccountProfileExport(
+        reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+        reader.GetFieldValue<TimeOnly>(4).ToString("HH:mm"), reader.GetString(5).Trim(),
+        reader.GetString(6), reader.GetString(7), reader.GetString(8),
+        Utc(reader.GetDateTime(9)), Utc(reader.GetDateTime(10)));
+    await reader.CloseAsync();
+    await using var agents = db.CreateCommand("""
+        SELECT u.id,u.display_name,u.timezone,u.base_currency,u.created_at,
+               k.id,k.name,k.scopes,k.created_at,k.revoked_at,k.last_used_at,k.last_successful_request_at
+        FROM identity.agent_managers m
+        JOIN identity.users u ON u.id=m.agent_user_id
+        LEFT JOIN identity.api_keys k ON k.user_id=u.id
+        WHERE m.manager_type='human' AND m.manager_user_id=$1
+        ORDER BY u.created_at,u.id,k.created_at,k.id
+        """);
+    agents.Parameters.AddWithValue(userId);
+    await using var agentReader = await agents.ExecuteReaderAsync();
+    var items = new List<AccountAgentExport>();
+    while (await agentReader.ReadAsync()) items.Add(new(
+        agentReader.GetGuid(0), agentReader.GetString(1), agentReader.GetString(2), agentReader.GetString(3).Trim(),
+        Utc(agentReader.GetDateTime(4)), agentReader.IsDBNull(5) ? null : agentReader.GetGuid(5),
+        agentReader.IsDBNull(6) ? null : agentReader.GetString(6),
+        agentReader.IsDBNull(7) ? [] : agentReader.GetFieldValue<string[]>(7),
+        agentReader.IsDBNull(8) ? null : Utc(agentReader.GetDateTime(8)),
+        agentReader.IsDBNull(9) ? null : Utc(agentReader.GetDateTime(9)),
+        agentReader.IsDBNull(10) ? null : Utc(agentReader.GetDateTime(10)),
+        agentReader.IsDBNull(11) ? null : Utc(agentReader.GetDateTime(11))));
+    return Results.Ok(new AccountIdentityExport(profile, items));
+})
+.RequireAuthorization()
+.Produces<AccountIdentityExport>(200).ProducesProblem(401).ProducesProblem(404);
+
+app.MapDelete("/internal/auth/account", async (
+    [FromBody] AccountDeletionRequest input, ClaimsPrincipal principal, NpgsqlDataSource db) =>
+{
+    if (!Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var userId)) return Results.Unauthorized();
+    if (input.Confirmation != "DELETE") return Results.Problem("confirmation_required", statusCode: 400);
+    await using var connection = await db.OpenConnectionAsync();
+    await using var tx = await connection.BeginTransactionAsync();
+    var ids = new List<Guid> { userId };
+    await using (var managed = new NpgsqlCommand("""
+        SELECT agent_user_id FROM identity.agent_managers
+        WHERE manager_type='human' AND manager_user_id=$1 FOR UPDATE
+        """, connection, tx))
+    {
+        managed.Parameters.AddWithValue(userId);
+        await using var reader = await managed.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) ids.Add(reader.GetGuid(0));
+    }
+    foreach (var sql in new[]
+    {
+        "DELETE FROM identity.api_keys WHERE user_id=ANY($1) OR created_by=ANY($1)",
+        "DELETE FROM identity.refresh_tokens WHERE user_id=ANY($1)",
+        "DELETE FROM identity.agent_managers WHERE agent_user_id=ANY($1) OR manager_user_id=ANY($1)",
+        "DELETE FROM identity.user_credentials WHERE user_id=ANY($1)",
+        "DELETE FROM identity.users WHERE id=ANY($1)",
+    })
+    {
+        await using var command = new NpgsqlCommand(sql, connection, tx);
+        command.Parameters.AddWithValue(ids.ToArray());
+        await command.ExecuteNonQueryAsync();
+    }
+    await tx.CommitAsync();
+    return Results.NoContent();
+})
+.RequireAuthorization()
+.Produces(204).ProducesProblem(400).ProducesProblem(401);
 
 // Explicit Identity contract for display names. Callers must already know the user IDs
 // (e.g. from Partner links). Does not expose email or allow search.
@@ -440,6 +643,21 @@ static bool ContainsControlCharacters(string value)
     return false;
 }
 
+static bool ValidAgentScopes(List<string>? scopes) =>
+    scopes is { Count: > 0 }
+    && scopes.Distinct().Count() == scopes.Count
+    && scopes.All(scope => scope is "journal:read" or "journal:write" or "agent:read");
+
+static bool HasServiceKey(HttpContext context, IConfiguration configuration)
+{
+    var supplied = Encoding.UTF8.GetBytes(context.Request.Headers["X-Service-Key"].ToString());
+    var expected = Encoding.UTF8.GetBytes(configuration["Internal:ServiceKey"] ?? "");
+    return expected.Length > 0 && supplied.Length == expected.Length
+        && CryptographicOperations.FixedTimeEquals(supplied, expected);
+}
+
+static DateTime Utc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
 static List<Guid> ParseUserIds(string? ids)
 {
     var result = new List<Guid>();
@@ -464,15 +682,22 @@ record RegisterRequest(string Email, string Password, string DisplayName, string
 record LoginRequest(string Email, string Password);
 record RefreshRequest(string RefreshToken);
 record AgentRequest(string Name, string DisplayName, string Timezone, string BaseCurrency, List<string> Scopes, DateTime? ExpiresAt);
+record AgentTokenRequest(List<string> Scopes);
 record ApiKeyTokenRequest(string ApiKey);
 record AuthUser(Guid Id, string Email, string DisplayName, string Timezone, string JournalDayRollover, string BaseCurrency, string Role, string AccountType, string Status, int StatusVersion, string Appearance = "system", string Locale = "en", string AccentTheme = "green");
 record AuthTokens(string AccessToken, DateTime ExpiresAt, string RefreshToken);
 record RegisterResponse(Guid Id, string Email, string DisplayName, string Timezone, string BaseCurrency);
-record AgentResponse(Guid UserId, Guid KeyId, string ApiKey, List<string> Scopes);
+record AgentProvisionResponse(Guid UserId, string DisplayName, Guid KeyId, string ApiToken, List<string> Scopes, DateTime CreatedAt, DateTime? LastUsedAt, DateTime? LastSuccessfulRequestAt);
+record AgentManagementResponse(Guid UserId, string DisplayName, string Timezone, string BaseCurrency, Guid? KeyId, IReadOnlyList<string> Scopes, DateTime? TokenCreatedAt, DateTime? LastUsedAt, DateTime? LastSuccessfulRequestAt);
+record AgentTokenResponse(Guid KeyId, string ApiToken, List<string> Scopes, DateTime CreatedAt);
 record ApiKeyTokenResponse(string AccessToken, DateTime ExpiresAt);
 record SsoProvidersResponse(string[] EnabledProviders);
 record UserSettingsResponse(string Email, string DisplayName, string Timezone, string JournalDayRollover, string BaseCurrency, string Appearance, string Locale, string AccentTheme, DateTime UpdatedAt);
 record UserSettingsWrite(string DisplayName, string Timezone, string JournalDayRollover, string BaseCurrency, string Appearance, string Locale, string AccentTheme);
+record AccountDeletionRequest(string Confirmation);
+record AccountProfileExport(Guid Id, string Email, string DisplayName, string Timezone, string JournalDayRollover, string BaseCurrency, string Appearance, string Locale, string AccentTheme, DateTime CreatedAt, DateTime UpdatedAt);
+record AccountAgentExport(Guid UserId, string DisplayName, string Timezone, string BaseCurrency, DateTime CreatedAt, Guid? KeyId, string? KeyName, IReadOnlyList<string> Scopes, DateTime? TokenCreatedAt, DateTime? RevokedAt, DateTime? LastUsedAt, DateTime? LastSuccessfulRequestAt);
+record AccountIdentityExport(AccountProfileExport Profile, IReadOnlyList<AccountAgentExport> Agents);
 record DisplayNameItem(Guid UserId, string? DisplayName);
 record CollectionResponse<T>(List<T> Items);
 

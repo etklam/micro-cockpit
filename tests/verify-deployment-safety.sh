@@ -23,7 +23,7 @@ grep -q 'cancel-in-progress: false' "$workflow"
 ! grep -Eq 'DEPLOY_USER:[[:space:]]*root|DEPLOY_HOST:[[:space:]]*[0-9]' "$workflow"
 grep -q 'image="\${IMAGE_BASE}/\${name}:\${IMAGE_TAG}"' "$workflow"
 ! grep -q ':latest' "$repo/k8s/06-services.yaml"
-[ "$(grep -c ':REQUIRED_IMAGE_TAG$' "$repo/k8s/06-services.yaml")" -eq 15 ]
+[ "$(grep -c ':REQUIRED_IMAGE_TAG$' "$repo/k8s/06-services.yaml")" -eq 6 ]
 
 if DEPLOY_HOST=host DEPLOY_USER=user DEPLOY_SSH_KEY=key DEPLOY_KNOWN_HOSTS= \
   "$repo/scripts/validate-deploy-ssh-inputs.sh" >/dev/null 2>&1; then
@@ -71,7 +71,7 @@ PATH="$tmp/bin:$PATH" REAL_KUBECTL="$real_kubectl" TEST_RENDERED="$tmp/rendered.
   "$repo/scripts/deploy-k8s-release.sh" --namespace micro-cockpit \
     --image-registry "$registry" --image-tag "$tag" >/dev/null
 
-[ "$(grep -c "image: ${registry}/.*:${tag}$" "$tmp/rendered.yaml")" -eq 15 ]
+[ "$(grep -c "image: ${registry}/.*:${tag}$" "$tmp/rendered.yaml")" -eq 6 ]
 ! grep -q 'image: .*:latest' "$tmp/rendered.yaml"
 grep -q "micro-cockpit/deployed-sha: ${tag}" "$tmp/rendered.yaml"
 

@@ -145,6 +145,66 @@
       "id": "0029",
       "filename": "0029_expectations.sql",
       "sha256": "bc161bfe35c1c8d8e5220fa3b0bdd7db79c091f8d7c3c06af5f16221b0595957"
+    },
+    {
+      "id": "0030",
+      "filename": "0030_expectation_reviews.sql",
+      "sha256": "96f48e9d2dd3d9e076ae33ecdab1b34750007dafb98e1185967dd10ff4806744"
+    },
+    {
+      "id": "0031",
+      "filename": "0031_action_decisions_trades.sql",
+      "sha256": "30fa0ac3746ecf0185e5012af68a837740cab31f60910635394087d53048d84c"
+    },
+    {
+      "id": "0032",
+      "filename": "0032_watchlist.sql",
+      "sha256": "ad38ca5f177d7a04f161814456f2cd7577517b474b4c1baa584220392b5fb4f4"
+    },
+    {
+      "id": "0033",
+      "filename": "0033_pattern_review_discipline_principles.sql",
+      "sha256": "008fa7a213f71ad8884e72f6c2b72f9e5922910c936a09c32f6af09ddc1ec17e"
+    },
+    {
+      "id": "0034",
+      "filename": "0034_market_daily_close_adjustments.sql",
+      "sha256": "68301abb5e7807a7d495de55aafb6533c87a7b7c1ec2411218e46836536b8f3a"
+    },
+    {
+      "id": "0035",
+      "filename": "0035_agent_users_tokens.sql",
+      "sha256": "9c10a954edc15c82c4bde70dc7970ba465c643e7845803efa21b44e7ffd42558"
+    },
+    {
+      "id": "0036",
+      "filename": "0036_agent_access_grants.sql",
+      "sha256": "47082bbed35cb378fa933fe906f2d4c1d19530695128b75b16c12e075146d34e"
+    },
+    {
+      "id": "0037",
+      "filename": "0037_incremental_record_changes.sql",
+      "sha256": "b1c5f70d5397f17dba3428a011c0c32c02a70c4fd93b338b58814371ab212d92"
+    },
+    {
+      "id": "0038",
+      "filename": "0038_record_deletion_consumer.sql",
+      "sha256": "22d9d33b3b50eb09e3d85f6591788c34d5b98e9bdf1cb4fc3e2df9fab65343ad"
+    },
+    {
+      "id": "0039",
+      "filename": "0039_retire_legacy_journal_outbox.sql",
+      "sha256": "b6112d8d50de9e411bca247bc9b9018da68b51455e47379e2effbe1b588945e2"
+    },
+    {
+      "id": "0040",
+      "filename": "0040_retire_legacy_reminder_event_tables.sql",
+      "sha256": "5ed7139937eeefead38f606bedcf1fcc0017c695c5701fea6ff5b1e5aa1eeede"
+    },
+    {
+      "id": "0041",
+      "filename": "0041_market_observation_cutover.sql",
+      "sha256": "d2db914ba6649066d4c738fd63969e927ac57a51cd83c5fa838a9716aa471ff0"
     }
   ]
 }

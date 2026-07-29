@@ -21,7 +21,14 @@ internal static class AuthenticationEndpoints
             .AllowAnonymous()
             .RequireRateLimiting(AuthRateLimiting.Login)
             .LimitAuthBody();
-        EdgeTransport.MapProxy(app, "/api/app/agents", "identity", "/internal/auth/agents", [HttpMethods.Post]);
+        EdgeTransport.MapProxy(app, "/api/app/agents", "identity", "/internal/auth/agents", [HttpMethods.Get, HttpMethods.Post]);
+        EdgeTransport.MapProxy(app, "/api/app/agents/{id:guid}/token", "identity", "/internal/auth/agents/{id}/token", [HttpMethods.Post, HttpMethods.Delete], preserveErrorBody: true);
+        EdgeTransport.MapProxy(app, "/api/app/access-grants", "journal", "/internal/access-grants", [HttpMethods.Get, HttpMethods.Post], preserveErrorBody: true);
+        EdgeTransport.MapProxy(app, "/api/app/access-grants/{id:guid}", "journal", "/internal/access-grants/{id}", [HttpMethods.Delete], preserveErrorBody: true);
+        EdgeTransport.MapProxy(app, "/api/agent/journal-records", "journal", "/internal/agent/granted-records", [HttpMethods.Get], preserveErrorBody: true)
+            .RequireAuthorization(TradeDiary.Authorization.TradeDiaryPolicies.AgentRead);
+        EdgeTransport.MapProxy(app, "/api/agent/journal-changes", "journal", "/internal/agent/journal-changes", [HttpMethods.Get], preserveErrorBody: true)
+            .RequireAuthorization(TradeDiary.Authorization.TradeDiaryPolicies.AgentRead);
         EdgeTransport.MapProxy(app, "/api/app/api-keys/{id:guid}", "identity", "/internal/auth/api-keys/{id}", [HttpMethods.Delete]);
     }
 

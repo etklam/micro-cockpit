@@ -5,11 +5,6 @@ import {
   accountMonthYear,
   utcToAccountDateTimeLocal,
 } from '../features/accountTime'
-import {
-  decodeDiaryReturnTo,
-  encodeDiaryReturnTo,
-  parseDiaryFilters,
-} from '../features/diaryFilters'
 
 describe('account time conversion', () => {
   test('UTC round-trip', () => {
@@ -58,27 +53,5 @@ describe('account time conversion', () => {
 
   test('month/year from account local date', () => {
     expect(accountMonthYear('2026-07-18')).toEqual({ year: 2026, month: 7 })
-  })
-})
-
-describe('diary filters normalization', () => {
-  test('blank tag is absent', () => {
-    const filters = parseDiaryFilters(new URLSearchParams('tag='))
-    expect(filters.tag).toBe('')
-  })
-
-  test('impossible dates are dropped', () => {
-    const filters = parseDiaryFilters(new URLSearchParams('from=2026-02-31&to=2026-13-01'))
-    expect(filters.from).toBe('')
-    expect(filters.to).toBe('')
-  })
-
-  test('returnTo encodes and only accepts diary search', () => {
-    const encoded = encodeDiaryReturnTo('symbol=AAPL&tag=fomo')
-    expect(decodeDiaryReturnTo(encoded)).toBe('symbol=AAPL&tag=fomo')
-    expect(decodeDiaryReturnTo(encodeURIComponent('https://evil.example/x'))).toBeNull()
-    // path outside /diary
-    const evil = btoa('/admin').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-    expect(decodeDiaryReturnTo(evil)).toBeNull()
   })
 })

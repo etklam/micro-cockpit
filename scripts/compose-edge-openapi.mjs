@@ -10,9 +10,7 @@ import { resolve } from 'node:path'
 const root = resolve(import.meta.dirname, '..')
 const docsDir = resolve(root, 'contracts/openapi')
 const serviceFiles = [
-  'identity-service', 'journal-service', 'performance-service', 'discipline-service',
-  'reminder-service', 'stock-research-service', 'market-data-service', 'price-alert-service',
-  'rotation-service', 'partner-service', 'content-service', 'tool-service', 'operations-service',
+  'identity-service', 'journal-service', 'market-data-service', 'tool-service',
 ]
 const docs = Object.fromEntries(serviceFiles.map((s) => [s, JSON.parse(readFileSync(resolve(docsDir, `${s}.openapi.json`), 'utf8'))]))
 const docFor = (svc) => docs[`${svc}-service`] // every Edge alias maps to `<alias>-service`
@@ -27,7 +25,7 @@ const norm = (p) => p.replace(/\{([^}:]+):[^}]+\}/g, '{$1}')
 // Structural form ignores param NAMES so e.g. Edge's {symbol} matches the service's {raw}.
 const struct = (p) => p.replace(/\{[^}]+\}/g, '{_}')
 const pathParams = (p) => (p.match(/\{([^}]+)\}/g) || []).map((x) => x.slice(1, -1))
-const ANON_PUBLIC = (p) => p.startsWith('/api/content/') || ['/api/auth/register', '/api/auth/login', '/api/auth/refresh', '/api/auth/logout', '/api/auth/api-key/token'].includes(p)
+const ANON_PUBLIC = (p) => ['/api/auth/register', '/api/auth/login', '/api/auth/refresh', '/api/auth/logout', '/api/auth/api-key/token'].includes(p)
 // Deterministic operationId from public method+path so the generated client has stable names
 // (matches the prior contract's naming, e.g. postApiAppDiaries, putApiAppDiariesId).
 const opId = (method, path) => `${method}_${path}`.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
@@ -52,13 +50,6 @@ for (const m of edgeSource.matchAll(/MapProxy\(app,\s*"([^"]+)",\s*"([\w-]+)",\s
 // next app.Map route. Aggregations/auth have no Forward() and are skipped.
 const fwdRe = /app\.Map(Get|Post|Put|Patch|Delete)\(\s*"([^"]+)"(?:(?!app\.Map).)*?\bForward(?:NoBody)?\(\s*clients,\s*"([\w-]+)",\s*\$?"([^"]+)"/gs
 for (const m of edgeSource.matchAll(fwdRe)) routes.push({ pub: norm(m[2]), method: m[1].toLowerCase(), svc: m[3], internal: norm(m[4]) })
-routes.push(
-  { pub: '/api/app/diaries/{diaryId}/review', method: 'get', svc: 'journal', internal: '/internal/diaries/{diaryId}/review' },
-  { pub: '/api/app/diaries/{diaryId}/review', method: 'put', svc: 'journal', internal: '/internal/diaries/{diaryId}/review' },
-  { pub: '/api/app/diary-review-summary', method: 'get', svc: 'journal', internal: '/internal/diary-review-summary' },
-  { pub: '/api/app/diary-review-items', method: 'get', svc: 'journal', internal: '/internal/diary-review-items' },
-  { pub: '/api/app/rotation/monitor', method: 'get', svc: 'rotation', internal: '/internal/rotation/monitor' },
-)
 
 // --- schema collection ------------------------------------------------------
 const collected = new Map()
@@ -124,55 +115,17 @@ for (const r of routes) {
   ;(paths[r.pub] ??= {})[r.method] = op
 }
 
-// --- aggregation endpoints (Edge-owned shapes referencing service schemas) --
-const perfDay = refName(successSchemaByStruct(docFor('performance'), '/internal/performance/day/{date}', 'get'))
-const monthSummary = refName(successSchemaByStruct(docFor('performance'), '/internal/performance/month-summary', 'get'))
-const diaryItem = collectionItemName(docFor('journal'), '/internal/diaries', 'get')
-const discipline = refName(successSchemaByStruct(docFor('discipline'), '/internal/disciplines/today', 'get'))
-const stock = refName(successSchemaByStruct(docFor('stock-research'), '/internal/stocks/{symbol}', 'get'))
-const bars = refName(successSchemaByStruct(docFor('market-data'), '/internal/v1/bars/{symbol}', 'get'))
-collectFromObj({ $ref: `#/components/schemas/${perfDay}` }, docFor('performance'))
-collectFromObj({ $ref: `#/components/schemas/${monthSummary}` }, docFor('performance'))
-if (diaryItem) collectFromObj({ $ref: `#/components/schemas/${diaryItem}` }, docFor('journal'))
-if (discipline) collectFromObj({ $ref: `#/components/schemas/${discipline}` }, docFor('discipline'))
-if (stock) collectFromObj({ $ref: `#/components/schemas/${stock}` }, docFor('stock-research'))
-if (bars) collectFromObj({ $ref: `#/components/schemas/${bars}` }, docFor('market-data'))
-
+// --- Edge-owned response shapes ---------------------------------------------
 const ref = (n) => (n ? { $ref: `#/components/schemas/${n}` } : {})
-const capability = { $ref: '#/components/schemas/CapabilityStatus' }
-const dashboardSchema = {
-  type: 'object', required: ['localDate', 'diary', 'performance', 'pendingAlerts', 'discipline', 'recentDiaries', 'capabilities'],
-  properties: {
-    localDate: { type: 'string' },
-    diary: { type: 'object', required: ['writtenToday', 'count'], properties: { writtenToday: { type: 'boolean' }, count: { type: 'integer' } } },
-    performance: perfDay ? { oneOf: [ref(perfDay), { type: 'null' }] } : { type: 'null' },
-    pendingAlerts: { type: ['integer', 'null'] },
-    discipline: discipline ? { oneOf: [ref(discipline), { type: 'null' }] } : { type: 'null' },
-    recentDiaries: diaryItem ? { type: 'array', items: ref(diaryItem) } : { type: 'array', items: {} },
-    capabilities: { type: 'object', required: ['alerts', 'discipline'], properties: { alerts: capability, discipline: capability } },
-  },
-}
 const calendarSchema = {
-  type: 'object', required: ['year', 'month', 'summary', 'days', 'capabilities'],
+  type: "object", required: ["year", "month", "days"],
   properties: {
-    year: { type: 'integer' }, month: { type: 'integer' },
-    summary: monthSummary ? { oneOf: [ref(monthSummary), { type: 'null' }] } : { type: 'null' },
-    days: { type: 'array', items: { type: 'object', required: ['date', 'performance', 'diaryCount', 'transactionCount', 'alertCount', 'marketObservationId', 'updateCount', 'readyForReviewCount'], properties: {
-      date: { type: 'string', format: 'date' },
-      performance: perfDay ? { oneOf: [ref(perfDay), { type: 'null' }] } : { type: 'null' },
-      diaryCount: { type: 'integer' }, transactionCount: { type: 'integer' }, alertCount: { type: ['integer', 'null'] },
-      marketObservationId: { type: ['string', 'null'], format: 'uuid' },
-      updateCount: { type: 'integer' }, readyForReviewCount: { type: ['integer', 'null'] },
+    year: { type: "integer" }, month: { type: "integer" },
+    days: { type: "array", items: { type: "object", required: ["date", "marketObservationId", "updateCount", "readyForReviewCount"], properties: {
+      date: { type: "string", format: "date" },
+      marketObservationId: { type: ["string", "null"], format: "uuid" },
+      updateCount: { type: "integer" }, readyForReviewCount: { type: ["integer", "null"] },
     } } },
-    capabilities: { type: 'object', required: ['alerts'], properties: { alerts: capability } },
-  },
-}
-const stockPageSchema = {
-  type: 'object', required: ['stock', 'bars', 'capabilities'],
-  properties: {
-    stock: stock ? ref(stock) : {},
-    bars: bars ? { oneOf: [ref(bars), { type: 'null' }] } : { type: 'null' },
-    capabilities: { type: 'object', required: ['marketData'], properties: { marketData: capability } },
   },
 }
 const bootstrapSchema = {
@@ -189,14 +142,27 @@ const bootstrapSchema = {
     availableProductAreas: { type: 'array', items: { type: 'string' } },
   },
 }
-collected.set('CapabilityStatus', { type: 'string', enum: ['available', 'empty', 'unavailable'] })
 collected.set('AppBootstrapResponse', bootstrapSchema)
-collected.set('DashboardResponse', dashboardSchema)
 collected.set('CalendarResponse', calendarSchema)
-collected.set('StockPageResponse', stockPageSchema)
 // Settings: Edge forwards Identity's UserSettingsResponse/Write 1:1.
 collectFromObj({ $ref: '#/components/schemas/UserSettingsResponse' }, docFor('identity'))
 collectFromObj({ $ref: '#/components/schemas/UserSettingsWrite' }, docFor('identity'))
+collected.set('AccountExportResponse', {
+  type: 'object',
+  required: ['schemaVersion', 'exportedAt', 'identity', 'journal', 'tools'],
+  properties: {
+    schemaVersion: { type: 'integer' },
+    exportedAt: { type: 'string', format: 'date-time' },
+    identity: { type: 'object', additionalProperties: true },
+    journal: { type: 'object', additionalProperties: true },
+    tools: { type: 'object', additionalProperties: true },
+  },
+})
+collected.set('AccountDeletionWrite', {
+  type: 'object',
+  required: ['confirmation'],
+  properties: { confirmation: { type: 'string' } },
+})
 collected.set('EdgeProblemDetails', {
   type: 'object', required: ['code', 'title', 'status', 'detail', 'correlationId'],
   properties: { code: { type: 'string' }, title: { type: 'string' }, status: { type: 'integer' }, detail: { type: 'string' }, correlationId: { type: 'string' } },
@@ -222,113 +188,12 @@ const agg = (path, schema, parameters = []) => ({
   },
 })
 const intParam = (name) => ({ name, in: 'query', required: true, schema: { type: 'integer' } })
-const strPathParam = (name) => ({ name, in: 'path', required: true, schema: { type: 'string' } })
-// Partner compare is Edge-owned composition (Partner summary + Journal diaries).
-collected.set('PartnerDiaryCapability', { type: 'string', enum: ['available', 'not_shared', 'unavailable'] })
-collected.set('PartnerCompareDiaryItem', {
-  type: 'object',
-  required: ['id', 'localDate', 'title', 'content', 'tags'],
-  properties: {
-    id: { type: 'string', format: 'uuid' },
-    localDate: { type: 'string', format: 'date' },
-    title: { type: 'string' },
-    content: { type: 'string' },
-    tags: { type: 'array', items: { type: 'string' } },
-  },
-})
-collected.set('PartnerCompareDayResponse', {
-  type: 'object',
-  required: ['localDate', 'mine', 'partner'],
-  properties: {
-    localDate: { type: 'string', format: 'date' },
-    mine: { type: 'array', items: { $ref: '#/components/schemas/PartnerCompareDiaryItem' } },
-    partner: { type: 'array', items: { $ref: '#/components/schemas/PartnerCompareDiaryItem' } },
-  },
-})
-collected.set('PartnerCompareCapabilitiesResponse', {
-  type: 'object',
-  required: ['partnerDiaries'],
-  properties: { partnerDiaries: { $ref: '#/components/schemas/PartnerDiaryCapability' } },
-})
-collected.set('PartnerCompareResponse', {
-  type: 'object',
-  required: ['linkId', 'partnerDisplayName', 'from', 'to', 'days', 'capabilities'],
-  properties: {
-    linkId: { type: 'string', format: 'uuid' },
-    partnerDisplayName: { type: ['string', 'null'] },
-    from: { type: 'string', format: 'date' },
-    to: { type: 'string', format: 'date' },
-    days: { type: 'array', items: { $ref: '#/components/schemas/PartnerCompareDayResponse' } },
-    capabilities: { $ref: '#/components/schemas/PartnerCompareCapabilitiesResponse' },
-  },
-})
-// Browser partner DTOs: no raw partner user IDs (OtherUserId stays internal-only).
-collected.set('PartnerLinkBrowserResponse', {
-  type: 'object',
-  required: ['id', 'partnerType', 'status', 'createdAt', 'updatedAt', 'acceptedAt', 'initiatedByMe', 'myShareDiaries', 'partnerShareDiaries', 'partnerDisplayName'],
-  properties: {
-    id: { type: 'string', format: 'uuid' },
-    partnerType: { type: 'string' },
-    status: { type: 'string' },
-    createdAt: { type: 'string', format: 'date-time' },
-    updatedAt: { type: 'string', format: 'date-time' },
-    acceptedAt: { type: ['string', 'null'], format: 'date-time' },
-    initiatedByMe: { type: 'boolean' },
-    myShareDiaries: { type: 'boolean' },
-    partnerShareDiaries: { type: 'boolean' },
-    partnerDisplayName: { type: ['string', 'null'] },
-  },
-})
-collected.set('PartnerLinkBrowserCollectionResponse', {
-  type: 'object',
-  required: ['items'],
-  properties: { items: { type: 'array', items: { $ref: '#/components/schemas/PartnerLinkBrowserResponse' } } },
-})
-
-const dateQuery = (name, required = false) => ({ name, in: 'query', required, schema: { type: 'string', format: 'date' } })
 Object.assign(paths,
   agg('/api/app/bootstrap', 'AppBootstrapResponse'),
-  agg('/api/app/dashboard', 'DashboardResponse'),
   agg('/api/app/calendar', 'CalendarResponse', [intParam('year'), intParam('month')]),
-  agg('/api/app/stocks/{symbol}/page', 'StockPageResponse', [strPathParam('symbol')]),
-  agg('/api/app/partners/{linkId}/compare', 'PartnerCompareResponse', [
-    { name: 'linkId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
-    dateQuery('from'),
-    dateQuery('to'),
-  ]),
 )
 // Settings endpoints (typed forwarders, not MapProxy) — declared explicitly.
 Object.assign(paths, {
-  '/api/app/partners': {
-    get: {
-      operationId: opId('get', '/api/app/partners'),
-      summary: 'List partner links (browser DTO, no raw user IDs)',
-      security: [{ bearerAuth: [] }],
-      responses: {
-        200: { description: 'Success', content: { 'application/json': { schema: { $ref: '#/components/schemas/PartnerLinkBrowserCollectionResponse' } } } },
-        401: { $ref: '#/components/responses/Problem' },
-        502: { $ref: '#/components/responses/Problem' },
-        503: { $ref: '#/components/responses/Problem' },
-        504: { $ref: '#/components/responses/Problem' },
-      },
-    },
-  },
-  '/api/app/partners/{id}/summary': {
-    get: {
-      operationId: opId('get', '/api/app/partners/{id}/summary'),
-      summary: 'Partner link summary (browser DTO, no raw user IDs)',
-      security: [{ bearerAuth: [] }],
-      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
-      responses: {
-        200: { description: 'Success', content: { 'application/json': { schema: { $ref: '#/components/schemas/PartnerLinkBrowserResponse' } } } },
-        401: { $ref: '#/components/responses/Problem' },
-        404: { $ref: '#/components/responses/Problem' },
-        502: { $ref: '#/components/responses/Problem' },
-        503: { $ref: '#/components/responses/Problem' },
-        504: { $ref: '#/components/responses/Problem' },
-      },
-    },
-  },
   '/api/app/settings': {
     get: {
       operationId: opId('get', '/api/app/settings'),
@@ -353,6 +218,36 @@ Object.assign(paths, {
         400: { $ref: '#/components/responses/Problem' },
         401: { $ref: '#/components/responses/Problem' },
         404: { $ref: '#/components/responses/Problem' },
+        502: { $ref: '#/components/responses/Problem' },
+        503: { $ref: '#/components/responses/Problem' },
+        504: { $ref: '#/components/responses/Problem' },
+      },
+    },
+  },
+  '/api/app/account-export': {
+    get: {
+      operationId: opId('get', '/api/app/account-export'),
+      summary: 'Export all first-version account data',
+      security: [{ bearerAuth: [] }],
+      responses: {
+        200: { description: 'Success', content: { 'application/json': { schema: { $ref: '#/components/schemas/AccountExportResponse' } } } },
+        401: { $ref: '#/components/responses/Problem' },
+        502: { $ref: '#/components/responses/Problem' },
+        503: { $ref: '#/components/responses/Problem' },
+        504: { $ref: '#/components/responses/Problem' },
+      },
+    },
+  },
+  '/api/app/account': {
+    delete: {
+      operationId: opId('delete', '/api/app/account'),
+      summary: 'Permanently delete the account and owned data',
+      security: [{ bearerAuth: [] }],
+      requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/AccountDeletionWrite' } } } },
+      responses: {
+        204: { description: 'No content' },
+        400: { $ref: '#/components/responses/Problem' },
+        401: { $ref: '#/components/responses/Problem' },
         502: { $ref: '#/components/responses/Problem' },
         503: { $ref: '#/components/responses/Problem' },
         504: { $ref: '#/components/responses/Problem' },

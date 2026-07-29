@@ -37,10 +37,11 @@ static class ExpectationRules
         var deadline = DateTime.SpecifyKind(reader.GetDateTime(5), DateTimeKind.Utc);
         DateTime? invalidatedAt = reader.IsDBNull(9) ? null : DateTime.SpecifyKind(reader.GetDateTime(9), DateTimeKind.Utc);
         var elapsed = deadline <= now.UtcDateTime;
+        var reviewed = reader.FieldCount > 12 && reader.GetBoolean(12);
         return new(
             reader.GetGuid(0), reader.GetGuid(1), reader.GetGuid(2), reader.GetFieldValue<DateOnly>(3), reader.GetString(4), deadline,
             reader.GetString(6), Enum.Parse<ExpectationConfidence>(reader.GetString(7)), reader.GetString(8), invalidatedAt,
-            invalidatedAt is not null || elapsed ? ExpectationReadiness.ready_for_review : ExpectationReadiness.active,
+            reviewed ? ExpectationReadiness.reviewed : invalidatedAt is not null || elapsed ? ExpectationReadiness.ready_for_review : ExpectationReadiness.active,
             elapsed, DateTime.SpecifyKind(reader.GetDateTime(10), DateTimeKind.Utc), DateTime.SpecifyKind(reader.GetDateTime(11), DateTimeKind.Utc));
     }
 

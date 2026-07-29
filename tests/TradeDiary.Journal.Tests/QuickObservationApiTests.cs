@@ -6,6 +6,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -109,7 +110,11 @@ public sealed class QuickObservationApiTests
         Assert.Equal(new[] { "breadth", "closing session" }, update.GetProperty("tags").EnumerateArray().Select(x => x.GetString()).ToArray());
         Assert.Equal(instrumentId, update.GetProperty("primarySubject").GetProperty("instrumentId").GetGuid());
         Assert.True(update.GetProperty("primarySubject").GetProperty("dailyCloseAvailable").GetBoolean());
+        Assert.Equal("available", update.GetProperty("primarySubject").GetProperty("dailyCloseStatus").GetString());
+        Assert.Equal(100m, update.GetProperty("primarySubject").GetProperty("dailyClose").GetProperty("rawClose").GetDecimal());
+        Assert.Equal(50m, update.GetProperty("primarySubject").GetProperty("dailyClose").GetProperty("adjustedClose").GetDecimal());
         Assert.False(update.GetProperty("relatedSubjects")[2].GetProperty("dailyCloseAvailable").GetBoolean());
+        Assert.Equal("unsupported", update.GetProperty("relatedSubjects")[2].GetProperty("dailyCloseStatus").GetString());
         Assert.Equal("https://example.com/market", update.GetProperty("evidence").GetProperty("url").GetString());
 
         using var unsupportedUs = await client.PutAsJsonAsync($"/internal/observation-updates/{updateId}", new
@@ -323,6 +328,292 @@ public sealed class QuickObservationApiTests
     }
 
     [Fact]
+    public async Task Owner_can_review_a_ready_expectation_with_system_and_custom_reasoning_labels()
+    {
+        await using var fixture = await Fixture.StartAsync(new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero));
+        var owner = Guid.NewGuid();
+        using var client = fixture.Client(owner);
+        using var observation = await Post(client, "Breadth is improving", "review-parent");
+        var updateId = (await observation.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("observationUpdateId").GetGuid();
+        using var created = await client.PostAsJsonAsync($"/internal/observation-updates/{updateId}/expectations", new
+        {
+            expectedBehavior = "Breadth should remain above 60%",
+            deadline = "2026-07-17T20:00:00Z",
+            invalidationCondition = "Breadth closes below 45%",
+            confidence = "medium",
+            market = "US",
+        });
+        var expectationId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        using var tooEarly = await client.PutAsJsonAsync($"/internal/expectations/{expectationId}/review", new
+        {
+            outcome = "confirmed",
+            reasoningQuality = "sound",
+        });
+        Assert.Equal(HttpStatusCode.Conflict, tooEarly.StatusCode);
+        await client.PostAsync($"/internal/expectations/{expectationId}/invalidate", null);
+
+        var available = await client.GetFromJsonAsync<JsonElement>("/internal/reasoning-labels");
+        Assert.Equal(12, available.GetProperty("items").GetArrayLength());
+        using var custom = await client.PostAsJsonAsync("/internal/reasoning-labels", new { kind = "issue", name = "Chased the opening move" });
+        Assert.Equal(HttpStatusCode.Created, custom.StatusCode);
+        var customId = (await custom.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        using var missingExplanation = await client.PutAsJsonAsync($"/internal/expectations/{expectationId}/review", new
+        {
+            outcome = "partially_confirmed",
+            reasoningQuality = "mixed",
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, missingExplanation.StatusCode);
+        Assert.Contains("explanation_required", await missingExplanation.Content.ReadAsStringAsync());
+
+        using var saved = await client.PutAsJsonAsync($"/internal/expectations/{expectationId}/review", new
+        {
+            outcome = "partially_confirmed",
+            reasoningQuality = "mixed",
+            explanation = "Breadth held, but leadership narrowed.",
+            systemIssueKeys = new[] { "insufficient_evidence" },
+            systemStrengthKeys = new[] { "clear_invalidation_condition" },
+            customLabelIds = new[] { customId },
+        });
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var review = await saved.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(3, review.GetProperty("labels").GetArrayLength());
+
+        var expectation = await client.GetFromJsonAsync<JsonElement>($"/internal/expectations/{expectationId}");
+        Assert.Equal("reviewed", expectation.GetProperty("readiness").GetString());
+        using var renamed = await client.PutAsJsonAsync($"/internal/reasoning-labels/{customId}", new { kind = "issue", name = "Opening move chased" });
+        Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
+        var afterRename = await client.GetFromJsonAsync<JsonElement>($"/internal/expectations/{expectationId}/review");
+        Assert.Contains(afterRename.GetProperty("labels").EnumerateArray(), label => label.GetProperty("name").GetString() == "Opening move chased");
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/internal/reasoning-labels/{customId}")).StatusCode);
+        var afterDelete = await client.GetFromJsonAsync<JsonElement>($"/internal/expectations/{expectationId}/review");
+        Assert.DoesNotContain(afterDelete.GetProperty("labels").EnumerateArray(), label => label.GetProperty("name").GetString() == "Opening move chased");
+        Assert.DoesNotContain((await client.GetFromJsonAsync<JsonElement>("/internal/reasoning-labels")).GetProperty("items").EnumerateArray(),
+            label => label.GetProperty("id").ValueKind != JsonValueKind.Null && label.GetProperty("id").GetGuid() == customId);
+
+        using var other = fixture.Client(Guid.NewGuid());
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync($"/internal/expectations/{expectationId}/review")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.PutAsJsonAsync($"/internal/expectations/{expectationId}/review", new
+        {
+            outcome = "confirmed",
+            reasoningQuality = "sound",
+        })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Owner_can_record_an_action_decision_execution_review_and_optional_trade_evidence()
+    {
+        await using var fixture = await Fixture.StartAsync(new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero));
+        var owner = Guid.NewGuid();
+        using var client = fixture.Client(owner);
+        using var observation = await Post(client, "Breadth is improving", "decision-parent");
+        var updateId = (await observation.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("observationUpdateId").GetGuid();
+        using var expectation = await client.PostAsJsonAsync($"/internal/observation-updates/{updateId}/expectations", new
+        {
+            expectedBehavior = "Breadth should remain above 60%",
+            deadline = "2026-07-17T20:00:00Z",
+            invalidationCondition = "Breadth closes below 45%",
+            confidence = "medium",
+            market = "US",
+        });
+        var expectationId = (await expectation.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        using var created = await client.PostAsJsonAsync($"/internal/observation-updates/{updateId}/action-decisions", new
+        {
+            intent = "avoid_trade",
+            reason = "Wait for breadth confirmation.",
+            expectationId,
+        });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var decision = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var decisionId = decision.GetProperty("id").GetGuid();
+        Assert.Equal("avoid_trade", decision.GetProperty("intent").GetString());
+        Assert.Equal(expectationId, decision.GetProperty("expectationId").GetGuid());
+        Assert.NotEqual(JsonValueKind.Null, decision.GetProperty("recordedAt").ValueKind);
+        Assert.False(decision.TryGetProperty("outcome", out _));
+        Assert.False(decision.TryGetProperty("pnl", out _));
+
+        using var edited = await client.PutAsJsonAsync($"/internal/action-decisions/{decisionId}", new
+        {
+            intent = "avoid_trade",
+            reason = "Waited for confirmation; no setup appeared.",
+            expectationId,
+            executionReview = "followed",
+        });
+        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+        var editBody = await edited.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(editBody.GetProperty("honestyReminderRequired").GetBoolean());
+        Assert.Equal("followed", editBody.GetProperty("executionReview").GetString());
+
+        using var trade = await client.PostAsJsonAsync($"/internal/action-decisions/{decisionId}/trades", new
+        {
+            symbol = " aapl ",
+            side = "buy",
+            quantity = 10,
+            price = 210.25m,
+            currency = "usd",
+            executedAt = "2026-07-14T13:00:00Z",
+            note = "Small evidence-only action",
+        });
+        Assert.Equal(HttpStatusCode.Created, trade.StatusCode);
+        var tradeBody = await trade.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("AAPL", tradeBody.GetProperty("symbol").GetString());
+        Assert.False(tradeBody.TryGetProperty("position", out _));
+        Assert.False(tradeBody.TryGetProperty("costBasis", out _));
+
+        using var other = fixture.Client(Guid.NewGuid());
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync($"/internal/action-decisions/{decisionId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.PutAsJsonAsync($"/internal/action-decisions/{decisionId}", new
+        {
+            intent = "trade",
+            reason = "stolen",
+        })).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/internal/action-decisions/{decisionId}")).StatusCode);
+        Assert.Empty((await client.GetFromJsonAsync<JsonElement>($"/internal/action-decisions/{decisionId}/trades")).GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Owner_can_manage_an_instrument_watchlist_and_short_note()
+    {
+        await using var fixture = await Fixture.StartAsync(new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero));
+        var owner = Guid.NewGuid();
+        using var client = fixture.Client(owner);
+
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsync($"/internal/watchlist/{KnownInstrumentId}", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync($"/internal/watchlist/{KnownInstrumentId}", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync($"/internal/watchlist/{Guid.NewGuid()}", null)).StatusCode);
+
+        using var note = await client.PutAsJsonAsync($"/internal/watchlist/{KnownInstrumentId}/note", new { note = " Watch while margins stabilize. " });
+        Assert.Equal(HttpStatusCode.OK, note.StatusCode);
+        Assert.Equal("Watch while margins stabilize.", (await note.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("note").GetString());
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync($"/internal/watchlist/{KnownInstrumentId}/note", new { note = new string('x', 501) })).StatusCode);
+
+        var list = await client.GetFromJsonAsync<JsonElement>("/internal/watchlist");
+        Assert.Single(list.GetProperty("items").EnumerateArray());
+        Assert.Equal(KnownInstrumentId, list.GetProperty("items")[0].GetProperty("instrumentId").GetGuid());
+        using var other = fixture.Client(Guid.NewGuid());
+        Assert.Empty((await other.GetFromJsonAsync<JsonElement>("/internal/watchlist")).GetProperty("items").EnumerateArray());
+        Assert.Equal(HttpStatusCode.NotFound, (await other.DeleteAsync($"/internal/watchlist/{KnownInstrumentId}")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/internal/watchlist/{KnownInstrumentId}")).StatusCode);
+        Assert.Empty((await client.GetFromJsonAsync<JsonElement>("/internal/watchlist")).GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task External_ingestion_can_read_the_expiring_tracked_us_instrument_set()
+    {
+        await using var fixture = await Fixture.StartAsync(new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero));
+        var owner = Guid.NewGuid();
+        using var client = fixture.Client(owner);
+        using var observation = await Post(client, "Apple breadth improved", "tracked-parent");
+        var updateId = (await observation.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("observationUpdateId").GetGuid();
+        using var enriched = await client.PutAsJsonAsync($"/internal/observation-updates/{updateId}", new
+        {
+            content = "Apple breadth improved",
+            primarySubject = new { type = "instrument", instrumentId = KnownInstrumentId, market = "US", symbol = "AAPL", displayName = "Apple Inc." },
+        });
+        Assert.Equal(HttpStatusCode.OK, enriched.StatusCode);
+
+        using var noKey = fixture.RawClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await noKey.GetAsync("/internal/v1/tracked-us-instruments")).StatusCode);
+        using var ingestion = fixture.ServiceClient();
+        var recent = await ingestion.GetFromJsonAsync<JsonElement>("/internal/v1/tracked-us-instruments");
+        Assert.Equal(1, recent.GetProperty("contractVersion").GetInt32());
+        Assert.Equal(KnownInstrumentId, recent.GetProperty("items")[0].GetProperty("instrumentId").GetGuid());
+
+        await fixture.SetUpdateRecordedAt(updateId, new DateTime(2026, 6, 1, 12, 0, 0, DateTimeKind.Utc));
+        Assert.Empty((await ingestion.GetFromJsonAsync<JsonElement>("/internal/v1/tracked-us-instruments")).GetProperty("items").EnumerateArray());
+
+        using var expectation = await client.PostAsJsonAsync($"/internal/observation-updates/{updateId}/expectations", new
+        {
+            expectedBehavior = "Apple holds its breakout",
+            deadline = "2026-07-17T20:00:00Z",
+            invalidationCondition = "Apple closes below support",
+            confidence = "medium",
+            market = "US",
+        });
+        Assert.Equal(HttpStatusCode.Created, expectation.StatusCode);
+        Assert.Single((await ingestion.GetFromJsonAsync<JsonElement>("/internal/v1/tracked-us-instruments")).GetProperty("items").EnumerateArray());
+
+        fixture.SetNow(new DateTimeOffset(2026, 7, 18, 12, 0, 0, TimeSpan.Zero));
+        Assert.Empty((await ingestion.GetFromJsonAsync<JsonElement>("/internal/v1/tracked-us-instruments")).GetProperty("items").EnumerateArray());
+
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsync($"/internal/watchlist/{KnownInstrumentId}", null)).StatusCode);
+        Assert.Single((await ingestion.GetFromJsonAsync<JsonElement>("/internal/v1/tracked-us-instruments")).GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Pattern_review_has_explicit_boundaries_evidence_and_manual_principle_selection()
+    {
+        await using var fixture = await Fixture.StartAsync(new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero));
+        var owner = Guid.NewGuid();
+        using var client = fixture.Client(owner);
+        using var observation = await Post(client, "Breadth is improving", "patterns-parent");
+        var updateId = (await observation.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("observationUpdateId").GetGuid();
+        using var created = await client.PostAsJsonAsync($"/internal/observation-updates/{updateId}/expectations", new
+        {
+            expectedBehavior = "Breadth should remain above 60%",
+            deadline = "2026-07-17T20:00:00Z",
+            invalidationCondition = "Breadth closes below 45%",
+            confidence = "medium",
+            market = "US",
+        });
+        var expectationId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        await client.PostAsync($"/internal/expectations/{expectationId}/invalidate", null);
+        using var review = await client.PutAsJsonAsync($"/internal/expectations/{expectationId}/review", new
+        {
+            outcome = "confirmed",
+            reasoningQuality = "sound",
+            systemIssueKeys = new[] { "insufficient_evidence" },
+        });
+        Assert.Equal(HttpStatusCode.OK, review.StatusCode);
+        await fixture.SetReviewCreatedAt(expectationId, new DateTime(2026, 7, 8, 0, 0, 0, DateTimeKind.Utc));
+
+        var weekly = await client.GetFromJsonAsync<JsonElement>("/internal/pattern-review?range=weekly");
+        Assert.Equal(1, weekly.GetProperty("reviewedExpectationCount").GetInt64());
+        var label = weekly.GetProperty("labels").EnumerateArray().Single(item => item.GetProperty("key").GetString() == "insufficient_evidence");
+        Assert.Equal(1, label.GetProperty("count").GetInt64());
+        Assert.Equal(1, label.GetProperty("denominator").GetInt64());
+        Assert.Equal(expectationId, label.GetProperty("evidence")[0].GetProperty("expectationId").GetGuid());
+
+        var boundary = await client.GetFromJsonAsync<JsonElement>("/internal/pattern-review?range=custom&from=2026-07-08&to=2026-07-08");
+        Assert.Equal(1, boundary.GetProperty("reviewedExpectationCount").GetInt64());
+        var empty = await client.GetFromJsonAsync<JsonElement>("/internal/pattern-review?range=custom&from=2026-07-09&to=2026-07-09");
+        Assert.Equal(0, empty.GetProperty("reviewedExpectationCount").GetInt64());
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/internal/pattern-review?range=custom&from=2026-07-10&to=2026-07-09")).StatusCode);
+
+        var first = await (await client.PostAsJsonAsync("/internal/discipline-principles", new { content = "Wait for invalidation." })).Content.ReadFromJsonAsync<JsonElement>();
+        var second = await (await client.PostAsJsonAsync("/internal/discipline-principles", new { content = "Separate signal from interpretation." })).Content.ReadFromJsonAsync<JsonElement>();
+        var firstId = first.GetProperty("id").GetGuid();
+        var secondId = second.GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync($"/internal/discipline-principles/{firstId}/select", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync($"/internal/discipline-principles/{secondId}/select", null)).StatusCode);
+        var principles = await client.GetFromJsonAsync<JsonElement>("/internal/discipline-principles");
+        Assert.Single(principles.GetProperty("items").EnumerateArray(), item => item.GetProperty("selectedForToday").GetBoolean());
+        Assert.Equal("active", principles.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("id").GetGuid() == firstId).GetProperty("status").GetString());
+        Assert.Equal(secondId, (await client.GetFromJsonAsync<JsonElement>("/internal/discipline-principles/today")).GetProperty("id").GetGuid());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"/internal/discipline-principles/{secondId}", new
+        {
+            content = "Separate signal from interpretation.",
+            status = "disabled",
+        })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/internal/discipline-principles/today")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"/internal/discipline-principles/{firstId}", new
+        {
+            content = "Wait for invalidation.",
+            status = "archived",
+        })).StatusCode);
+
+        using var other = fixture.Client(Guid.NewGuid());
+        Assert.Equal(0, (await other.GetFromJsonAsync<JsonElement>("/internal/pattern-review?range=monthly")).GetProperty("reviewedExpectationCount").GetInt64());
+        Assert.Empty((await other.GetFromJsonAsync<JsonElement>("/internal/discipline-principles")).GetProperty("items").EnumerateArray());
+        Assert.Equal(HttpStatusCode.NotFound, (await other.PostAsync($"/internal/discipline-principles/{secondId}/select", null)).StatusCode);
+    }
+
+    [Fact]
     public async Task Blank_capture_creates_nothing_and_cross_owner_edit_is_hidden()
     {
         await using var fixture = await Fixture.StartAsync(new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero));
@@ -371,7 +662,7 @@ public sealed class QuickObservationApiTests
             await using var setup = new NpgsqlConnection(postgres.GetConnectionString());
             await setup.OpenAsync();
             var root = Path.GetFullPath("../../../../..", AppContext.BaseDirectory);
-            foreach (var file in new[] { "0001_initial_journal_performance.sql", "0013_journal_idempotency.sql", "0026_market_observations.sql", "0028_observation_enrichment.sql", "0029_expectations.sql" })
+            foreach (var file in new[] { "0001_initial_journal_performance.sql", "0013_journal_idempotency.sql", "0026_market_observations.sql", "0028_observation_enrichment.sql", "0029_expectations.sql", "0030_expectation_reviews.sql", "0031_action_decisions_trades.sql", "0032_watchlist.sql", "0033_pattern_review_discipline_principles.sql", "0037_incremental_record_changes.sql" })
                 await new NpgsqlCommand(await File.ReadAllTextAsync(Path.Combine(root, "platform/postgres/migrations", file)), setup).ExecuteNonQueryAsync();
 
             var dataSource = NpgsqlDataSource.Create(postgres.GetConnectionString());
@@ -389,7 +680,8 @@ public sealed class QuickObservationApiTests
                     options.DefaultAuthenticateScheme = TestAuth.Scheme;
                     options.DefaultChallengeScheme = TestAuth.Scheme;
                 }).AddScheme<AuthenticationSchemeOptions, TestAuth>(TestAuth.Scheme, _ => { });
-            }));
+            })).WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, config) =>
+                config.AddInMemoryCollection(new Dictionary<string, string?> { ["Internal:ServiceKey"] = "test-service-key" })));
             return new Fixture(postgres, dataSource, factory, clock);
         }
 
@@ -402,7 +694,32 @@ public sealed class QuickObservationApiTests
             return client;
         }
 
+        internal HttpClient RawClient() => factory.CreateClient();
+
+        internal HttpClient ServiceClient()
+        {
+            var client = factory.CreateClient();
+            client.DefaultRequestHeaders.Add("X-Service-Key", "test-service-key");
+            return client;
+        }
+
         internal void SetNow(DateTimeOffset value) => clock.Set(value);
+
+        internal async Task SetReviewCreatedAt(Guid expectationId, DateTime value)
+        {
+            await using var command = dataSource.CreateCommand("UPDATE journal.expectation_reviews SET created_at=$2 WHERE expectation_id=$1");
+            command.Parameters.AddWithValue(expectationId);
+            command.Parameters.AddWithValue(value);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        internal async Task SetUpdateRecordedAt(Guid updateId, DateTime value)
+        {
+            await using var command = dataSource.CreateCommand("UPDATE journal.observation_updates SET recorded_at=$2 WHERE id=$1");
+            command.Parameters.AddWithValue(updateId);
+            command.Parameters.AddWithValue(value);
+            await command.ExecuteNonQueryAsync();
+        }
 
         internal async Task<long> Count(string table)
         {
@@ -422,6 +739,16 @@ public sealed class QuickObservationApiTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            var dailyClose = request.RequestUri?.AbsolutePath.EndsWith("/daily-close", StringComparison.OrdinalIgnoreCase) is true
+                && request.RequestUri.AbsolutePath.Contains(KnownInstrumentId.ToString(), StringComparison.OrdinalIgnoreCase);
+            if (dailyClose) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    instrumentId = KnownInstrumentId, symbol = "AAPL", status = "available", tradingDate = "2026-07-14",
+                    rawClose = 100m, adjustedClose = 50m, provider = "test", publishedAt = "2026-07-14T22:00:00Z",
+                }),
+            });
             var known = request.RequestUri?.AbsolutePath.EndsWith(KnownInstrumentId.ToString(), StringComparison.OrdinalIgnoreCase) is true;
             return Task.FromResult(known
                 ? new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { instrumentId = KnownInstrumentId, symbol = "AAPL", name = "Apple Inc.", exchange = "NASDAQ", currency = "USD", timezone = "America/New_York" }) }

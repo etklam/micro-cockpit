@@ -16,7 +16,7 @@ import {
 } from '../i18n'
 import * as fmt from '../i18n/format'
 import { setActiveFormatLocale, formatDate, signed, pct, money } from '../format'
-import { diaryMutationErrorMessage, registerErrorMessage } from '../i18n'
+import { registerErrorMessage } from '../i18n'
 import { ApiError } from '../generated/edge'
 import { server } from './setup'
 import App from '../App'
@@ -43,6 +43,8 @@ describe('locale helpers', () => {
     // valid key always present
     expect(translate('zh-Hant', 'nav.today')).toBe('今日')
     expect(translate('en', 'nav.today')).toBe('Today')
+    expect(translate('en', 'comparison.title')).toMatch(/Human/)
+    expect(translate('zh-Hant', 'comparison.title')).toMatch(/對照/)
     warn.mockRestore()
   })
 })
@@ -74,8 +76,6 @@ describe('locale-aware formatting', () => {
 
 describe('translated API errors', () => {
   it('maps status and body markers', () => {
-    expect(diaryMutationErrorMessage('en', new ApiError(400, 'too_many_tags'))).toMatch(/10/)
-    expect(diaryMutationErrorMessage('zh-Hant', new ApiError(404, ''))).toMatch(/不存在|找不到|已不存在/)
     expect(registerErrorMessage('en', new ApiError(429, ''))).toMatch(/Too many/)
     expect(registerErrorMessage('zh-Hant', new ApiError(400, ''))).toMatch(/密碼|字元/)
   })
@@ -144,10 +144,10 @@ describe('authenticated locale from bootstrap', () => {
     server.use(
       http.post('/api/auth/refresh', () => HttpResponse.json({ accessToken: 't', expiresAt: '2026-07-16T12:00:00Z' })),
       http.get('/api/app/bootstrap', () => HttpResponse.json(bootstrap)),
-      http.get('/api/app/dashboard', () => HttpResponse.json({
-        localDate: '2026-07-16', diary: { writtenToday: false, count: 0 }, performance: null,
-        pendingAlerts: null, discipline: null, recentDiaries: [], capabilities: { alerts: 'unavailable', discipline: 'empty' },
-      })),
+      http.get('/api/app/market-observations/today', () => new HttpResponse(null, { status: 404 })),
+      http.get('/api/app/expectations', () => HttpResponse.json({ items: [] })),
+      http.get('/api/app/discipline-principles/today', () => new HttpResponse(null, { status: 404 })),
+      http.get('/api/app/market/symbols', () => HttpResponse.json({ items: [] })),
       http.get('/api/app/settings', () => HttpResponse.json({
         email: 'owner@example.com', displayName: 'Owner', timezone: 'Asia/Taipei',
         baseCurrency: 'USD', appearance: 'system', accentTheme: 'green', locale: 'zh-Hant', updatedAt: '2026-07-16T00:00:00Z',
@@ -174,10 +174,10 @@ describe('authenticated locale from bootstrap', () => {
         </BrowserRouter>
       </QueryClientProvider>,
     )
-    expect((await screen.findAllByRole('link', { name: '日誌' })).length).toBeGreaterThan(0)
+    expect((await screen.findAllByRole('link', { name: '回顧' })).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('link', { name: '今日' }).length).toBeGreaterThan(0)
 
-    await userEvent.click(screen.getByRole('link', { name: '設定' }))
+    await userEvent.click(screen.getAllByRole('link', { name: '設定' })[0])
     expect(await screen.findByRole('heading', { level: 1, name: '設定' })).toBeInTheDocument()
     await userEvent.click(screen.getByText('English'))
     await waitFor(() => expect(screen.getAllByRole('link', { name: 'Today' }).length).toBeGreaterThan(0))

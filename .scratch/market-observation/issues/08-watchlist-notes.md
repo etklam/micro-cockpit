@@ -4,12 +4,12 @@
 
 **Blocked by:** 02 — 結構化 Observation Update
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] 使用者可新增或移除 Watchlist Instrument
-- [ ] Watchlist UI 與 API 不使用 portfolio、holding、position 或 buy-list 語意
-- [ ] 每個 Watchlist member 可保存簡短且可修改的 Watchlist Note
-- [ ] Watchlist Note 用於關注原因，不取代 Observation Update、Expectation 或 Research Timeline
-- [ ] 使用者可從 Watchlist 開啟 Instrument 的跨日觀察時間線
-- [ ] Watchlist membership 使 Instrument 保持 Tracked Instrument 狀態
-- [ ] 覆蓋 duplicate membership、ownership、note validation 與手機畫面
+- [x] 使用者可新增或移除 Watchlist Instrument
+- [x] Watchlist UI 與 API 不使用 portfolio、holding、position 或 buy-list 語意
+- [x] 每個 Watchlist member 可保存簡短且可修改的 Watchlist Note
+- [x] Watchlist Note 用於關注原因，不取代 Observation Update、Expectation 或 Research Timeline
+- [x] 使用者可從 Watchlist 開啟 Instrument 的跨日觀察時間線
+- [x] Watchlist membership 使 Instrument 保持 Tracked Instrument 狀態
+- [x] 覆蓋 duplicate membership、ownership、note validation 與手機畫面

@@ -4,16 +4,16 @@
 
 **Blocked by:** 05 — 完成 Expectation Review
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Review 支援 weekly、monthly 與 custom date range
-- [ ] Pattern Review 顯示 reviewed Expectations 數量
-- [ ] 每個 Reasoning Issue／Strength 顯示 count、denominator 與 evidence links
-- [ ] 系統不自動建立 Confirmed Pattern 或宣稱某標籤是使用者的問題
-- [ ] 使用者可手動 create、disable 與 archive Discipline Principles
-- [ ] 使用者可選定至多一條 Discipline Principle 顯示在 Today
-- [ ] 選定另一條 Principle 時不自動 archive 原 Principle
-- [ ] 覆蓋 aggregation boundaries、empty ranges、ownership 與 Principle selection
+- [x] Review 支援 weekly、monthly 與 custom date range
+- [x] Pattern Review 顯示 reviewed Expectations 數量
+- [x] 每個 Reasoning Issue／Strength 顯示 count、denominator 與 evidence links
+- [x] 系統不自動建立 Confirmed Pattern 或宣稱某標籤是使用者的問題
+- [x] 使用者可手動 create、disable 與 archive Discipline Principles
+- [x] 使用者可選定至多一條 Discipline Principle 顯示在 Today
+- [x] 選定另一條 Principle 時不自動 archive 原 Principle
+- [x] 覆蓋 aggregation boundaries、empty ranges、ownership 與 Principle selection
 
 **決定（grill 2026-07-27）：**
 - 聚合鍵沿用 issue 05：系統預設 label 用常數 key、自訂 label 用 UID。改自訂 label 名稱不影響歷史聚合（鍵是 UID）。

@@ -36,7 +36,7 @@ history_present=$(kubectl exec deployment/postgres -n "$namespace" -- sh -ceu \
 status_code=0
 if [ "$history_present" != t ]; then
   managed=$(kubectl exec deployment/postgres -n "$namespace" -- sh -ceu \
-    'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname IN ('"'"'identity'"'"','"'"'journal'"'"','"'"'performance'"'"','"'"'discipline'"'"','"'"'reminder'"'"','"'"'market'"'"','"'"'market_data_public'"'"','"'"'price_alert'"'"','"'"'rotation'"'"','"'"'stock_research'"'"','"'"'partner'"'"','"'"'content'"'"','"'"'operations'"'"'))"')
+    'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname IN ('"'"'identity'"'"','"'"'journal'"'"','"'"'market'"'"','"'"'market_data_public'"'"','"'"'tool'"'"'))"')
   echo "history-present: false"
   echo "baseline-required: $([ "$managed" = t ] && echo true || echo false)"
   echo "current-migration-id: none"

@@ -25,7 +25,7 @@ done
 [[ "$image_tag" =~ ^[0-9a-f]{40}$ ]] || { echo "Image tag must be a full lowercase commit SHA." >&2; exit 1; }
 [[ "$image_tag" != "latest" ]] || { echo "Mutable image tags are not allowed." >&2; exit 1; }
 
-deployments=(identity journal performance discipline reminder stock-research market-data price-alert rotation partner content tool operations edge frontend)
+deployments=(identity journal market-data tool edge frontend)
 
 overlay=$(mktemp -d "${TMPDIR:-/tmp}/micro-cockpit-release.XXXXXX")
 cleanup() { rm -rf "$overlay"; }

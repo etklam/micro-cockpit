@@ -440,6 +440,67 @@
           }
         ]
       }
+    },
+    "/internal/account-export": {
+      "get": {
+        "tags": [
+          "TradeDiary.Tool"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolAccountExport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/account-data": {
+      "delete": {
+        "tags": [
+          "TradeDiary.Tool"
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -881,8 +942,6 @@
           "inputs",
           "currency",
           "symbol",
-          "sourceDiaryId",
-          "sourceTransactionId",
           "note"
         ],
         "type": "object",
@@ -902,25 +961,26 @@
               "string"
             ]
           },
-          "sourceDiaryId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "sourceTransactionId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
           "note": {
             "type": [
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "ToolAccountExport": {
+        "required": [
+          "presets",
+          "savedCalculations"
+        ],
+        "type": "object",
+        "properties": {
+          "presets": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "savedCalculations": {
+            "$ref": "#/components/schemas/JsonElement"
           }
         }
       }

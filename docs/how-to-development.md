@@ -1,296 +1,38 @@
-# How to develop and verify changes
+# Development and verification
 
-This guide shows how to iterate on the frontend or backend, update contracts safely, and run the same checks used by CI.
+## Backend
 
-## Prerequisites
-
-- .NET SDK 10.
-- Node.js 22 and npm.
-- Python 3.
-- Docker with Docker Compose v2.
-- `openapi-spec-validator==0.7.2` when validating OpenAPI locally.
-- A populated, git-ignored `.env` for integrated runtime work.
-
-Install frontend dependencies exactly from the lockfile:
-
-```sh
-npm --prefix frontend ci
-```
-
-Install the OpenAPI validator if needed:
-
-```sh
-python -m pip install openapi-spec-validator==0.7.2
-```
-
-## Run the fastest static development loop
-
-Restore and build .NET once:
-
-```sh
-dotnet restore TradeDiary.slnx
-dotnet build TradeDiary.slnx --no-restore -m:1 --disable-build-servers
-```
-
-The serialized `-m:1` build matches CI and avoids local MSBuild contention across the solution.
-
-Run backend tests without rebuilding:
-
-```sh
-dotnet test TradeDiary.slnx --no-build -m:1 --disable-build-servers
-```
-
-Run the frontend checks:
-
-```sh
-npm --prefix frontend run lint
-npm --prefix frontend run build
-npm --prefix frontend run test
-```
-
-## Run frontend development against the integrated Edge API
-
-Start the complete stack, then replace only the containerized frontend with Vite:
-
-```sh
-docker compose up -d --build --wait --wait-timeout 300
-docker compose stop frontend
-npm --prefix frontend run dev -- --host 127.0.0.1
-```
-
-Open the Vite URL printed by the command. `frontend/vite.config.ts` proxies `/api` to the composed Edge API at `http://127.0.0.1:5099`. Browser code still uses same-origin paths and never learns internal service URLs.
-
-When finished:
-
-```sh
-docker compose down
-```
-
-## Rebuild one backend capability
-
-For a service-level change, rebuild the service and Edge while leaving the rest of the stack running. For example:
-
-```sh
-docker compose up -d --build journal edge
-docker compose ps journal edge
-```
-
-Run the relevant focused test project before the full suite:
-
-```sh
-dotnet test tests/TradeDiary.Journal.Tests/TradeDiary.Journal.Tests.csproj
-dotnet test tests/TradeDiary.EdgeApi.Tests/TradeDiary.EdgeApi.Tests.csproj
-```
-
-Replace the project paths with the owning service test project. Some test projects use Testcontainers and require a working Docker daemon.
-
-## Add or change an Edge API operation
-
-1. Change the owning service endpoint and explicit request/response DTOs.
-2. Add or update service tests for validation, authorization, ownership, nulls, and failure behavior.
-3. Map the public route in the matching `gateway/TradeDiary.EdgeApi/Endpoints/` module.
-4. Use an explicit Edge DTO for composed responses. Do not expose database entities, anonymous response objects, `JsonNode`, `JsonObject`, or downstream raw payloads.
-5. Add Edge tests for downstream timeout, invalid payload, authorization, and optional/required behavior where composition is involved.
-6. Regenerate contracts:
-
-   ```sh
-   npm --prefix frontend run api:generate
-   ```
-
-7. Review changes under `contracts/openapi/` and `frontend/src/generated/edge.ts`. Do not hand-edit generated output.
-8. Update the feature API adapter and query/mutation hook. Components must not import generated transport internals directly.
-9. Verify drift:
-
-   ```sh
-   npm --prefix frontend run api:verify
-   python scripts/validate-openapi.py
-   ```
-
-## Add or change a frontend screen
-
-Keep the dependency direction:
-
-```text
-Page -> query/mutation hook -> feature API adapter -> generated Edge client
-```
-
-For server state:
-
-1. Add a stable query key containing every request parameter that changes the response.
-2. Put network calls in `frontend/src/features/api.ts`.
-3. Put caching, invalidation, and mutation behavior in `frontend/src/features/queries.ts`.
-4. Use route path or query state for navigation that must survive refresh and browser history.
-5. Invalidate only affected queries after a mutation.
-6. Add MSW-backed tests for loading, valid empty, unavailable, authorization, deep-link, and navigation behavior.
-
-Raw `fetch` calls, internal service URLs, duplicate handwritten transport types, and frontend copies of backend market formulas are not accepted.
-
-## Internationalization (i18n)
-
-Supported UI locales: `en`, `zh-Hant`. Unknown values fall back to `en`.
-
-### Locale resolution order
-
-1. Authenticated: account `locale` from bootstrap/settings (server source of truth).
-2. Anonymous / pre-login: `localStorage` key `td_locale` (last selection).
-3. First visit: browser language when it maps to a supported locale, else English.
-
-Changing language updates the UI immediately. Authenticated saves also `PUT /api/app/settings` with the rest of the profile. Local storage is never the authenticated source of truth.
-
-### Architecture
-
-Lightweight typed internal layer (no i18n library dependency):
-
-| Path | Role |
-|---|---|
-| `frontend/src/i18n/locale.ts` | Locale type, normalize, mirror, browser detect |
-| `frontend/src/i18n/messages/en.ts` | English catalog (stable keys) |
-| `frontend/src/i18n/messages/zh-Hant.ts` | Traditional Chinese catalog |
-| `frontend/src/i18n/translate.ts` | Lookup + English fallback + missing-key warn |
-| `frontend/src/i18n/format.ts` | Locale-aware date/number/currency helpers |
-| `frontend/src/i18n/errors.ts` | Map API status/body markers to keys |
-| `frontend/src/i18n/I18nProvider.tsx` | Context, `useI18n` / `useT` |
-
-Pages must use `t('key')` / `useI18n()` — never import message dictionaries directly.
-
-### Add a translation key
-
-1. Add the key and English value to `messages/en.ts`.
-2. Add the Traditional Chinese value to `messages/zh-Hant.ts` (natural product language).
-3. Use `t('your.key')` in components. Interpolation: `t('key', { count: 2 })`. Plurals: define `key_other` when `count !== 1`.
-
-### Formatting conventions
-
-Use `format` from `useI18n()` or the active-locale wrappers in `frontend/src/format.ts`. Do not scatter bare `toLocaleString()` with browser defaults for diary workflow UI. Missing numeric values stay `—` / translated empty, never zero.
-
-Keep tickers, user content, tags, Markdown, API keys, currency codes, and raw numbers untranslated.
-
-### Verification
-
-```sh
-npm --prefix frontend run test
-npm --prefix frontend run lint
-npm --prefix frontend run build
-```
-
-## Add a database migration
-
-Read [Database migrations](database-migrations.md) before editing.
-
-The short workflow is:
-
-1. Add the next contiguous `NNNN_description.sql` file under `platform/postgres/migrations/`.
-2. Add the required `migration-id`, `owner`, and `description` metadata lines.
-3. Use expand-first, backward-compatible DDL.
-4. Append the filename and exact SHA-256 to `manifest.json`.
-5. Never edit an existing migration.
-6. Run:
-
-   ```sh
-   python3 scripts/validate-migrations.py
-   python3 scripts/audit-migrations.py
-   python3 scripts/validate-migration-append-only.py --base-ref BASE_COMMIT
-   ./tests/verify-migration-safety.sh
-   ```
-
-The baseline fingerprint represents the schema through migration `0013`; later migrations must remain outside that fingerprint.
-
-## Run the complete verification set
-
-Use the CI-equivalent build and test commands:
-
-```sh
+```bash
 dotnet restore TradeDiary.slnx
 dotnet build TradeDiary.slnx --no-restore -m:1 --disable-build-servers
 dotnet test TradeDiary.slnx --no-build -m:1 --disable-build-servers
+```
 
+Add Journal endpoints to the focused endpoint module named by `Program.cs`. Map browser routes through the matching Edge module, add authorization tests, regenerate OpenAPI, and update the generated client. Persistence changes require a new immutable migration and manifest checksum.
+
+## Frontend
+
+```bash
 npm --prefix frontend ci
 npm --prefix frontend run lint
 npm --prefix frontend run build
-npm --prefix frontend run test
+npm --prefix frontend test -- --run
+```
+
+Use typed message keys in both locales. Put remote state in query hooks, form state in the page, and deterministic calculations in pure modules. Core changes need phone layout, keyboard behavior, empty/error states, and non-color labels.
+
+## Contracts and architecture
+
+```bash
+npm --prefix frontend run api:generate
 npm --prefix frontend run api:verify
-
-python scripts/validate-openapi.py
+python3 scripts/validate-openapi.py
 python3 scripts/validate-migrations.py
-python3 scripts/audit-migrations.py
-
 ./tests/verify-architecture.sh
-./tests/verify-secret-handling.sh
-./tests/verify-deployment-safety.sh
-./tests/verify-rotation-safety.sh
-./tests/verify-runtime-secret-source.sh
-./tests/verify-k8s-operation-lock.sh
-./tests/verify-migration-safety.sh
 ```
 
-For a change that adds a migration, also run the append-only validator against the immutable base commit selected for the review.
+## Full stack
 
-## Run disposable-stack smoke tests
+The manual E2E workflow creates ephemeral secrets, starts Compose, registers a User, and runs auth, Market Observation idempotency, JWT ownership, the complete release smoke, and PostgreSQL role isolation.
 
-The manual E2E workflow in `.github/workflows/e2e.yml` starts the full Compose stack with ephemeral secrets and runs authentication, idempotency, ownership, **partner compare**, release-path, degradation, and database-role checks (in that order: auth → journal idempotency → JWT ownership → partner compare → release paths → degradation → role isolation).
-
-Partner compare (`tests/smoke-partner-compare.sh`) needs `EDGE_URL`, `TEST_PASSWORD`, and `LOCAL_REGISTRATION_KEY`. It registers two users with the registration key, exercises invitation → redeem → diary/review/transaction → share → compare privacy → unshare → revoke, checks the inclusive 366-day compare window, and sets `locale=zh-Hant` on one account as a practicality probe.
-
-To inspect individual runtime scripts, see `tests/smoke-*.sh`, `tests/service-unavailable-degradation.sh`, and `tests/postgres-role-isolation.sh`. Run them only against a disposable local stack with the required environment variables.
-
-## Verification
-
-Before handing off a change:
-
-```sh
-git diff --check
-git status --short
-```
-
-Confirm that:
-
-- OpenAPI and generated client have no drift.
-- No populated secret or connection string is staged.
-- No historical migration changed.
-- Frontend code calls Edge only.
-- Missing domain values remain null rather than invented zeroes.
-- Authorization failures do not become partial success.
-
-## Troubleshooting
-
-### `dotnet test` cannot open a local socket
-
-`WebApplicationFactory` and test-host communication need loopback sockets. Run the command in an environment that permits local socket binding.
-
-### A solution build appears to stop after one project
-
-Stop stale build servers and rerun the serialized CI command:
-
-```sh
-dotnet build-server shutdown
-dotnet build TradeDiary.slnx --no-restore -m:1 --disable-build-servers
-```
-
-Also stop locally running service processes that may hold build outputs.
-
-### OpenAPI verification reports drift
-
-Do not patch the generated client. Run `npm --prefix frontend run api:generate`, inspect the source DTO/endpoint change that caused the diff, and commit all intentional generated artifacts together.
-
-### Testcontainers tests are skipped or fail to start
-
-Verify Docker first:
-
-```sh
-docker info
-docker ps
-```
-
-The database migrator, Identity, and Journal integration tests require disposable PostgreSQL containers.
-
-### A Compose service cannot reach another service
-
-Use Compose service names and container port `8080` inside the `backend` network. Do not add host ports as a shortcut. Only frontend, Edge, and host-local PostgreSQL are intentionally published.
-
-## Related documentation
-
-- [Getting started](tutorial-getting-started.md)
-- [System reference](reference-system.md)
-- [API and data reference](reference-api-data.md)
-- [Architecture](explanation-architecture.md)
-- [Security review checklist](security-review-checklist.md)
+Never run the release smoke against a valued database: it creates and removes fixture market data and deletes its test Market Observation.

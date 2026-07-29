@@ -47,8 +47,6 @@ def historical_compromised_values() -> set[str]:
             for path in ROOT.glob("services/*/src/*/Program.cs")
         ],
         *[path.relative_to(ROOT).as_posix() for path in ROOT.glob("tests/*.sh")],
-        "services/rotation-service/src/TradeDiary.Rotation/appsettings.json",
-        "services/rotation-service/src/TradeDiary.Rotation/appsettings.Development.json",
     ]
     commits = subprocess.run(
         ["git", "rev-list", "--all"], cwd=ROOT, check=True, capture_output=True, text=True

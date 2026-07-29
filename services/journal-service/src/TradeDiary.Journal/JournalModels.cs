@@ -1,17 +1,22 @@
 using System.Text.Json;
 
-public record DiaryWrite(DateOnly LocalDate, string Title, string? Content, IReadOnlyList<string>? Tags = null);
-record QuickNote(DateOnly LocalDate, string Content, Guid? TargetDiaryId);
-public record DiaryResponse(Guid Id, DateOnly LocalDate, string Title, string Content, DateTime CreatedAt, DateTime UpdatedAt, IReadOnlyList<string> Tags);
-record TransactionWrite(string Symbol, string Side, decimal Quantity, decimal Price, string Currency, DateTime TradedAt, string? Notes);
-record TransactionResponse(Guid Id, Guid DiaryId, string Symbol, string Side, decimal Quantity, decimal Price, string Currency, DateTime TradedAt, string Notes, DateTime CreatedAt, DateTime UpdatedAt);
 record StoredResult(int StatusCode, string? Location, JsonElement Body);
-record QuickNoteResponse(Guid? DiaryId, bool Appended);
-record QuickObservationWrite(string Content);
+record QuickObservationWrite(string Content, string? SourceLabel = null);
 record QuickObservationResponse(Guid MarketObservationId, Guid ObservationUpdateId, DateOnly JournalDay, DateTime RecordedAt, bool Appended);
 enum ObservationSubjectType { broad_market, sector, theme, instrument }
 record ObservationSubjectWrite(ObservationSubjectType Type, string? Name = null, Guid? InstrumentId = null, string? Market = null, string? Symbol = null, string? DisplayName = null);
-record ObservationSubjectResponse(ObservationSubjectType Type, string? Name, Guid? InstrumentId, string? Market, string? Symbol, string? DisplayName, bool DailyCloseAvailable);
+enum DailyCloseStatus { available, unavailable, unsupported }
+record DailyCloseEvidenceResponse(DateOnly TradingDate, decimal RawClose, decimal AdjustedClose, string Provider, DateTime PublishedAt);
+record ObservationSubjectResponse(
+    ObservationSubjectType Type,
+    string? Name,
+    Guid? InstrumentId,
+    string? Market,
+    string? Symbol,
+    string? DisplayName,
+    bool DailyCloseAvailable,
+    DailyCloseStatus DailyCloseStatus = DailyCloseStatus.unsupported,
+    DailyCloseEvidenceResponse? DailyClose = null);
 record ObservationEvidenceWrite(string Url, string? Title = null, string? Quote = null);
 record ObservationEvidenceResponse(string Url, string? Title, string? Quote);
 record ObservationUpdateWrite(
@@ -22,7 +27,8 @@ record ObservationUpdateWrite(
     IReadOnlyList<string>? Tags = null,
     ObservationSubjectWrite? PrimarySubject = null,
     IReadOnlyList<ObservationSubjectWrite>? RelatedSubjects = null,
-    ObservationEvidenceWrite? Evidence = null);
+    ObservationEvidenceWrite? Evidence = null,
+    string? SourceLabel = null);
 record ObservationUpdateResponse(
     Guid Id,
     string Content,
@@ -55,6 +61,9 @@ record MarketObservationDaySummaryItem(DateOnly Date, Guid MarketObservationId, 
 enum ExpectationConfidence { low, medium, high }
 enum ExpectationReadiness { active, ready_for_review, reviewed }
 enum ExpectationDeadlinePreset { next_trading_day, five_trading_days }
+enum ExpectationOutcome { confirmed, partially_confirmed, invalidated, indeterminate }
+enum ReasoningQuality { sound, mixed, weak }
+enum ReasoningLabelKind { issue, strength }
 record ExpectationWrite(
     string ExpectedBehavior,
     DateTimeOffset? Deadline,
@@ -93,10 +102,89 @@ record ExpectationEditResponse(
     DateTime CreatedAt,
     DateTime UpdatedAt,
     bool HonestyReminderRequired);
-record DiaryDaySummaryItem(DateOnly LocalDate, long DiaryCount, long TransactionCount);
+record ExpectationReviewWrite(
+    ExpectationOutcome Outcome,
+    ReasoningQuality ReasoningQuality,
+    string? Explanation,
+    IReadOnlyList<string>? SystemIssueKeys = null,
+    IReadOnlyList<string>? SystemStrengthKeys = null,
+    IReadOnlyList<Guid>? CustomLabelIds = null);
+record ReasoningLabelResponse(Guid? Id, ReasoningLabelKind Kind, string Key, string Name, bool IsSystem);
+record ExpectationReviewResponse(
+    Guid Id,
+    Guid ExpectationId,
+    ExpectationOutcome Outcome,
+    ReasoningQuality ReasoningQuality,
+    string? Explanation,
+    IReadOnlyList<ReasoningLabelResponse> Labels,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+record ReasoningLabelWrite(ReasoningLabelKind Kind, string Name);
+enum ActionDecisionIntent { trade, continue_observing, avoid_trade }
+enum ExecutionReview { followed, partially_followed, deviated }
+enum TradeSide { buy, sell }
+record ActionDecisionWrite(ActionDecisionIntent Intent, string Reason, Guid? ExpectationId = null, ExecutionReview? ExecutionReview = null);
+record ActionDecisionResponse(
+    Guid Id,
+    Guid ObservationUpdateId,
+    Guid? ExpectationId,
+    ActionDecisionIntent Intent,
+    string Reason,
+    DateTime RecordedAt,
+    ExecutionReview? ExecutionReview,
+    DateTime UpdatedAt);
+record ActionDecisionEditResponse(
+    Guid Id,
+    Guid ObservationUpdateId,
+    Guid? ExpectationId,
+    ActionDecisionIntent Intent,
+    string Reason,
+    DateTime RecordedAt,
+    ExecutionReview? ExecutionReview,
+    DateTime UpdatedAt,
+    bool HonestyReminderRequired);
+record TradeEvidenceWrite(string Symbol, TradeSide Side, decimal Quantity, decimal Price, string Currency, DateTimeOffset ExecutedAt, string? Note = null);
+record TradeEvidenceResponse(
+    Guid Id,
+    Guid ActionDecisionId,
+    string Symbol,
+    TradeSide Side,
+    decimal Quantity,
+    decimal Price,
+    string Currency,
+    DateTime ExecutedAt,
+    string? Note,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+record WatchlistItemResponse(Guid InstrumentId, string? Note, DateTime CreatedAt, DateTime UpdatedAt);
+record WatchlistNoteWrite(string? Note);
+record PatternEvidenceResponse(Guid ExpectationId, string Url);
+record PatternLabelResponse(
+    ReasoningLabelKind Kind,
+    string Key,
+    string Name,
+    bool System,
+    int Count,
+    int Denominator,
+    IReadOnlyList<PatternEvidenceResponse> Evidence);
+record PatternReviewResponse(
+    DateOnly From,
+    DateOnly To,
+    int ReviewedExpectationCount,
+    IReadOnlyList<PatternLabelResponse> Labels);
+enum DisciplinePrincipleStatus { active, disabled, archived }
+record DisciplinePrincipleCreate(string Content);
+record DisciplinePrincipleUpdate(string Content, DisciplinePrincipleStatus Status);
+record DisciplinePrincipleResponse(
+    Guid Id,
+    string Content,
+    DisciplinePrincipleStatus Status,
+    bool SelectedForToday,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+record TrackedInstrumentResponse(Guid InstrumentId);
+record TrackedInstrumentSetResponse(int ContractVersion, DateTime GeneratedAt, IReadOnlyList<TrackedInstrumentResponse> Items);
 record CollectionResponse<T>(List<T> Items);
-/// <summary>Sanitized diary projection for partner compare. No transactions/reviews/internal IDs.</summary>
-public record PartnerDiaryItem(Guid Id, DateOnly LocalDate, string Title, string Content, IReadOnlyList<string> Tags);
 
 // ponytail: WithOpenApi parameter mutations are dropped by .NET 10 doc generation (hence its deprecation),
 // so the Idempotency-Key header is surfaced via a marker + operation transformer instead.

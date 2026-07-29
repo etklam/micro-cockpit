@@ -18,15 +18,13 @@ public sealed class MigrationEngineTests : IAsyncLifetime
     private static string Fingerprint => Path.Combine(Root, "platform/postgres/baseline/legacy-v1-schema.json");
     private static readonly Dictionary<string, (string Schema, string Table)> RuntimeRoles = new(StringComparer.Ordinal)
     {
-        ["identity_service"] = ("identity", "users"), ["journal_service"] = ("journal", "diaries"),
-        ["performance_service"] = ("performance", "daily_performances"), ["discipline_service"] = ("discipline", "disciplines"),
-        ["reminder_service"] = ("reminder", "diary_alerts"), ["market_data_service"] = ("market", "symbols"),
-        ["price_alert_service"] = ("price_alert", "alerts"), ["rotation_service"] = ("rotation", "market_rotation_universes"),
-        ["stock_research_service"] = ("stock_research", "stocks"), ["partner_service"] = ("partner", "partner_links"),
-        ["content_service"] = ("content", "posts"), ["tool_service"] = ("tool", "presets"), ["operations_service"] = ("operations", "audit_events")
+        ["identity_service"] = ("identity", "users"),
+        ["journal_service"] = ("journal", "market_observations"),
+        ["market_data_service"] = ("market", "symbols"),
+        ["tool_service"] = ("tool", "presets"),
     };
     private static readonly string[] ManagedSchemas =
-    ["identity", "journal", "performance", "discipline", "reminder", "market", "market_data_public", "price_alert", "rotation", "stock_research", "partner", "content", "tool", "operations"];
+    ["identity", "journal", "market", "market_data_public", "tool"];
 
     public async Task InitializeAsync()
     {
@@ -101,7 +99,7 @@ public sealed class MigrationEngineTests : IAsyncLifetime
         await Reset();
         var engine = Engine(Migrations);
         Assert.Equal(0, await engine.RunAsync("migrate"));
-        Assert.Equal(29L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
+        Assert.Equal(41L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
         var applied = await Scalar<DateTime>("SELECT max(applied_at) FROM platform_migrations.schema_history");
         Assert.Equal(0, await engine.RunAsync("migrate"));
         Assert.Equal(applied, await Scalar<DateTime>("SELECT max(applied_at) FROM platform_migrations.schema_history"));
@@ -126,9 +124,7 @@ public sealed class MigrationEngineTests : IAsyncLifetime
         }
         Assert.True(await HasTablePrivilege("market_data_service", "market.instruments", "INSERT"));
         Assert.True(await HasTablePrivilege("market_data_service", "market.instrument_symbol_history", "UPDATE"));
-        Assert.False(await HasTablePrivilege("price_alert_service", "market.symbols", "SELECT"));
-        Assert.True(await HasTablePrivilege("price_alert_service", "market.published_provider_health_v1", "SELECT"));
-        Assert.True(await HasTablePrivilege("rotation_service", "market_data_public.adjusted_daily_bars_v1", "SELECT"));
+        Assert.True(await HasTablePrivilege("market_data_service", "market_data_public.adjusted_daily_bars_v1", "SELECT"));
 
         await using (var migrator = new NpgsqlConnection(MigratorConnection()))
         {
@@ -143,63 +139,28 @@ public sealed class MigrationEngineTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PriceAlertReadsOnlyPublishedDailyBarPricesContract()
+    public async Task Cutover_preserves_market_observation_security_and_data_invariants()
     {
         await Reset();
         Assert.Equal(0, await Engine(Migrations).RunAsync("migrate"));
-        await Admin(await File.ReadAllTextAsync(Path.Combine(Root, "platform/postgres/roles/003_finalize_grants.sql")));
-        var runId = Guid.NewGuid();
-        await Admin($"INSERT INTO market.symbols(symbol,name,exchange,currency,timezone) VALUES ('TEST','Test','NYSE','USD','America/New_York'); INSERT INTO market.provider_runs(id,provider,started_at,completed_at,status) VALUES ('{runId}','test',now(),now(),'succeeded'); INSERT INTO market.daily_bars(symbol,trading_date,open,high,low,close,volume,provider,provider_run_id,published_at) VALUES ('TEST','2026-07-16',100,110,90,105,1000,'test','{runId}',now())");
 
-        await using var connection = new NpgsqlConnection(RoleConnection("price_alert_service"));
-        await connection.OpenAsync();
-        await using var command = new NpgsqlCommand("SELECT symbol,trade_date,open_price,close_price,published_at IS NOT NULL FROM market_data_public.daily_bar_prices_v1", connection);
-        await using var reader = await command.ExecuteReaderAsync();
-        Assert.True(await reader.ReadAsync());
-        Assert.Equal("TEST", reader.GetString(0));
-        Assert.Equal(new DateOnly(2026, 7, 16), reader.GetFieldValue<DateOnly>(1));
-        Assert.Equal(100m, reader.GetDecimal(2));
-        Assert.Equal(105m, reader.GetDecimal(3));
-        Assert.True(reader.GetBoolean(4));
-        await reader.CloseAsync();
-        Assert.False(await HasTablePrivilege("price_alert_service", "market_data_public.adjusted_daily_bars_v1", "SELECT"));
-        await Assert.ThrowsAsync<PostgresException>(() => Execute(connection, "SELECT count(*) FROM market.daily_bars"));
-    }
+        Assert.Equal(0, await Scalar<int>(
+            "SELECT count(*)::int FROM pg_namespace WHERE nspname = ANY($1)",
+            (object)new[] { "performance", "discipline", "reminder", "stock_research", "price_alert", "rotation", "partner", "content", "operations" }));
+        Assert.False(await Scalar<bool>("SELECT to_regclass('journal.diaries') IS NOT NULL"));
+        Assert.False(await Scalar<bool>("SELECT to_regclass('journal.transactions') IS NOT NULL"));
+        Assert.False(await Scalar<bool>(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='tool' AND table_name='saved_calculations' AND column_name IN ('source_diary_id','source_transaction_id'))"));
 
-    [Fact]
-    public async Task PriceAlertEvaluationPriceMigrationBackfillsExistingTriggers()
-    {
-        await Reset();
-        var through0016 = CopyMigrations();
-        foreach (var name in Directory.GetFiles(through0016, "*.sql")
-                     .Select(Path.GetFileName)
-                     .Where(name => name is not null && string.CompareOrdinal(name, "0017") >= 0))
-            File.Delete(Path.Combine(through0016, name!));
-        await RefreshManifest(through0016);
-        Assert.Equal(0, await Engine(through0016).RunAsync("migrate"));
-        var alertId = Guid.NewGuid(); var triggerId = Guid.NewGuid(); var userId = Guid.NewGuid();
-        await Admin($"INSERT INTO price_alert.alerts(id,user_id,symbol,condition_type,threshold,status) VALUES ('{alertId}','{userId}','TEST','above',100,'active'); INSERT INTO price_alert.triggers(id,alert_id,trading_date,observed_close) VALUES ('{triggerId}','{alertId}','2026-07-16',101)");
-
-        Assert.Equal(0, await Engine(Migrations).RunAsync("migrate"));
-        Assert.Equal("close", await Scalar<string>($"SELECT evaluation_price FROM price_alert.alerts WHERE id='{alertId}'"));
-        Assert.Equal(101m, await Scalar<decimal>($"SELECT observed_price FROM price_alert.triggers WHERE id='{triggerId}'"));
-        Assert.Equal("close", await Scalar<string>($"SELECT price_type FROM price_alert.triggers WHERE id='{triggerId}'"));
-        var invalidEvaluation = await Assert.ThrowsAsync<PostgresException>(() => Admin($"UPDATE price_alert.alerts SET evaluation_price='high' WHERE id='{alertId}'"));
-        Assert.Equal(PostgresErrorCodes.CheckViolation, invalidEvaluation.SqlState);
-        var invalidPriceType = await Assert.ThrowsAsync<PostgresException>(() => Admin($"UPDATE price_alert.triggers SET price_type='low' WHERE id='{triggerId}'"));
-        Assert.Equal(PostgresErrorCodes.CheckViolation, invalidPriceType.SqlState);
-    }
-
-    [Fact]
-    public async Task DiaryReviewCompositeForeignKeyRejectsInconsistentOwnership()
-    {
-        await Reset(); await Engine(Migrations).RunAsync("migrate");
-        var diaryId = Guid.NewGuid(); var ownerId = Guid.NewGuid(); var otherUserId = Guid.NewGuid();
-        await Admin($"INSERT INTO journal.diaries(id,user_id,local_date,title) VALUES ('{diaryId}','{ownerId}','2026-07-16','Ownership')");
-        var exception = await Assert.ThrowsAsync<PostgresException>(() => Admin($"INSERT INTO journal.diary_reviews(diary_id,user_id) VALUES ('{diaryId}','{otherUserId}')"));
-        Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, exception.SqlState);
-        await Admin($"INSERT INTO journal.diary_reviews(diary_id,user_id) VALUES ('{diaryId}','{ownerId}')");
-        Assert.Equal(2, await Scalar<int>("SELECT count(*)::int FROM pg_constraint WHERE conrelid='journal.diary_reviews'::regclass AND contype='f'"));
+        Assert.True(await Scalar<bool>(
+            "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='identity' AND indexname='api_keys_one_active_per_user' AND indexdef ILIKE '%revoked_at IS NULL%')"));
+        Assert.Equal(3, await Scalar<int>(
+            "SELECT count(*)::int FROM pg_constraint WHERE conrelid='journal.agent_access_grants'::regclass AND conname IN ('agent_access_grants_date_check','agent_access_grants_subject_check','agent_access_grants_distinct_users')"));
+        Assert.True(await Scalar<bool>("SELECT to_regclass('market.instrument_symbol_history') IS NOT NULL"));
+        Assert.True(await Scalar<bool>("SELECT to_regclass('market_data_public.daily_bar_prices_v1') IS NOT NULL"));
+        Assert.True(await Scalar<bool>("SELECT to_regclass('market_data_public.adjusted_daily_bars_v1') IS NOT NULL"));
+        Assert.True(await Scalar<bool>(
+            "SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='journal.retired_diary_deleted_outbox'::regclass AND conname='retired_diary_deleted_outbox_content_free')"));
     }
 
     [Fact]
@@ -207,19 +168,19 @@ public sealed class MigrationEngineTests : IAsyncLifetime
     {
         await Reset();
         var fixture = CopyMigrations();
-        await File.WriteAllTextAsync(Path.Combine(fixture, "0030_failure.sql"), "-- migration-id: 0030\n-- owner: journal-service\n-- description: Failure fixture\n\nCREATE TABLE journal.rollback_probe(id integer);\nSELECT 1 / 0;\n");
+        await File.WriteAllTextAsync(Path.Combine(fixture, "0042_failure.sql"), "-- migration-id: 0042\n-- owner: journal-service\n-- description: Failure fixture\n\nCREATE TABLE journal.rollback_probe(id integer);\nSELECT 1 / 0;\n");
         await RefreshManifest(fixture);
         await Assert.ThrowsAnyAsync<Exception>(() => Engine(fixture).RunAsync("migrate"));
         Assert.False(await Scalar<bool>("SELECT to_regclass('journal.rollback_probe') IS NOT NULL"));
-        Assert.Equal(0L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history WHERE migration_id='0030'"));
-        File.Delete(Path.Combine(fixture, "0030_failure.sql"));
+        Assert.Equal(0L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history WHERE migration_id='0042'"));
+        File.Delete(Path.Combine(fixture, "0042_failure.sql"));
         await File.AppendAllTextAsync(Path.Combine(fixture, "0001_initial_journal_performance.sql"), "\n-- changed\n");
         await RefreshManifest(fixture);
         await Assert.ThrowsAsync<MigrationException>(() => Engine(fixture).RunAsync("migrate"));
         File.Delete(Path.Combine(fixture, "0001_initial_journal_performance.sql"));
         await RefreshManifest(fixture);
         await Assert.ThrowsAsync<MigrationException>(() => Engine(fixture).RunAsync("migrate"));
-        Assert.Equal(29L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
+        Assert.Equal(41L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
     }
 
     [Fact]
@@ -237,7 +198,7 @@ public sealed class MigrationEngineTests : IAsyncLifetime
         await Reset();
         var results = await Task.WhenAll(Engine(Migrations).RunAsync("migrate"), Engine(Migrations).RunAsync("migrate"));
         Assert.Equal(new[] { 0, 0 }, results);
-        Assert.Equal(29L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
+        Assert.Equal(41L, await Scalar<long>("SELECT count(*) FROM platform_migrations.schema_history"));
     }
 
     [Fact]
@@ -252,7 +213,7 @@ public sealed class MigrationEngineTests : IAsyncLifetime
         Assert.False(await Scalar<bool>("SELECT to_regclass('journal.diary_reviews') IS NOT NULL"));
         Assert.Equal(0, await Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
         Assert.Equal(0, await Engine(Migrations).RunAsync("migrate"));
-        Assert.True(await Scalar<bool>("SELECT to_regclass('journal.diary_reviews') IS NOT NULL"));
+        Assert.False(await Scalar<bool>("SELECT to_regclass('journal.diary_reviews') IS NOT NULL"));
         Assert.False(await Scalar<bool>("SELECT baseline FROM platform_migrations.schema_history WHERE migration_id='0014'"));
         Assert.False(await Scalar<bool>("SELECT baseline FROM platform_migrations.schema_history WHERE migration_id='0015'"));
         Assert.Equal(0, await Engine(Migrations).RunAsync("baseline", new(true, "backup", Fingerprint)));
@@ -308,8 +269,6 @@ public sealed class MigrationEngineTests : IAsyncLifetime
     private static HashSet<string> ExpectedSchemas(string role, string owned) => role switch
     {
         "market_data_service" => ["market", "market_data_public"],
-        "price_alert_service" => ["price_alert", "market", "market_data_public"],
-        "rotation_service" => ["rotation", "market_data_public"],
         _ => [owned]
     };
     private MigrationEngine Engine(string path, string? connection = null) => new(connection ?? MigratorConnection(), path, "test-release", TimeSpan.FromSeconds(30));

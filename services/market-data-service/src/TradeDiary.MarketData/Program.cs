@@ -98,7 +98,7 @@ app.MapPut("/internal/admin/provider-runs/{id:guid}/bars", async (Guid id, List<
     if (!Admin(request,config)) return Results.Problem("invalid_service_key", statusCode:403); if (bars.Count is 0 or > 5000 || bars.Any(x => !ValidBar(x))) return Results.Problem("invalid_bars", statusCode:400);
     await using var connection=await db.OpenConnectionAsync(); await using var tx=await connection.BeginTransactionAsync();
     await using var owner=new NpgsqlCommand("SELECT provider FROM market.provider_runs WHERE id=$1 AND status='running' FOR UPDATE",connection,tx); owner.Parameters.AddWithValue(id); var provider=(string?)await owner.ExecuteScalarAsync(); if (provider is null) return Results.Problem("not_found", statusCode:404);
-    foreach(var bar in bars) { var symbol=bar.Symbol.Trim().ToUpperInvariant(); await using var cmd=new NpgsqlCommand("INSERT INTO market.daily_bars(symbol,trading_date,open,high,low,close,volume,provider,provider_run_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(symbol,trading_date) DO UPDATE SET open=$3,high=$4,low=$5,close=$6,volume=$7,provider=$8,provider_run_id=$9,ingested_at=now(),published_at=NULL",connection,tx); cmd.Parameters.AddWithValue(symbol); cmd.Parameters.AddWithValue(bar.TradingDate); cmd.Parameters.AddWithValue(bar.Open); cmd.Parameters.AddWithValue(bar.High); cmd.Parameters.AddWithValue(bar.Low); cmd.Parameters.AddWithValue(bar.Close); cmd.Parameters.AddWithValue(bar.Volume); cmd.Parameters.AddWithValue(provider); cmd.Parameters.AddWithValue(id); try { await cmd.ExecuteNonQueryAsync(); } catch(PostgresException e) when(e.SqlState=="23503") { return Results.Problem("unknown_symbol", statusCode:400); } }
+    foreach(var bar in bars) { var symbol=bar.Symbol.Trim().ToUpperInvariant(); await using var cmd=new NpgsqlCommand("INSERT INTO market.daily_bars(symbol,trading_date,open,high,low,close,adjusted_close,volume,provider,provider_run_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(symbol,trading_date,provider_run_id) DO UPDATE SET open=$3,high=$4,low=$5,close=$6,adjusted_close=$7,volume=$8,provider=$9,ingested_at=now(),published_at=NULL",connection,tx); cmd.Parameters.AddWithValue(symbol); cmd.Parameters.AddWithValue(bar.TradingDate); cmd.Parameters.AddWithValue(bar.Open); cmd.Parameters.AddWithValue(bar.High); cmd.Parameters.AddWithValue(bar.Low); cmd.Parameters.AddWithValue(bar.Close); cmd.Parameters.AddWithValue(bar.AdjustedClose??bar.Close); cmd.Parameters.AddWithValue(bar.Volume); cmd.Parameters.AddWithValue(provider); cmd.Parameters.AddWithValue(id); try { await cmd.ExecuteNonQueryAsync(); } catch(PostgresException e) when(e.SqlState=="23503") { return Results.Problem("unknown_symbol", statusCode:400); } }
     await using var count=new NpgsqlCommand("UPDATE market.provider_runs SET rows_received=rows_received+$2 WHERE id=$1",connection,tx); count.Parameters.AddWithValue(id); count.Parameters.AddWithValue(bars.Count); await count.ExecuteNonQueryAsync(); await tx.CommitAsync(); return Results.NoContent();
 })
 .Produces(204).ProducesProblem(400).ProducesProblem(403).ProducesProblem(404).WithMetadata(new ServiceKeyMetadata());
@@ -127,8 +127,34 @@ app.MapGet("/internal/v1/instruments/{id:guid}", async (Guid id, NpgsqlDataSourc
 })
 .AllowAnonymous().Produces<PublishedSymbolResponse>(200).ProducesProblem(404);
 
-app.MapGet("/internal/v1/bars/{raw}", async (string raw, DateOnly? from, DateOnly? to, NpgsqlDataSource db) => { var symbol=raw.Trim().ToUpperInvariant(); var end=to??DateOnly.FromDateTime(DateTime.UtcNow); var start=from??end.AddDays(-365); if(end<start || end.DayNumber-start.DayNumber>3660) return Results.Problem("invalid_date_range", statusCode:400); await using var cmd=db.CreateCommand("SELECT trading_date,open,high,low,close,volume,provider,published_at FROM market.published_daily_bars_v1 WHERE symbol=$1 AND trading_date BETWEEN $2 AND $3 ORDER BY trading_date"); cmd.Parameters.AddWithValue(symbol);cmd.Parameters.AddWithValue(start);cmd.Parameters.AddWithValue(end);await using var r=await cmd.ExecuteReaderAsync();var items=new List<PublishedBarResponse>();while(await r.ReadAsync())items.Add(new PublishedBarResponse(r.GetFieldValue<DateOnly>(0),r.GetDecimal(1),r.GetDecimal(2),r.GetDecimal(3),r.GetDecimal(4),r.GetDecimal(5),r.GetString(6),r.GetDateTime(7)));return Results.Ok(new BarsResponse(1, symbol, items)); })
+app.MapGet("/internal/v1/bars/{raw}", async (string raw, DateOnly? from, DateOnly? to, NpgsqlDataSource db) => { var symbol=raw.Trim().ToUpperInvariant(); var end=to??DateOnly.FromDateTime(DateTime.UtcNow); var start=from??end.AddDays(-365); if(end<start || end.DayNumber-start.DayNumber>3660) return Results.Problem("invalid_date_range", statusCode:400); await using var cmd=db.CreateCommand("SELECT trading_date,open,high,low,raw_close,adjusted_close,volume,provider,published_at FROM market.published_daily_bars_v1 WHERE symbol=$1 AND trading_date BETWEEN $2 AND $3 ORDER BY trading_date"); cmd.Parameters.AddWithValue(symbol);cmd.Parameters.AddWithValue(start);cmd.Parameters.AddWithValue(end);await using var r=await cmd.ExecuteReaderAsync();var items=new List<PublishedBarResponse>();while(await r.ReadAsync())items.Add(new PublishedBarResponse(r.GetFieldValue<DateOnly>(0),r.GetDecimal(1),r.GetDecimal(2),r.GetDecimal(3),r.GetDecimal(4),r.GetDecimal(4),r.GetDecimal(5),r.GetDecimal(6),r.GetString(7),r.GetDateTime(8)));return Results.Ok(new BarsResponse(1, symbol, items)); })
 .AllowAnonymous().Produces<BarsResponse>(200).ProducesProblem(400);
+
+app.MapGet("/internal/v1/instruments/{id:guid}/daily-close", async (Guid id, DateOnly? onOrBefore, NpgsqlDataSource db) =>
+{
+    await using var command = db.CreateCommand("""
+        SELECT s.symbol,b.trading_date,b.raw_close,b.adjusted_close,b.provider,b.published_at
+        FROM market.published_symbols_v1 s
+        LEFT JOIN LATERAL (
+            SELECT trading_date,raw_close,adjusted_close,provider,published_at
+            FROM market.published_daily_bars_v1
+            WHERE symbol=s.symbol AND trading_date <= $2
+            ORDER BY trading_date DESC LIMIT 1
+        ) b ON true
+        WHERE s.instrument_id=$1
+        """);
+    command.Parameters.AddWithValue(id);
+    command.Parameters.AddWithValue(onOrBefore ?? DateOnly.FromDateTime(DateTime.UtcNow));
+    await using var reader = await command.ExecuteReaderAsync();
+    if (!await reader.ReadAsync()) return Results.Problem("not_found", statusCode:404);
+    return reader.IsDBNull(1)
+        ? Results.Ok(new DailyCloseResponse(id, reader.GetString(0), "unavailable", null, null, null, null, null))
+        : Results.Ok(new DailyCloseResponse(
+            id, reader.GetString(0), "available", reader.GetFieldValue<DateOnly>(1),
+            reader.GetDecimal(2), reader.GetDecimal(3), reader.GetString(4),
+            DateTime.SpecifyKind(reader.GetDateTime(5),DateTimeKind.Utc)));
+})
+.AllowAnonymous().Produces<DailyCloseResponse>(200).ProducesProblem(404);
 
 app.MapGet("/internal/v1/providers/health", async (NpgsqlDataSource db) => { await using var cmd=db.CreateCommand("SELECT provider,last_success_at,healthy FROM market.published_provider_health_v1 ORDER BY provider");await using var r=await cmd.ExecuteReaderAsync();var items=new List<ProviderHealthResponse>();while(await r.ReadAsync())items.Add(new ProviderHealthResponse(r.GetString(0),r.GetDateTime(1),r.GetBoolean(2)));return Results.Ok(new ProvidersHealthResponse(1, items.Count>0 && items.All(x=>x.Healthy), items)); })
 .AllowAnonymous().Produces<ProvidersHealthResponse>(200);
@@ -136,17 +162,18 @@ app.MapGet("/internal/v1/providers/health", async (NpgsqlDataSource db) => { awa
 app.Run();
 
 static bool Admin(HttpRequest request,IConfiguration config){var a=Encoding.UTF8.GetBytes(request.Headers["X-Service-Key"].ToString());var b=Encoding.UTF8.GetBytes(config["Internal:ServiceKey"]??"");return b.Length>0&&a.Length==b.Length&&CryptographicOperations.FixedTimeEquals(a,b);}
-static bool ValidBar(BarWrite x)=>!string.IsNullOrWhiteSpace(x.Symbol)&&x.Open>=0&&x.Low>=0&&x.Close>=0&&x.Volume>=0&&x.High>=Math.Max(x.Open,Math.Max(x.Low,x.Close))&&x.Low<=Math.Min(x.Open,Math.Min(x.High,x.Close));
+static bool ValidBar(BarWrite x)=>!string.IsNullOrWhiteSpace(x.Symbol)&&x.Open>=0&&x.Low>=0&&x.Close>=0&&(x.AdjustedClose??x.Close)>=0&&x.Volume>=0&&x.High>=Math.Max(x.Open,Math.Max(x.Low,x.Close))&&x.Low<=Math.Min(x.Open,Math.Min(x.High,x.Close));
 record SymbolWrite(string Name,string Exchange,string Currency,string Timezone,bool Active=true,Guid? InstrumentId=null);
 record ProviderRunWrite(string Provider);
 record CompleteRun(string Status,string? Error);
-record BarWrite(string Symbol,DateOnly TradingDate,decimal Open,decimal High,decimal Low,decimal Close,decimal Volume);
+record BarWrite(string Symbol,DateOnly TradingDate,decimal Open,decimal High,decimal Low,decimal Close,decimal Volume,decimal? AdjustedClose=null);
 record ProviderRunCreatedResponse(Guid Id);
 sealed record ServiceKeyMetadata;
 record PublishedSymbolResponse(Guid InstrumentId,string Symbol,string Name,string Exchange,string Currency,string Timezone);
 record SymbolsResponse(int ContractVersion,List<PublishedSymbolResponse> Items);
-record PublishedBarResponse(DateOnly TradingDate,decimal Open,decimal High,decimal Low,decimal Close,decimal Volume,string Provider,DateTime PublishedAt);
+record PublishedBarResponse(DateOnly TradingDate,decimal Open,decimal High,decimal Low,decimal Close,decimal RawClose,decimal AdjustedClose,decimal Volume,string Provider,DateTime PublishedAt);
 record BarsResponse(int ContractVersion,string Symbol,List<PublishedBarResponse> Items);
+record DailyCloseResponse(Guid InstrumentId,string Symbol,string Status,DateOnly? TradingDate,decimal? RawClose,decimal? AdjustedClose,string? Provider,DateTime? PublishedAt);
 record ProviderHealthResponse(string Provider,DateTime LastSuccessAt,bool Healthy);
 record ProvidersHealthResponse(int ContractVersion,bool Healthy,List<ProviderHealthResponse> Items);
 

@@ -7,36 +7,29 @@ import { Brand, Button, ErrorBox, IconButton, ThemeControls, ThemeToggle, useCon
 import { Icon } from './icons'
 import { cx } from './format'
 import './App.css'
-import { AlertsPage, CalendarPage, DiaryDetailPage, DiaryPage, DisciplinePage, ObservationHistoryPage, TodayPage } from './pages'
-import { ArticleDetailPage, ArticlesPage, MorePage, PartnerComparePage, PartnersPage, PriceAlertsPage, RotationPage, ToolsPage, WatchlistPage } from './latePages'
+import { CalendarPage, ObservationHistoryPage, ReviewPage, TodayPage } from './pages'
+import { ToolsPage } from './screens/tools/ToolsPage'
+import { WatchlistPage } from './screens/watchlist'
 import { SettingsPage } from './screens/settings'
 import { useBootstrapQuery } from './features/queries'
 import { reconcileAccent, reconcileAppearance, subscribeSystemAppearance, type Appearance, isAppearance } from './features/appearance'
 import { TOOL_CATALOG } from './features/toolsCatalog'
 import { accountMonthYear } from './features/accountTime'
-import { MonthlyReviewPage, MonthlyReviewRedirect } from './MonthlyReviewPage'
 import { CockpitProvider, SectionError, type Page } from './shell'
 import { isLocale, reconcileLocale, useI18n } from './i18n'
 import { LandingPage } from './LandingPage'
 
 const PATHS: Record<Page, string> = {
-  today: '/today', diary: '/diary', calendar: '/calendar', discipline: '/discipline', alerts: '/alerts',
-  more: '/more', review: '/review', settings: '/settings', watchlist: '/watchlist', 'price-alerts': '/price-alerts', rotation: '/rotation', partners: '/partners',
-  articles: '/articles', tools: '/tools',
+  today: '/today', review: '/review', watchlist: '/watchlist',
+  calendar: '/calendar', tools: '/tools', settings: '/settings',
 }
-const NAV: { id: Page; labelKey: 'nav.today' | 'nav.diary' | 'nav.calendar' | 'nav.discipline' | 'nav.alerts'; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+const NAV: { id: Page; labelKey: 'nav.today' | 'nav.review' | 'nav.watchlist' | 'nav.calendar' | 'nav.tools' | 'nav.settings'; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { id: 'today', labelKey: 'nav.today', icon: 'today' },
-  { id: 'diary', labelKey: 'nav.diary', icon: 'diary' },
+  { id: 'review', labelKey: 'nav.review', icon: 'diary' },
+  { id: 'watchlist', labelKey: 'nav.watchlist', icon: 'compass' },
   { id: 'calendar', labelKey: 'nav.calendar', icon: 'calendar' },
-  { id: 'discipline', labelKey: 'nav.discipline', icon: 'compass' },
-  { id: 'alerts', labelKey: 'nav.alerts', icon: 'bell' },
-]
-const MORE: { id: Page; labelKey: 'nav.review' | 'nav.settings' | 'nav.watchlist' | 'nav.priceAlerts' | 'nav.rotation' | 'nav.partners' | 'nav.articles' | 'nav.tools' }[] = [
-  { id: 'review', labelKey: 'nav.review' },
-  { id: 'settings', labelKey: 'nav.settings' },
-  { id: 'watchlist', labelKey: 'nav.watchlist' }, { id: 'price-alerts', labelKey: 'nav.priceAlerts' },
-  { id: 'rotation', labelKey: 'nav.rotation' }, { id: 'partners', labelKey: 'nav.partners' },
-  { id: 'articles', labelKey: 'nav.articles' }, { id: 'tools', labelKey: 'nav.tools' },
+  { id: 'tools', labelKey: 'nav.tools', icon: 'layers' },
+  { id: 'settings', labelKey: 'nav.settings', icon: 'monitor' },
 ]
 
 export default function App() {
@@ -50,23 +43,11 @@ export default function App() {
         <Route element={<Shell />}>
           <Route path="/today" element={<TodayPage />} />
           <Route path="/today/observations" element={<ObservationHistoryPage />} />
-          <Route path="/diary" element={<DiaryPage />} />
-          <Route path="/diary/:diaryId" element={<DiaryDetailPage />} />
+          <Route path="/review" element={<ReviewPage />} />
+          <Route path="/watchlist" element={<WatchlistPage />} />
           <Route path="/calendar" element={<CalendarRedirect />} />
           <Route path="/calendar/:year/:month" element={<CalendarPage />} />
-          <Route path="/discipline" element={<DisciplinePage />} />
-          <Route path="/alerts" element={<AlertsPage />} />
-          <Route path="/more" element={<MorePage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/review" element={<MonthlyReviewRedirect />} />
-          <Route path="/review/:year/:month" element={<MonthlyReviewPage />} />
-          <Route path="/watchlist" element={<WatchlistPage />} />
-          <Route path="/price-alerts" element={<PriceAlertsPage />} />
-          <Route path="/rotation" element={<RotationPage />} />
-          <Route path="/partners" element={<PartnersPage />} />
-          <Route path="/partners/:partnerId/compare" element={<PartnerComparePage />} />
-          <Route path="/articles" element={<ArticlesPage />} />
-          <Route path="/articles/:slug" element={<ArticleDetailPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>
@@ -339,9 +320,7 @@ function CalendarRedirect() {
 }
 
 function Sidebar({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: () => void }) {
-  const location = useLocation()
   const { t } = useI18n()
-  const moreOpen = MORE.some(item => location.pathname.startsWith(PATHS[item.id]))
   return (
     <aside className="sidebar" aria-label="Primary">
       <Brand />
@@ -350,16 +329,6 @@ function Sidebar({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: ()
         <nav className="nav" aria-label="Primary sections">
           {NAV.map(item => <NavItem key={item.id} item={item} />)}
         </nav>
-        <details className="more-nav" open={moreOpen}>
-          <summary>{t('nav.decisionSupport')}</summary>
-          <div className="more-nav__list">
-            {MORE.map(item => (
-              <NavLink key={item.id} className={({ isActive }) => cx('nav__item', isActive && 'is-active')} to={PATHS[item.id]}>
-                {t(item.labelKey)}
-              </NavLink>
-            ))}
-          </div>
-        </details>
       </div>
       <div className="sidebar__foot">
         <div className="sidebar__identity" aria-label="Signed in user">
@@ -394,11 +363,8 @@ function MobileTop({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: 
   )
 }
 function MobileNav() {
-  const mobile = NAV.slice(0, 4)
-  const location = useLocation()
   const { t } = useI18n()
-  const moreActive = location.pathname.startsWith('/more') || location.pathname.startsWith('/alerts') || MORE.some(item => location.pathname.startsWith(PATHS[item.id]))
-  return <nav className="mobile-nav" aria-label="Sections">{mobile.map(item => <NavLink key={item.id} to={PATHS[item.id]} className={({ isActive }) => cx('mobile-nav__item', isActive && 'is-active')}><Icon name={item.icon} size={20} /><span>{t(item.labelKey)}</span></NavLink>)}<NavLink to="/more" className={cx('mobile-nav__item', moreActive && 'is-active')}><Icon name="layers" size={20} /><span>{t('common.more')}</span></NavLink></nav>
+  return <nav className="mobile-nav" aria-label="Sections">{NAV.map(item => <NavLink key={item.id} to={PATHS[item.id]} className={({ isActive }) => cx('mobile-nav__item', isActive && 'is-active')}><Icon name={item.icon} size={20} /><span>{t(item.labelKey)}</span></NavLink>)}</nav>
 }
 
 function NotFoundPage() {

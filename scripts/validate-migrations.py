@@ -25,6 +25,7 @@ FORBIDDEN = {
         r"\bALTER\s+(?:TABLE\s+\S+\s+)?COLUMN\s+\S+\s+TYPE\b|\bRENAME\s+COLUMN\b"
     ),
 }
+DESTRUCTIVE_APPROVAL = "-- destructive-approved: market-observation-cutover-unlaunched"
 SECRET = re.compile(r"(?i)(password|service[_-]?key)\s*=\s*['\"][^'\"]+['\"]")
 
 
@@ -62,6 +63,8 @@ def main() -> int:
         elif values[0] != migration_id:
             errors.append(f"{path.name}: header ID {values[0]} differs from filename")
         for label, pattern in FORBIDDEN.items():
+            if label == "destructive DDL" and DESTRUCTIVE_APPROVAL in lines[3:6]:
+                continue
             if pattern.search(text):
                 errors.append(f"{path.name}: contains forbidden {label}")
         if SECRET.search(text):

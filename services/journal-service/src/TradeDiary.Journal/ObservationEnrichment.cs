@@ -13,8 +13,9 @@ static class ObservationEnrichment
         if (input.Content.Trim().Length > 10_000) return "content_too_long";
         if (Trim(input.Signal)?.Length > 10_000 || Trim(input.Interpretation)?.Length > 10_000) return "enrichment_too_long";
         if (Trim(input.MentalState)?.Length > 100) return "mental_state_too_long";
+        if (Trim(input.SourceLabel)?.Length > 100) return "source_label_too_long";
 
-        var tagError = DiaryTags.NormalizeAll(input.Tags, out var normalizedTags);
+        var tagError = ObservationTags.NormalizeAll(input.Tags, out var normalizedTags);
         if (tagError is not null) return tagError;
         normalizedTags = normalizedTags.Order(StringComparer.Ordinal).ToArray();
 
@@ -34,7 +35,7 @@ static class ObservationEnrichment
         if (evidenceError is not null) return evidenceError;
         value = new ObservationEnrichmentValue(
             input.Content.Trim(), Trim(input.Signal), Trim(input.Interpretation), Trim(input.MentalState),
-            normalizedTags, primary, related, evidence);
+            normalizedTags, primary, related, evidence, Trim(input.SourceLabel));
         return null;
     }
 
@@ -49,7 +50,7 @@ static class ObservationEnrichment
             if (name is null || name.Length > 120) return "subject_name_required";
             if (input.InstrumentId is not null || Trim(input.Market) is not null || Trim(input.Symbol) is not null || Trim(input.DisplayName) is not null)
                 return "invalid_subject_fields";
-            subject = new(type, name, null, null, null, null, false);
+            subject = new(type, name, null, null, null, null, false, DailyCloseStatus.unsupported);
             return null;
         }
 
@@ -60,7 +61,9 @@ static class ObservationEnrichment
             return "instrument_fields_required";
         if (market == "US" && input.InstrumentId is null) return "directory_instrument_required";
         if (market != "US" && input.InstrumentId is not null) return "manual_instrument_required";
-        subject = new(type, null, input.InstrumentId, market, symbol, displayName, market == "US");
+        subject = new(
+            type, null, input.InstrumentId, market, symbol, displayName, market == "US",
+            market == "US" ? DailyCloseStatus.unavailable : DailyCloseStatus.unsupported);
         return null;
     }
 
@@ -111,4 +114,5 @@ sealed record ObservationEnrichmentValue(
     IReadOnlyList<string> Tags,
     ObservationSubjectResponse? PrimarySubject,
     IReadOnlyList<ObservationSubjectResponse> RelatedSubjects,
-    ObservationEvidenceResponse? Evidence);
+    ObservationEvidenceResponse? Evidence,
+    string? SourceLabel);

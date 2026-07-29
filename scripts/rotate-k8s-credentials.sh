@@ -55,21 +55,12 @@ role_mappings=(
   trade_diary_migrator:MIGRATOR_DB_PASSWORD
   identity_service:IDENTITY_DB_PASSWORD
   journal_service:JOURNAL_DB_PASSWORD
-  performance_service:PERFORMANCE_DB_PASSWORD
-  discipline_service:DISCIPLINE_DB_PASSWORD
-  reminder_service:REMINDER_DB_PASSWORD
-  stock_research_service:STOCK_RESEARCH_DB_PASSWORD
   market_data_service:MARKET_DATA_DB_PASSWORD
-  price_alert_service:PRICE_ALERT_DB_PASSWORD
-  rotation_service:ROTATION_DB_PASSWORD
-  partner_service:PARTNER_DB_PASSWORD
-  content_service:CONTENT_DB_PASSWORD
   tool_service:TOOL_DB_PASSWORD
-  operations_service:OPERATIONS_DB_PASSWORD
 )
-deployments=(identity journal performance discipline reminder stock-research market-data price-alert rotation partner content tool operations)
-internal_key_deployments=(journal reminder market-data price-alert operations)
-required_keys=(POSTGRES_PASSWORD MIGRATOR_DB_PASSWORD IDENTITY_DB_PASSWORD JOURNAL_DB_PASSWORD PERFORMANCE_DB_PASSWORD DISCIPLINE_DB_PASSWORD REMINDER_DB_PASSWORD STOCK_RESEARCH_DB_PASSWORD MARKET_DATA_DB_PASSWORD PRICE_ALERT_DB_PASSWORD ROTATION_DB_PASSWORD PARTNER_DB_PASSWORD CONTENT_DB_PASSWORD TOOL_DB_PASSWORD OPERATIONS_DB_PASSWORD LOCAL_REGISTRATION_KEY INTERNAL_SERVICE_KEY)
+deployments=(identity journal market-data tool)
+internal_key_deployments=(journal market-data)
+required_keys=(POSTGRES_PASSWORD MIGRATOR_DB_PASSWORD IDENTITY_DB_PASSWORD JOURNAL_DB_PASSWORD MARKET_DATA_DB_PASSWORD TOOL_DB_PASSWORD LOCAL_REGISTRATION_KEY INTERNAL_SERVICE_KEY)
 
 secret_value() {
   local file=$1 key=$2
@@ -102,7 +93,7 @@ write_role_sql() {
       '\.' \
       'DO $$' \
       'BEGIN' \
-      "  IF (SELECT count(*) FROM rotation_credentials) <> 15 OR EXISTS (SELECT 1 FROM rotation_credentials WHERE role_name <> ALL (ARRAY['trade_diary','trade_diary_migrator','identity_service','journal_service','performance_service','discipline_service','reminder_service','stock_research_service','market_data_service','price_alert_service','rotation_service','partner_service','content_service','tool_service','operations_service'])) THEN" \
+      "  IF (SELECT count(*) FROM rotation_credentials) <> 6 OR EXISTS (SELECT 1 FROM rotation_credentials WHERE role_name <> ALL (ARRAY['trade_diary','trade_diary_migrator','identity_service','journal_service','market_data_service','tool_service'])) THEN" \
       "    RAISE EXCEPTION 'Unexpected PostgreSQL role identifier';" \
       '  END IF;' \
       'END' \

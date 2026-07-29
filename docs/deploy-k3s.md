@@ -335,17 +335,13 @@ database that has not yet been baselined, PostgreSQL may exhaust its
 Scale the application Deployments to zero, run the baseline, then scale back up:
 
 ```sh
-for dep in identity journal performance discipline reminder \
-           stock-research market-data price-alert rotation \
-           partner content tool operations edge frontend; do
+for dep in identity journal market-data tool edge frontend; do
   kubectl scale deployment/"$dep" -n micro-cockpit --replicas=0
 done
 
 # ... run baseline ...
 
-for dep in identity journal performance discipline reminder \
-           stock-research market-data price-alert rotation \
-           partner content tool operations edge frontend; do
+for dep in identity journal market-data tool edge frontend; do
   kubectl scale deployment/"$dep" -n micro-cockpit --replicas=1
 done
 ```
@@ -359,7 +355,7 @@ fast-forward and the running Deployments do not interfere.
 ## 8. First release
 
 After infrastructure, Secrets, and baseline are in place, the first application
-release applies all 15 service images with the same immutable commit SHA:
+release applies all six application images with the same immutable commit SHA:
 
 ```sh
 scripts/deploy-k8s-release.sh \
@@ -464,7 +460,7 @@ the `systemd-tmpfiles` entry to make it survive reboots.
 The three production Secrets are not all present. Run the provisioner in
 section 6. If only `service-connection-strings` is missing (for example, after
 migrating an environment that pre-existed the current Secret layout), generate
-the 12 connection strings from the existing `db-credentials` Secret:
+the four connection strings from the existing `db-credentials` Secret:
 
 ```sh
 PWD=$(kubectl get secret db-credentials -n micro-cockpit \

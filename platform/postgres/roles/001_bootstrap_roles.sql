@@ -4,9 +4,7 @@ DECLARE role_name text;
 BEGIN
   FOREACH role_name IN ARRAY ARRAY[
     'trade_diary_migrator',
-    'identity_service','journal_service','performance_service','discipline_service',
-    'reminder_service','market_data_service','price_alert_service','rotation_service',
-    'stock_research_service','partner_service','content_service','tool_service','operations_service'
+    'identity_service','journal_service','market_data_service','tool_service'
   ] LOOP
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = role_name) THEN
       EXECUTE format('CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT', role_name);

@@ -5,332 +5,211 @@ import { isAppearance, reconcileAccent, reconcileAppearance } from './appearance
 import { queueSettingsWrite } from './settingsWrites'
 import { isLocale, reconcileLocale } from '../i18n'
 
-export type DiaryListKeyFilters = {
-  q: string
-  from: string
-  to: string
-  review: string
-  symbol: string
-  tag: string
-}
-
 export const queryKeys = {
   bootstrap: ['bootstrap'] as const,
   settings: ['settings'] as const,
-  dashboard: ['dashboard'] as const,
+  agents: ['agents'] as const,
+  accessGrants: ['access-grants'] as const,
   todayObservation: ['market-observations', 'today'] as const,
   expectations: ['expectations'] as const,
+  expectationReview: (id: string) => ['expectations', id, 'review'] as const,
+  reasoningLabels: ['reasoning-labels'] as const,
+  actionDecisions: (updateId: string) => ['action-decisions', updateId] as const,
+  tradeEvidence: (decisionId: string) => ['action-decisions', decisionId, 'trades'] as const,
   instrumentDirectory: ['market', 'instruments'] as const,
-  observationHistory: (filters: api.ObservationSearchFilters) => ['market-observations', 'history', filters.query ?? '', filters.from ?? '', filters.to ?? '', filters.subjectType ?? '', filters.subject ?? '', filters.instrumentId ?? '', filters.market ?? '', filters.symbol ?? '', filters.tag ?? '', filters.author ?? ''] as const,
-  diaries: ['diaries'] as const,
-  diariesList: (filters: DiaryListKeyFilters) => ['diaries', 'list', filters.q, filters.from, filters.to, filters.review, filters.symbol, filters.tag] as const,
-  diary: (id: string) => ['diary', id] as const,
-  transactions: (id: string) => ['transactions', id] as const,
+  observationHistory: (filters: api.ObservationSearchFilters) =>
+    ['market-observations', 'history', filters.query ?? '', filters.from ?? '', filters.to ?? '',
+      filters.subjectType ?? '', filters.subject ?? '', filters.instrumentId ?? '', filters.market ?? '',
+      filters.symbol ?? '', filters.tag ?? '', filters.author ?? ''] as const,
   calendar: (year: number, month: number) => ['calendar', year, month] as const,
   disciplines: ['disciplines'] as const,
-  alerts: ['alerts'] as const,
+  todayDiscipline: ['discipline-principles', 'today'] as const,
+  patternReview: (range: string, from: string, to: string) => ['pattern-review', range, from, to] as const,
+  comparison: (query: api.ComparisonQuery | null) => ['comparison', query] as const,
   watchlist: ['watchlist'] as const,
-  researchNote: (id: string) => ['research-note', id] as const,
-  researchTimeline: (id: string) => ['research-timeline', id] as const,
-  priceAlerts: {
-    list: ['price-alerts', 'list'] as const,
-    triggers: (id: string) => ['price-alerts', 'triggers', id] as const,
-  },
-  rotation: {
-    universes: ['rotation', 'universes'] as const,
-    monitor: (universe: string, scope: string) => ['rotation', 'monitor', universe, scope] as const,
-  },
-  partners: ['partners'] as const,
-  partnerInvitations: ['partners', 'invitations'] as const,
-  partnerCompare: (linkId: string, from: string, to: string) => ['partners', 'compare', linkId, from, to] as const,
-  articles: ['articles'] as const,
-  article: (slug: string) => ['article', slug] as const,
-  diaryReview: {
-    detail: (diaryId: string) => ['diary-review', 'detail', diaryId] as const,
-    summary: (from: string, to: string) => ['diary-review', 'summary', from, to] as const,
-    summaries: ['diary-review', 'summary'] as const,
-    itemsPrefix: ['diary-review', 'items'] as const,
-    items: (from: string, to: string, status: api.DiaryReviewFilterStatus, assessment: api.DiaryReviewAssessmentFilter, tag: string, cursor: string) =>
-      ['diary-review', 'items', from, to, status, assessment, tag, cursor] as const,
-  },
 }
 
-export const useBootstrapQuery = (enabled = true) => useQuery({ queryKey: queryKeys.bootstrap, queryFn: api.getBootstrap, staleTime: 60_000, enabled })
+export const useBootstrapQuery = (enabled = true) =>
+  useQuery({ queryKey: queryKeys.bootstrap, queryFn: api.getBootstrap, staleTime: 60_000, enabled })
 export const useSettingsQuery = () => useQuery({ queryKey: queryKeys.settings, queryFn: api.getSettings })
-export const useDashboardQuery = () => useQuery({ queryKey: queryKeys.dashboard, queryFn: api.getDashboard })
-export const useTodayObservationQuery = () => useQuery({ queryKey: queryKeys.todayObservation, queryFn: api.getTodayMarketObservation, refetchInterval: 60_000 })
+export const useAgentsQuery = () => useQuery({ queryKey: queryKeys.agents, queryFn: api.getAgents })
+export const useAccessGrantsQuery = () => useQuery({ queryKey: queryKeys.accessGrants, queryFn: api.getAccessGrants })
+export const useTodayObservationQuery = () =>
+  useQuery({ queryKey: queryKeys.todayObservation, queryFn: api.getTodayMarketObservation, refetchInterval: 60_000 })
 export const useExpectationsQuery = () => useQuery({ queryKey: queryKeys.expectations, queryFn: api.getExpectations })
-export const useInstrumentDirectoryQuery = () => useQuery({ queryKey: queryKeys.instrumentDirectory, queryFn: api.getInstrumentDirectory, staleTime: 300_000 })
+export const useExpectationReviewQuery = (id: string) =>
+  useQuery({ queryKey: queryKeys.expectationReview(id), queryFn: () => api.getExpectationReview(id), enabled: !!id })
+export const useReasoningLabelsQuery = () =>
+  useQuery({ queryKey: queryKeys.reasoningLabels, queryFn: api.getReasoningLabels })
+export const useActionDecisionsQuery = (updateId: string) =>
+  useQuery({ queryKey: queryKeys.actionDecisions(updateId), queryFn: () => api.getActionDecisions(updateId), enabled: !!updateId })
+export const useTradeEvidenceQuery = (decisionId: string) =>
+  useQuery({ queryKey: queryKeys.tradeEvidence(decisionId), queryFn: () => api.getTradeEvidence(decisionId), enabled: !!decisionId })
+export const useInstrumentDirectoryQuery = () =>
+  useQuery({ queryKey: queryKeys.instrumentDirectory, queryFn: api.getInstrumentDirectory, staleTime: 300_000 })
 export const useObservationHistoryQuery = (filters: api.ObservationSearchFilters) => useInfiniteQuery({
   queryKey: queryKeys.observationHistory(filters),
   initialPageParam: undefined as string | undefined,
   queryFn: ({ pageParam }) => api.getObservationHistory(filters, pageParam),
   getNextPageParam: page => page.nextCursor ?? undefined,
 })
-export const useDiariesInfiniteQuery = (filters: DiaryListKeyFilters) => useInfiniteQuery({
-  queryKey: queryKeys.diariesList(filters),
-  initialPageParam: undefined as string | undefined,
-  queryFn: ({ pageParam }) => api.getDiaries({
-    query: filters.q || undefined,
-    from: filters.from || undefined,
-    to: filters.to || undefined,
-    reviewStatus: (filters.review as api.DiaryListQuery['reviewStatus']) || 'all',
-    symbol: filters.symbol || undefined,
-    tag: filters.tag || undefined,
-    cursor: pageParam,
-    limit: 20,
-  }),
-  getNextPageParam: (last) => last.nextCursor ?? undefined,
-})
-/** Searchable diary picker (alerts). Server-side page; not an archive dump. */
-export const useDiaryPickerQuery = (q: string) => useQuery({
-  queryKey: ['diaries', 'picker', q] as const,
-  queryFn: () => api.getDiaries({ query: q || undefined, limit: 20 }),
-})
-// Compact list for pickers that still need a simple list. Prefer useDiaryPickerQuery for large accounts.
-export const useDiariesQuery = () => useQuery({
-  queryKey: queryKeys.diariesList({ q: '', from: '', to: '', review: 'all', symbol: '', tag: '' }),
-  queryFn: () => api.getDiaries({ limit: 100 }),
-})
-export const useDiaryQuery = (id: string) => useQuery({ queryKey: queryKeys.diary(id), queryFn: () => api.getDiary(id), enabled: !!id })
-export const useTransactionsQuery = (id: string) => useQuery({ queryKey: queryKeys.transactions(id), queryFn: () => api.getTransactions(id), enabled: !!id })
-export const useCalendarQuery = (year: number, month: number) => useQuery({ queryKey: queryKeys.calendar(year, month), queryFn: () => api.getCalendar(year, month) })
+export const useCalendarQuery = (year: number, month: number) =>
+  useQuery({ queryKey: queryKeys.calendar(year, month), queryFn: () => api.getCalendar(year, month) })
 export const useDisciplinesQuery = () => useQuery({ queryKey: queryKeys.disciplines, queryFn: api.getDisciplines })
-export const useAlertsQuery = () => useQuery({ queryKey: queryKeys.alerts, queryFn: api.getAlerts })
+export const useTodayDisciplineQuery = () =>
+  useQuery({ queryKey: queryKeys.todayDiscipline, queryFn: api.getTodayDiscipline })
+export const usePatternReviewQuery = (range: 'weekly' | 'monthly' | 'custom', from = '', to = '') => useQuery({
+  queryKey: queryKeys.patternReview(range, from, to),
+  queryFn: () => api.getPatternReview(range, from || undefined, to || undefined),
+  enabled: range !== 'custom' || (!!from && !!to && from <= to),
+})
+export const useComparisonQuery = (query: api.ComparisonQuery | null) => useQuery({
+  queryKey: queryKeys.comparison(query),
+  queryFn: () => api.getComparison(query!),
+  enabled: query !== null,
+})
 export const useWatchlistQuery = () => useQuery({ queryKey: queryKeys.watchlist, queryFn: api.getWatchlist })
-export const useResearchNoteQuery = (id: string) => useQuery({ queryKey: queryKeys.researchNote(id), queryFn: () => api.getResearchNote(id), enabled: !!id })
-export const useResearchTimelineQuery = (id: string) => useQuery({ queryKey: queryKeys.researchTimeline(id), queryFn: () => api.getResearchTimeline(id), enabled: !!id })
-export const usePriceAlertsQuery = () => useQuery({ queryKey: queryKeys.priceAlerts.list, queryFn: api.getPriceAlerts })
-export const usePriceAlertTriggersQuery = (id: string | null) => useQuery({ queryKey: queryKeys.priceAlerts.triggers(id ?? ''), queryFn: () => api.getPriceAlertTriggers(id!), enabled: !!id })
-export const useRotationUniversesQuery = () => useQuery({ queryKey: queryKeys.rotation.universes, queryFn: api.getRotationUniverses, staleTime: 60_000 })
-export const useRotationQuery = (universe: string, scope: string) => useQuery({
-  queryKey: queryKeys.rotation.monitor(universe, scope),
-  queryFn: () => api.getMarketRotation(universe),
-  enabled: !!universe && !!scope,
-  placeholderData: previous => previous,
-})
-export const usePartnersQuery = () => useQuery({ queryKey: queryKeys.partners, queryFn: api.getPartners })
-export const usePartnerInvitationsQuery = () => useQuery({ queryKey: queryKeys.partnerInvitations, queryFn: api.getPartnerInvitations })
-export const usePartnerCompareQuery = (linkId: string, from: string, to: string) => useQuery({
-  queryKey: queryKeys.partnerCompare(linkId, from, to),
-  queryFn: () => api.getPartnerCompare(linkId, from || undefined, to || undefined),
-  enabled: !!linkId && !!from && !!to,
-})
-export function useCreatePartnerInvitationMutation() {
+
+const calendarPrefix = ['calendar'] as const
+const invalidateCalendar = (client: ReturnType<typeof useQueryClient>) =>
+  client.invalidateQueries({ queryKey: calendarPrefix })
+
+export function useCreateExpectationMutation() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: api.createPartnerInvitation,
-    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.partnerInvitations }) },
-  })
-}
-export function useRevokePartnerInvitationMutation() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => api.revokePartnerInvitation(id),
-    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.partnerInvitations }) },
-  })
-}
-export function useRedeemPartnerInvitationMutation() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (code: string) => api.redeemPartnerInvitation(code),
+    mutationFn: ({ updateId, body, key }: { updateId: string; body: api.ExpectationWrite; key: string }) =>
+      api.createExpectation(updateId, body, key),
     onSuccess: async () => {
       await Promise.all([
-        client.invalidateQueries({ queryKey: queryKeys.partners }),
-        client.invalidateQueries({ queryKey: queryKeys.partnerInvitations }),
+        client.invalidateQueries({ queryKey: queryKeys.expectations }),
+        client.invalidateQueries({ queryKey: queryKeys.todayObservation }),
+        invalidateCalendar(client),
       ])
     },
   })
 }
-export function useAcceptPartnerMutation() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => api.acceptPartner(id),
-    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.partners }) },
-  })
-}
-export function useRevokePartnerMutation() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => api.revokePartner(id),
-    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.partners }) },
-  })
-}
-export function usePartnerShareDiariesMutation() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, shareDiaries }: { id: string; shareDiaries: boolean }) => api.setPartnerShareDiaries(id, shareDiaries),
-    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.partners }) },
-  })
-}
-export const useArticlesQuery = () => useQuery({ queryKey: queryKeys.articles, queryFn: api.getArticles })
-export const useArticleQuery = (slug: string) => useQuery({ queryKey: queryKeys.article(slug), queryFn: () => api.getArticle(slug), enabled: !!slug })
-export const useDiaryReviewQuery = (diaryId: string) => useQuery({ queryKey: queryKeys.diaryReview.detail(diaryId), queryFn: () => api.getDiaryReview(diaryId), enabled: !!diaryId })
-export const useDiaryReviewSummaryQuery = (from: string, to: string) => useQuery({ queryKey: queryKeys.diaryReview.summary(from, to), queryFn: () => api.getDiaryReviewSummary(from, to), enabled: !!from && !!to })
-export const useDiaryReviewItemsQuery = (from: string, to: string, status: api.DiaryReviewFilterStatus, assessment: api.DiaryReviewAssessmentFilter, tag: string, cursor: string) => useQuery({
-  queryKey: queryKeys.diaryReview.items(from, to, status, assessment, tag, cursor),
-  queryFn: () => api.getDiaryReviewItems(from, to, status, assessment, tag || undefined, cursor || undefined),
-  enabled: !!from && !!to,
-})
 
-const calendarPrefix = ['calendar'] as const
-const invalidateCalendar = (client: ReturnType<typeof useQueryClient>) => client.invalidateQueries({ queryKey: calendarPrefix })
-
-export function useCreateExpectationMutation() {
+function useInvalidatingMutation<T>(operation: (value: T) => Promise<unknown>, keys: readonly (readonly unknown[])[]) {
   const client = useQueryClient()
-  return useMutation({ mutationFn: ({ updateId, body, key }: { updateId: string; body: api.ExpectationWrite; key: string }) => api.createExpectation(updateId, body, key), onSuccess: async () => {
-    await Promise.all([
-      client.invalidateQueries({ queryKey: queryKeys.expectations }),
-      client.invalidateQueries({ queryKey: queryKeys.todayObservation }),
-      invalidateCalendar(client),
-    ])
-  } })
+  return useMutation({
+    mutationFn: operation,
+    onSuccess: async () => { await Promise.all(keys.map(queryKey => client.invalidateQueries({ queryKey }))) },
+  })
 }
 
 export const useUpdateExpectationMutation = () => useInvalidatingMutation(
   ({ id, body }: { id: string; body: api.ExpectationWrite }) => api.updateExpectation(id, body),
   [queryKeys.expectations, calendarPrefix],
 )
-export const useInvalidateExpectationMutation = () => useInvalidatingMutation(api.invalidateExpectation, [queryKeys.expectations, calendarPrefix])
-
-export function useQuickNoteMutation() {
+export const useInvalidateExpectationMutation = () =>
+  useInvalidatingMutation(api.invalidateExpectation, [queryKeys.expectations, calendarPrefix])
+export function useSaveExpectationReviewMutation(id: string) {
   const client = useQueryClient()
-  return useMutation({ mutationFn: ({ date, content, key }: { date: string; content: string; key: string }) => api.saveQuickNote(date, content, key), onSuccess: async () => {
-    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.diaries }), client.invalidateQueries({ queryKey: queryKeys.dashboard }), invalidateCalendar(client)])
-  } })
+  return useMutation({
+    mutationFn: (body: api.ExpectationReviewWrite) => api.saveExpectationReview(id, body),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.expectationReview(id) }),
+        client.invalidateQueries({ queryKey: queryKeys.expectations }),
+        invalidateCalendar(client),
+      ])
+    },
+  })
 }
-
+export function useCreateReasoningLabelMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ kind, name }: { kind: api.ReasoningLabelKind; name: string }) => api.createReasoningLabel(kind, name),
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.reasoningLabels }) },
+  })
+}
+export function useCreateActionDecisionMutation(updateId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: api.ActionDecisionWrite) => api.createActionDecision(updateId, body),
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.actionDecisions(updateId) }) },
+  })
+}
+export function useUpdateActionDecisionMutation(updateId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: api.ActionDecisionWrite }) => api.updateActionDecision(id, body),
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.actionDecisions(updateId) }) },
+  })
+}
+export function useDeleteActionDecisionMutation(updateId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: api.deleteActionDecision,
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.actionDecisions(updateId) }) },
+  })
+}
+export function useCreateTradeEvidenceMutation(decisionId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: api.TradeEvidenceWrite) => api.createTradeEvidence(decisionId, body),
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.tradeEvidence(decisionId) }) },
+  })
+}
 export function useQuickObservationMutation() {
   const client = useQueryClient()
-  return useMutation({ mutationFn: ({ content, key }: { content: string; key: string }) => api.saveQuickObservation(content, key), onSuccess: async () => {
-    await client.invalidateQueries({ queryKey: queryKeys.todayObservation })
-  } })
+  return useMutation({
+    mutationFn: ({ content, key }: { content: string; key: string }) => api.saveQuickObservation(content, key),
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.todayObservation }) },
+  })
 }
-
 export function useUpdateObservationMutation() {
   const client = useQueryClient()
-  return useMutation({ mutationFn: ({ id, body }: { id: string; body: api.ObservationUpdateWrite }) => api.updateObservation(id, body), onSuccess: async () => {
-    await client.invalidateQueries({ queryKey: queryKeys.todayObservation })
-  } })
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: api.ObservationUpdateWrite }) => api.updateObservation(id, body),
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.todayObservation }) },
+  })
 }
 
-export function useSaveDiaryMutation() {
-  const client = useQueryClient()
-  return useMutation({ mutationFn: ({ id, date, title, content, tags, key }: { id?: string; date: string; title: string; content: string; tags: string[]; key: string }) => id ? api.updateDiary(id, date, title, content, tags) : api.createDiary(date, title, content, tags, key), onSuccess: async (result, vars) => {
-    await Promise.all([
-      client.invalidateQueries({ queryKey: queryKeys.diaries }),
-      client.invalidateQueries({ queryKey: queryKeys.dashboard }),
-      invalidateCalendar(client),
-      vars.id ? client.invalidateQueries({ queryKey: queryKeys.diary(vars.id) }) : Promise.resolve(),
-    ])
-    return result
-  } })
-}
-
-export function useDeleteDiaryMutation() {
-  const client = useQueryClient()
-  return useMutation({ mutationFn: api.deleteDiary, onSuccess: async (_, id) => {
-    await Promise.all([
-      client.invalidateQueries({ queryKey: queryKeys.diaries }),
-      client.invalidateQueries({ queryKey: queryKeys.dashboard }),
-      invalidateCalendar(client),
-      client.invalidateQueries({ queryKey: queryKeys.diary(id) }),
-    ])
-  } })
-}
-
-export function useCreateTransactionMutation(diaryId: string) {
-  const client = useQueryClient()
-  return useMutation({ mutationFn: ({ body, key }: { body: Parameters<typeof api.createTransaction>[1]; key: string }) => api.createTransaction(diaryId, body, key), onSuccess: async () => {
-    await Promise.all([
-      client.invalidateQueries({ queryKey: queryKeys.transactions(diaryId) }),
-      client.invalidateQueries({ queryKey: queryKeys.diaries }),
-      invalidateCalendar(client),
-    ])
-  } })
-}
-
-export function useUpdateTransactionMutation(diaryId: string) {
-  const client = useQueryClient()
-  return useMutation({ mutationFn: ({ id, body }: { id: string; body: Parameters<typeof api.updateTransaction>[2] }) => api.updateTransaction(diaryId, id, body), onSuccess: async () => {
-    await Promise.all([
-      client.invalidateQueries({ queryKey: queryKeys.transactions(diaryId) }),
-      client.invalidateQueries({ queryKey: queryKeys.diaries }),
-      invalidateCalendar(client),
-    ])
-  } })
-}
-
-export function useDeleteTransactionMutation(diaryId: string) {
-  const client = useQueryClient()
-  return useMutation({ mutationFn: (id: string) => api.deleteTransaction(diaryId, id), onSuccess: async () => {
-    await Promise.all([
-      client.invalidateQueries({ queryKey: queryKeys.transactions(diaryId) }),
-      client.invalidateQueries({ queryKey: queryKeys.diaries }),
-      invalidateCalendar(client),
-    ])
-  } })
-}
-
-function useInvalidatingMutation<T>(operation: (value: T) => Promise<unknown>, keys: readonly (readonly unknown[])[]) {
-  const client = useQueryClient()
-  return useMutation({ mutationFn: operation, onSuccess: async () => { await Promise.all(keys.map(queryKey => client.invalidateQueries({ queryKey }))) } })
-}
-
-export const useCreateDisciplineMutation = () => useInvalidatingMutation(api.createDiscipline, [queryKeys.disciplines, queryKeys.dashboard])
-export const useDeleteDisciplineMutation = () => useInvalidatingMutation(api.deleteDiscipline, [queryKeys.disciplines, queryKeys.dashboard])
-export const useCreateAlertMutation = () => useInvalidatingMutation(api.createAlert, [queryKeys.alerts, queryKeys.dashboard, calendarPrefix])
-export const useDismissAlertMutation = () => useInvalidatingMutation(api.dismissAlert, [queryKeys.alerts, queryKeys.dashboard, calendarPrefix])
-export const useDeleteAlertMutation = () => useInvalidatingMutation(api.deleteAlert, [queryKeys.alerts, queryKeys.dashboard, calendarPrefix])
+export const useCreateDisciplineMutation = () =>
+  useInvalidatingMutation(api.createDiscipline, [queryKeys.disciplines, queryKeys.todayDiscipline])
+export const useUpdateDisciplineMutation = () => useInvalidatingMutation(
+  ({ id, content, status }: { id: string; content: string; status: api.DisciplinePrincipleStatus }) =>
+    api.updateDiscipline(id, content, status),
+  [queryKeys.disciplines, queryKeys.todayDiscipline],
+)
+export const useSelectDisciplineMutation = () =>
+  useInvalidatingMutation(api.selectDiscipline, [queryKeys.disciplines, queryKeys.todayDiscipline])
 export const useAddWatchlistMutation = () => useInvalidatingMutation(api.addWatchlist, [queryKeys.watchlist])
 export const useRemoveWatchlistMutation = () => useInvalidatingMutation(api.removeWatchlist, [queryKeys.watchlist])
-export const useSaveResearchNoteMutation = (id: string) => useInvalidatingMutation((content: string) => api.saveResearchNote(id, content), [queryKeys.researchNote(id), queryKeys.researchTimeline(id), queryKeys.watchlist])
-export const useAddPriceAlertMutation = () => useInvalidatingMutation(({ symbol, threshold, condition, evaluationPrice }: { symbol: string; threshold: number; condition: string; evaluationPrice: api.PriceAlertEvaluationPrice }) => api.addPriceAlert(symbol, threshold, condition, evaluationPrice), [queryKeys.priceAlerts.list])
-export function useDeletePriceAlertMutation() {
-  const client = useQueryClient()
-  return useMutation({ mutationFn: api.deletePriceAlert, onSuccess: async (_, id) => {
-    await Promise.all([
-      client.invalidateQueries({ queryKey: queryKeys.priceAlerts.list }),
-      client.invalidateQueries({ queryKey: queryKeys.priceAlerts.triggers(id) }),
-    ])
-  } })
-}
-function usePriceAlertLifecycleMutation(operation: (id: string) => Promise<unknown>) {
-  const client = useQueryClient()
-  return useMutation({ mutationFn: operation, onSuccess: async (_, id) => {
-    await Promise.all([
-      client.invalidateQueries({ queryKey: queryKeys.priceAlerts.list }),
-      client.invalidateQueries({ queryKey: queryKeys.priceAlerts.triggers(id) }),
-    ])
-  } })
-}
-export const useDismissPriceAlertMutation = () => usePriceAlertLifecycleMutation(api.dismissPriceAlert)
-export const useReactivatePriceAlertMutation = () => usePriceAlertLifecycleMutation(api.reactivatePriceAlert)
-export const useCreateAgentMutation = () => useMutation({ mutationFn: api.createAgent })
+export const useSaveWatchlistNoteMutation = () => useInvalidatingMutation(
+  ({ instrumentId, note }: { instrumentId: string; note: string }) => api.saveWatchlistNote(instrumentId, note),
+  [queryKeys.watchlist],
+)
 
-export function useSaveDiaryReviewMutation(diaryId: string) {
+export function useCreateAgentMutation() {
   const client = useQueryClient()
-  return useMutation({ mutationFn: (body: api.DiaryReviewWrite) => api.saveDiaryReview(diaryId, body), onSuccess: async () => {
-    await Promise.all([
-      client.invalidateQueries({ queryKey: queryKeys.diaryReview.detail(diaryId) }),
-      client.invalidateQueries({ queryKey: queryKeys.diaryReview.summaries }),
-      client.invalidateQueries({ queryKey: queryKeys.diaryReview.itemsPrefix }),
-      client.invalidateQueries({ queryKey: queryKeys.diary(diaryId) }),
-      client.invalidateQueries({ queryKey: queryKeys.diaries }),
-    ])
+  return useMutation({ mutationFn: api.createAgent, onSuccess: async () => {
+    await client.invalidateQueries({ queryKey: queryKeys.agents })
   } })
 }
-
-export function useDeleteDiaryReviewMutation(diaryId: string) {
+export function useRotateAgentTokenMutation() {
   const client = useQueryClient()
-  return useMutation({ mutationFn: () => api.deleteDiaryReview(diaryId), onSuccess: async () => {
-    await Promise.all([
-      client.invalidateQueries({ queryKey: queryKeys.diaryReview.detail(diaryId) }),
-      client.invalidateQueries({ queryKey: queryKeys.diaryReview.summaries }),
-      client.invalidateQueries({ queryKey: queryKeys.diaryReview.itemsPrefix }),
-      client.invalidateQueries({ queryKey: queryKeys.diary(diaryId) }),
-      client.invalidateQueries({ queryKey: queryKeys.diaries }),
-    ])
+  return useMutation({ mutationFn: api.rotateAgentToken, onSuccess: async () => {
+    await client.invalidateQueries({ queryKey: queryKeys.agents })
+  } })
+}
+export function useRevokeAgentTokenMutation() {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: api.revokeAgentToken, onSuccess: async () => {
+    await client.invalidateQueries({ queryKey: queryKeys.agents })
+  } })
+}
+export function useCreateAccessGrantMutation() {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: api.createAccessGrant, onSuccess: async () => {
+    await client.invalidateQueries({ queryKey: queryKeys.accessGrants })
+  } })
+}
+export function useRevokeAccessGrantMutation() {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: api.revokeAccessGrant, onSuccess: async () => {
+    await client.invalidateQueries({ queryKey: queryKeys.accessGrants })
   } })
 }
 
@@ -346,8 +225,6 @@ export function useSaveSettingsMutation() {
       if (!settings) throw new Error('settings_write_skipped')
       const refreshed = await session.refreshSession()
       if (!refreshed) {
-        // Settings persisted in Identity; access token claims may be stale. Clear the
-        // in-memory token without a second refresh-rotation attempt.
         session.clearAccessToken()
         return {
           status: 'saved_session_stale',
@@ -361,12 +238,8 @@ export function useSaveSettingsMutation() {
       await Promise.all([
         client.invalidateQueries({ queryKey: queryKeys.settings }),
         client.invalidateQueries({ queryKey: queryKeys.bootstrap }),
-        client.invalidateQueries({ queryKey: queryKeys.dashboard }),
         client.invalidateQueries({ queryKey: queryKeys.todayObservation }),
         client.invalidateQueries({ queryKey: calendarPrefix }),
-        client.invalidateQueries({ queryKey: queryKeys.diaries }),
-        client.invalidateQueries({ queryKey: queryKeys.diaryReview.summaries }),
-        client.invalidateQueries({ queryKey: queryKeys.alerts }),
       ])
       await client.refetchQueries({ queryKey: queryKeys.bootstrap })
       return { status: 'ok', settings }

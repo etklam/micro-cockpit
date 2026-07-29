@@ -26,7 +26,7 @@ access=$(jq -er .accessToken <<<"$first")
 test "$(jq -r '.refreshToken // ""' <<<"$first")" = ""
 refresh1=$(cookie "$first_jar")
 test -n "$refresh1"
-test "$(status -H "Authorization: Bearer $access" "$edge/api/app/diaries")" = 200
+test "$(status -H "Authorization: Bearer $access" "$edge/api/app/bootstrap")" = 200
 
 second=$(curl -sS -H 'Content-Type: application/json' -b "td_refresh=$refresh1" -c "$tmp/second.cookies" -X POST "$edge/api/auth/refresh")
 refresh2=$(cookie "$tmp/second.cookies")

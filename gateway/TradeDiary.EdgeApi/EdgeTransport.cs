@@ -50,6 +50,20 @@ internal sealed class EdgeTransport(IHttpClientFactory clients, IConfiguration c
         return Deserialize<TResponse>(raw);
     }
 
+    internal async Task<DownstreamResponse<bool>> SendEmptyAsync(
+        string service, string path, HttpMethod method, HttpContext context)
+    {
+        var raw = await SendAsync(service, path, method, null, context);
+        return new DownstreamResponse<bool>(raw.StatusCode, raw.StatusCode is >= 200 and < 300, raw.Failure);
+    }
+
+    internal async Task<DownstreamResponse<bool>> SendJsonEmptyAsync<TRequest>(
+        string service, string path, HttpMethod method, TRequest body, HttpContext context)
+    {
+        var raw = await SendAsync(service, path, method, JsonSerializer.Serialize(body, Json), context);
+        return new DownstreamResponse<bool>(raw.StatusCode, raw.StatusCode is >= 200 and < 300, raw.Failure);
+    }
+
     private static DownstreamResponse<T> Deserialize<T>(RawDownstreamResponse raw)
     {
         if (raw.Failure != DownstreamFailure.None)

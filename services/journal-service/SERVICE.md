@@ -1,19 +1,16 @@
-# Journal Service
+# Journal service
 
-Owns `journal.*`: Market Observations and timestamped Observation Updates, plus legacy diaries and their transactions during cutover.
+Owns `journal.*`: Market Observations and timestamped updates, Expectations and owner reviews, reasoning labels, Action Decisions and optional Trade evidence, Watchlist notes, Discipline Principles, Access Grants, change cursors, and content-free deletion records.
 
-- Never reads or writes another service schema.
-- Every user-owned lookup includes both `user_id` and resource ID.
-- Missing and cross-user resources both return 404.
-- Transactions are diary records only; no holdings or cost basis is derived.
-- `POST /internal/quick-observations` derives Journal Day from authenticated timezone and rollover claims, atomically creates or reuses that day's Market Observation, and appends one timestamped Observation Update.
-- `POST /internal/diaries`, `POST /internal/quick-note`, `POST /internal/quick-observations`, and transaction creation accept an optional `Idempotency-Key` (maximum 200 characters). The key is scoped by user and operation; an identical retry returns the stored result, while reuse with another payload returns 409.
+Key invariants:
 
-## Partner diary projection
+- A Market Observation belongs to one User and one Journal Day.
+- Child records preserve the same owner.
+- Trades are evidence, never holdings or accounting records.
+- Quick Observation and selected creates support scoped idempotency keys.
+- Access Grants are revocable read-only closures; they never permit editing another owner’s record.
+- Human / Agent comparison reads remain owner-labeled and apply the active grant’s date and subject scope to Agent records.
+- Deletions physically remove personal content and expose only record ID, type, version, operation, and time to incremental consumers.
+- Cross-user misses are non-disclosing.
 
-`GET /internal/partner-diaries?ownerId&from&to` is Edge-composition only (not a browser Edge route).
-
-- Viewer JWT required; self-read as partner is `404`.
-- Partner service is asked for diary authorization; deny → `404`, Partner unavailable → `503`.
-- Response is a sanitized projection: `id`, `localDate`, `title`, `content`, `tags` only. Transactions, reviews, and internal metadata are never selected.
-- Inclusive max range: `to.DayNumber - from.DayNumber <= 365` (inclusive 366-day window). Larger ranges return `invalid_date_range`. Diary-review summary uses the same rule via `DiaryReviewRules.InvalidRange`.
+See the generated Journal OpenAPI document for the authoritative route and DTO inventory.

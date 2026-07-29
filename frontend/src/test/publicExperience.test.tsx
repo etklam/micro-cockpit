@@ -30,15 +30,15 @@ function renderPublic(path = '/') {
 describe('public experience', () => {
   it('renders landing sections, preview, trust, and free-tool links', async () => {
     renderPublic('/')
-    expect(await screen.findByRole('heading', { name: 'A quiet cockpit for reflection.' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'A cockpit for developing a market view.' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'How it works' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'What it is for' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'What you get' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Tools you can use without signing in' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Built for honest notes' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Built for accountable observations' })).toBeInTheDocument()
     expect(screen.getByLabelText('Preview')).toBeInTheDocument()
     expect(screen.getByText('Quick note')).toBeInTheDocument()
-    expect(screen.getByText('Daily P/L')).toBeInTheDocument()
+    expect(screen.getByText('Expectation confidence')).toBeInTheDocument()
     expect(screen.getByText('No brokerage execution or order routing')).toBeInTheDocument()
     expect(screen.getByText('Decision support, not investment advice')).toBeInTheDocument()
     for (const tool of TOOL_CATALOG) {
@@ -50,7 +50,7 @@ describe('public experience', () => {
 
   it('exposes product/features anchors and tools dropdown content', async () => {
     renderPublic('/')
-    await screen.findByRole('heading', { name: 'A quiet cockpit for reflection.' })
+    await screen.findByRole('heading', { name: 'A cockpit for developing a market view.' })
     const desktopNav = screen.getByRole('navigation', { name: 'Public' })
     expect(within(desktopNav).getByRole('link', { name: 'Product' })).toHaveAttribute('href', '/#product')
     expect(within(desktopNav).getByRole('link', { name: 'Features' })).toHaveAttribute('href', '/#features')
@@ -64,7 +64,7 @@ describe('public experience', () => {
 
   it('supports arrow-key focus in tools dropdown', async () => {
     renderPublic('/')
-    await screen.findByRole('heading', { name: 'A quiet cockpit for reflection.' })
+    await screen.findByRole('heading', { name: 'A cockpit for developing a market view.' })
     const toolsBtn = screen.getByRole('button', { name: 'Tools' })
     toolsBtn.focus()
     await userEvent.keyboard('{ArrowDown}')
@@ -80,7 +80,7 @@ describe('public experience', () => {
   it('opens mobile menu with product, tools, language, and independent theme switches', async () => {
     // Force mobile drawer path: open menu button is always in DOM for mobile actions CSS, but still in document
     renderPublic('/')
-    await screen.findByRole('heading', { name: 'A quiet cockpit for reflection.' })
+    await screen.findByRole('heading', { name: 'A cockpit for developing a market view.' })
     const menuButton = screen.getByRole('button', { name: 'Menu' })
     await userEvent.click(menuButton)
     const drawer = document.getElementById(menuButton.getAttribute('aria-controls') ?? '')
@@ -115,10 +115,10 @@ describe('public experience', () => {
 
   it('switches public copy to Traditional Chinese', async () => {
     renderPublic('/')
-    await screen.findByRole('heading', { name: 'A quiet cockpit for reflection.' })
+    await screen.findByRole('heading', { name: 'A cockpit for developing a market view.' })
     const lang = screen.getAllByRole('group', { name: 'Language' })[0]
     await userEvent.click(within(lang).getByRole('button', { name: '繁' }))
-    expect(await screen.findByRole('heading', { name: '安靜的反思駕駛艙。' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '培養市場觀點的駕駛艙。' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '使用方式' })).toBeInTheDocument()
   })
 })

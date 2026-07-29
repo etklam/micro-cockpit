@@ -1,6 +1,7 @@
 <Solution>
-  <Folder Name="/platform/" />
-  <Folder Name="/platform/postgres/" />
+  <Folder Name="/platform/">
+    <Project Path="platform/TradeDiary.Authorization/TradeDiary.Authorization.csproj" />
+  </Folder>
   <Folder Name="/platform/postgres/migrator/">
     <Project Path="platform/postgres/migrator/TradeDiary.DatabaseMigrator/TradeDiary.DatabaseMigrator.csproj" />
   </Folder>
@@ -10,91 +11,24 @@
   <Folder Name="/gateway/">
     <Project Path="gateway/TradeDiary.EdgeApi/TradeDiary.EdgeApi.csproj" />
   </Folder>
-  <Folder Name="/services/" />
-  <Folder Name="/services/content-service/" />
-  <Folder Name="/services/content-service/src/">
-    <Project Path="services/content-service/src/TradeDiary.Content/TradeDiary.Content.csproj" />
-  </Folder>
-  <Folder Name="/services/discipline-service/" />
-  <Folder Name="/services/discipline-service/src/">
-    <Project Path="services/discipline-service/src/TradeDiary.Discipline/TradeDiary.Discipline.csproj" />
-  </Folder>
-  <Folder Name="/services/identity-service/" />
   <Folder Name="/services/identity-service/src/">
     <Project Path="services/identity-service/src/TradeDiary.Identity/TradeDiary.Identity.csproj" />
   </Folder>
-  <Folder Name="/services/journal-service/" />
   <Folder Name="/services/journal-service/src/">
     <Project Path="services/journal-service/src/TradeDiary.Journal/TradeDiary.Journal.csproj" />
   </Folder>
-  <Folder Name="/services/market-data-service/" />
   <Folder Name="/services/market-data-service/src/">
     <Project Path="services/market-data-service/src/TradeDiary.MarketData/TradeDiary.MarketData.csproj" />
   </Folder>
-  <Folder Name="/services/operations-service/" />
-  <Folder Name="/services/operations-service/src/">
-    <Project Path="services/operations-service/src/TradeDiary.Operations/TradeDiary.Operations.csproj" />
-  </Folder>
-  <Folder Name="/services/partner-service/" />
-  <Folder Name="/services/partner-service/src/">
-    <Project Path="services/partner-service/src/TradeDiary.Partner/TradeDiary.Partner.csproj" />
-  </Folder>
-  <Folder Name="/services/performance-service/" />
-  <Folder Name="/services/performance-service/src/">
-    <Project Path="services/performance-service/src/TradeDiary.Performance/TradeDiary.Performance.csproj" />
-  </Folder>
-  <Folder Name="/services/reminder-service/" />
-  <Folder Name="/services/reminder-service/src/">
-    <Project Path="services/reminder-service/src/TradeDiary.Reminder/TradeDiary.Reminder.csproj" />
-  </Folder>
-  <Folder Name="/services/tool-service/" />
   <Folder Name="/services/tool-service/src/">
     <Project Path="services/tool-service/src/TradeDiary.Tool/TradeDiary.Tool.csproj" />
   </Folder>
-  <Folder Name="/services/price-alert-service/" />
-  <Folder Name="/services/price-alert-service/src/">
-    <Project Path="services/price-alert-service/src/TradeDiary.PriceAlert/TradeDiary.PriceAlert.csproj" />
-  </Folder>
-  <Folder Name="/services/stock-research-service/src/">
-    <Project Path="services/stock-research-service/src/TradeDiary.StockResearch/TradeDiary.StockResearch.csproj" />
-  </Folder>
-  <Folder Name="/services/rotation-service/src/">
-    <Project Path="services/rotation-service/src/TradeDiary.Rotation/TradeDiary.Rotation.csproj" />
-  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/TradeDiary.DatabaseMigrator.Tests/TradeDiary.DatabaseMigrator.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/TradeDiary.Identity.Tests/">
-    <Project Path="tests/TradeDiary.Identity.Tests/TradeDiary.Identity.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/TradeDiary.Journal.Tests/">
-    <Project Path="tests/TradeDiary.Journal.Tests/TradeDiary.Journal.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/TradeDiary.MarketData.Tests/">
-    <Project Path="tests/TradeDiary.MarketData.Tests/TradeDiary.MarketData.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/TradeDiary.Partner.Tests/">
-    <Project Path="tests/TradeDiary.Partner.Tests/TradeDiary.Partner.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/TradeDiary.Performance.Tests/">
-    <Project Path="tests/TradeDiary.Performance.Tests/TradeDiary.Performance.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/TradeDiary.Operations.Tests/">
-    <Project Path="tests/TradeDiary.Operations.Tests/TradeDiary.Operations.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/TradeDiary.Reminder.Tests/">
-    <Project Path="tests/TradeDiary.Reminder.Tests/TradeDiary.Reminder.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/TradeDiary.PriceAlert.Tests/">
-    <Project Path="tests/TradeDiary.PriceAlert.Tests/TradeDiary.PriceAlert.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/TradeDiary.Rotation.Tests/">
-    <Project Path="tests/TradeDiary.Rotation.Tests/TradeDiary.Rotation.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/TradeDiary.EdgeApi.Tests/">
     <Project Path="tests/TradeDiary.EdgeApi.Tests/TradeDiary.EdgeApi.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/TradeDiary.Tool.Tests/">
+    <Project Path="tests/TradeDiary.Identity.Tests/TradeDiary.Identity.Tests.csproj" />
+    <Project Path="tests/TradeDiary.Journal.Tests/TradeDiary.Journal.Tests.csproj" />
+    <Project Path="tests/TradeDiary.MarketData.Tests/TradeDiary.MarketData.Tests.csproj" />
     <Project Path="tests/TradeDiary.Tool.Tests/TradeDiary.Tool.Tests.csproj" />
   </Folder>
 </Solution>

@@ -4,8 +4,7 @@ import type { ConfirmOpts } from './ui'
 import { useI18n } from './i18n'
 
 export type Page =
-  | 'today' | 'diary' | 'calendar' | 'discipline' | 'alerts' | 'more' | 'review' | 'settings'
-  | 'watchlist' | 'price-alerts' | 'rotation' | 'partners' | 'articles' | 'tools'
+  | 'today' | 'review' | 'watchlist' | 'calendar' | 'tools' | 'settings'
 
 type Cockpit = { go: (page: Page) => void; confirm: (options: ConfirmOpts) => Promise<boolean> }
 const CockpitContext = createContext<Cockpit>(null!)

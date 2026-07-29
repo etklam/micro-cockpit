@@ -49,6 +49,8 @@ jobs:
         run: npm --prefix frontend run lint
       - name: Frontend production build
         run: npm --prefix frontend run build
+      - name: Frontend tests
+        run: npm --prefix frontend test -- --run
 
       - name: Architecture boundary checks
         run: ./tests/verify-architecture.sh
@@ -74,7 +76,6 @@ jobs:
           python3 scripts/verify-no-plaintext-k8s-secrets.py
           ./tests/verify-secret-handling.sh
           ./tests/verify-deployment-safety.sh
-          ./tests/verify-rotation-safety.sh
           ./tests/verify-runtime-secret-source.sh
           ./tests/verify-k8s-operation-lock.sh
           ./tests/verify-migration-safety.sh
@@ -85,18 +86,10 @@ jobs:
           MIGRATOR_DB_PASSWORD: ci
           IDENTITY_DB_PASSWORD: ci
           JOURNAL_DB_PASSWORD: ci
-          PERFORMANCE_DB_PASSWORD: ci
-          DISCIPLINE_DB_PASSWORD: ci
-          REMINDER_DB_PASSWORD: ci
-          STOCK_RESEARCH_DB_PASSWORD: ci
           MARKET_DATA_DB_PASSWORD: ci
-          PRICE_ALERT_DB_PASSWORD: ci
-          ROTATION_DB_PASSWORD: ci
-          PARTNER_DB_PASSWORD: ci
-          CONTENT_DB_PASSWORD: ci
-          OPERATIONS_DB_PASSWORD: ci
+          TOOL_DB_PASSWORD: ci
           LOCAL_REGISTRATION_KEY: ci
           INTERNAL_SERVICE_KEY: ci
         run: docker compose config --quiet
-      - name: Build journal and reminder images (shared event contract)
+      - name: Build journal image with shared event contract
         run: ./tests/verify-docker-shared-events.sh

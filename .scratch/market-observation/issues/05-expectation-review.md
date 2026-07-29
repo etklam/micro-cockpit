@@ -4,17 +4,17 @@
 
 **Blocked by:** 04 — 建立與追蹤 Expectation
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] 只有 Expectation 擁有者可建立或修改正式 Expectation Review
-- [ ] Outcome 支援 `confirmed / partially_confirmed / invalidated / indeterminate`
-- [ ] reasoning quality 支援 `sound / mixed / weak`
-- [ ] partially confirmed 與 indeterminate 必須填寫簡短理由
-- [ ] 提供 PRD 定義的六個預設 Reasoning Issues 與六個 Reasoning Strengths
-- [ ] 使用者可建立自己的 Reasoning Issue／Strength labels
-- [ ] Daily Close 或其他證據只能輔助判斷，不自動決定 Outcome
-- [ ] 完成 review 後 Expectation readiness 變為 `reviewed`
-- [ ] 覆蓋 validation、owner isolation、deleted source 與雙語回顧流程
+- [x] 只有 Expectation 擁有者可建立或修改正式 Expectation Review
+- [x] Outcome 支援 `confirmed / partially_confirmed / invalidated / indeterminate`
+- [x] reasoning quality 支援 `sound / mixed / weak`
+- [x] partially confirmed 與 indeterminate 必須填寫簡短理由
+- [x] 提供 PRD 定義的六個預設 Reasoning Issues 與六個 Reasoning Strengths
+- [x] 使用者可建立自己的 Reasoning Issue／Strength labels
+- [x] Daily Close 或其他證據只能輔助判斷，不自動決定 Outcome
+- [x] 完成 review 後 Expectation readiness 變為 `reviewed`
+- [x] 覆蓋 validation、owner isolation、deleted source 與雙語回顧流程
 
 **決定（grill 2026-07-27）：**
 - Review 記錄**不存任何 Daily Close 欄位**。Daily Close 僅為 Review 畫面旁附的唯讀證據，缺資料顯示 unavailable 且不阻擋提交（遵 System Never Judges，見 CONTEXT.md 與 ADR-0007）。Review 只存 Outcome、reasoning quality、issue／strength labels 與必要理由。
