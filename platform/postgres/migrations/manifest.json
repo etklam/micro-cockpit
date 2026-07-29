@@ -184,12 +184,12 @@
     {
       "id": "0037",
       "filename": "0037_incremental_record_changes.sql",
-      "sha256": "b1c5f70d5397f17dba3428a011c0c32c02a70c4fd93b338b58814371ab212d92"
+      "sha256": "870e4b24907e873bfb8e99aa8da1a81d775a57744cd4863b70da6d109eb98d3b"
     },
     {
       "id": "0038",
       "filename": "0038_record_deletion_consumer.sql",
-      "sha256": "22d9d33b3b50eb09e3d85f6591788c34d5b98e9bdf1cb4fc3e2df9fab65343ad"
+      "sha256": "544e155e121b8947359a4a9e4b6890cfc279973a3f6ef4579ffaa68e148cf645"
     },
     {
       "id": "0039",
