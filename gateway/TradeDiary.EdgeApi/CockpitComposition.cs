@@ -1,33 +1,34 @@
 using System.Globalization;
-using System.Security.Claims;
 
 internal static class CockpitComposition
 {
     internal sealed record CalendarWindow(int Year, int Month, DateOnly Start, DateOnly End);
 
-    internal static DateOnly ResolveLocalDate(ClaimsPrincipal user, DateTimeOffset nowUtc)
+    // Resolves the authoritative Journal Day from a User's timezone and rollover. This is a
+    // deliberate re-implementation of journal-service JournalDay.Resolve: ADR-0001 forbids a
+    // shared kernel across service boundaries, so both services own the same pure date math.
+    // The Journal Day tests assert the identical behavior matrix in both services so drift is
+    // caught. Invalid persisted preferences throw rather than silently substituting UTC.
+    internal static DateOnly ResolveJournalDay(string timezoneId, string rollover, DateTimeOffset nowUtc)
     {
-        var timezoneId = user.FindFirst("timezone")?.Value ?? "UTC";
-        try
-        {
-            return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(nowUtc, TimeZoneInfo.FindSystemTimeZoneById(timezoneId)).DateTime);
-        }
-        catch
-        {
-            return DateOnly.FromDateTime(nowUtc.UtcDateTime);
-        }
+        if (!TimeZoneInfo.TryFindSystemTimeZoneById(timezoneId, out var zone))
+            throw new ArgumentException("invalid_timezone", nameof(timezoneId));
+        if (!TimeOnly.TryParseExact(rollover, "HH:mm", out var rolloverTime))
+            throw new ArgumentException("invalid_rollover", nameof(rollover));
+
+        var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(nowUtc, zone).DateTime);
+        var boundary = BoundaryUtc(localDate, rolloverTime, zone);
+        return nowUtc.UtcDateTime < boundary ? localDate.AddDays(-1) : localDate;
     }
 
-    internal static DateOnly ResolveLocalDate(string timezoneId, DateTimeOffset nowUtc)
+    private static DateTime BoundaryUtc(DateOnly date, TimeOnly rollover, TimeZoneInfo zone)
     {
-        try
-        {
-            return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(nowUtc, TimeZoneInfo.FindSystemTimeZoneById(timezoneId)).DateTime);
-        }
-        catch
-        {
-            return DateOnly.FromDateTime(nowUtc.UtcDateTime);
-        }
+        var local = date.ToDateTime(rollover, DateTimeKind.Unspecified);
+        while (zone.IsInvalidTime(local)) local = local.AddMinutes(1);
+        var offset = zone.IsAmbiguousTime(local)
+            ? zone.GetAmbiguousTimeOffsets(local).Max()
+            : zone.GetUtcOffset(local);
+        return new DateTimeOffset(local, offset).UtcDateTime;
     }
 
     internal static bool TryCreateCalendarWindow(int year, int month, out CalendarWindow window)

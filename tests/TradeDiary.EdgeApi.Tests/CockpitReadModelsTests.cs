@@ -6,9 +6,75 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 public sealed class CockpitCompositionTests
 {
+    // The identical Journal Day behavior matrix mirrored from journal-service (QuickObservationApiTests).
+    // Edge re-implements JournalDay.Resolve (ADR-0001 forbids a shared kernel), so these assert
+    // cross-adapter parity: the date Bootstrap/Calendar derive must equal the date a Journal write uses.
+    [Theory]
+    [InlineData("2026-07-14T01:29:59Z", "America/Los_Angeles", "18:30", "2026-07-12")]
+    [InlineData("2026-07-14T01:30:00Z", "America/Los_Angeles", "18:30", "2026-07-13")]
+    [InlineData("2026-03-08T09:30:00Z", "America/Los_Angeles", "02:00", "2026-03-07")]
+    [InlineData("2026-03-08T10:00:00Z", "America/Los_Angeles", "02:00", "2026-03-08")]
+    [InlineData("2026-11-01T08:29:59Z", "America/Los_Angeles", "01:30", "2026-10-31")]
+    [InlineData("2026-11-01T08:30:00Z", "America/Los_Angeles", "01:30", "2026-11-01")]
+    [InlineData("2026-11-01T09:00:00Z", "America/Los_Angeles", "01:30", "2026-11-01")]
+    public void ResolveJournalDay_matches_journal_service_matrix(string instant, string timezone, string rollover, string expected)
+    {
+        Assert.Equal(DateOnly.Parse(expected), CockpitComposition.ResolveJournalDay(timezone, rollover, DateTimeOffset.Parse(instant)));
+    }
+
+    [Theory]
+    [InlineData("not-a-zone", "00:00", "invalid_timezone")]
+    [InlineData("America/Los_Angeles", "25:00", "invalid_rollover")]
+    public void ResolveJournalDay_treats_invalid_preferences_as_controlled_failure(string timezone, string rollover, string message)
+    {
+        var ex = Assert.Throws<ArgumentException>(() => CockpitComposition.ResolveJournalDay(timezone, rollover, DateTimeOffset.Parse("2026-07-14T01:30:00Z")));
+        Assert.StartsWith(message, ex.Message);
+    }
+
+    [Fact]
+    public async Task Bootstrap_derives_journal_day_from_rollover_not_clock_time()
+    {
+        // 2026-07-13 17:30 UTC is still the 13th by the wall clock in Asia/Taipei (UTC+8 → 02:30 on the 14th),
+        // but with a 06:00 rollover the Journal Day is still the 13th — i.e. the non-midnight rollover must win.
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service != "identity") return Json(HttpStatusCode.OK, "{}");
+            return path.Contains("/settings", StringComparison.Ordinal)
+                ? Json(HttpStatusCode.OK,
+                    """{"email":"owner@example.com","displayName":"Owner","timezone":"Asia/Taipei","journalDayRollover":"06:00","baseCurrency":"USD","appearance":"dark","locale":"zh-Hant","accentTheme":"red","updatedAt":"2026-07-18T00:00:00Z"}""")
+                : Json(HttpStatusCode.OK,
+                    """{"id":"33333333-3333-3333-3333-333333333333","email":"owner@example.com","displayName":"Owner","timezone":"Asia/Taipei","journalDayRollover":"06:00","baseCurrency":"USD","role":"user","accountType":"human","status":"active","statusVersion":1,"appearance":"dark","locale":"zh-Hant","accentTheme":"red"}""");
+        }, new DateTimeOffset(2026, 7, 13, 17, 30, 0, TimeSpan.Zero));
+
+        using var response = await factory.CreateClient().GetAsync("/api/app/bootstrap");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("2026-07-13", document.RootElement.GetProperty("currentJournalDay").GetString());
+    }
+
+    [Fact]
+    public async Task Bootstrap_rejects_invalid_persisted_timezone_with_controlled_error()
+    {
+        using var factory = CreateFactory((service, path) =>
+        {
+            if (service != "identity") return Json(HttpStatusCode.OK, "{}");
+            return path.Contains("/settings", StringComparison.Ordinal)
+                ? Json(HttpStatusCode.OK,
+                    """{"email":"owner@example.com","displayName":"Owner","timezone":"Bogus/Zone","journalDayRollover":"00:00","baseCurrency":"USD","appearance":"dark","locale":"zh-Hant","accentTheme":"red","updatedAt":"2026-07-18T00:00:00Z"}""")
+                : Json(HttpStatusCode.OK,
+                    """{"id":"33333333-3333-3333-3333-333333333333","email":"owner@example.com","displayName":"Owner","timezone":"Bogus/Zone","journalDayRollover":"00:00","baseCurrency":"USD","role":"user","accountType":"human","status":"active","statusVersion":1,"appearance":"dark","locale":"zh-Hant","accentTheme":"red"}""");
+        });
+
+        using var response = await factory.CreateClient().GetAsync("/api/app/bootstrap");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task Bootstrap_returns_only_cutover_product_areas()
     {
@@ -74,10 +140,13 @@ public sealed class CockpitCompositionTests
     }
 
     private static WebApplicationFactory<Program> CreateFactory(
-        Func<string, string, HttpResponseMessage> responder) =>
+        Func<string, string, HttpResponseMessage> responder,
+        DateTimeOffset? nowUtc = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
+                if (nowUtc is not null)
+                    services.Replace(ServiceDescriptor.Singleton<TimeProvider>(new FixedTimeProvider(nowUtc.Value)));
                 services.AddAuthentication(options =>
                     {
                         options.DefaultAuthenticateScheme = TestAuthenticationHandler.Scheme;
@@ -132,5 +201,10 @@ public sealed class CockpitCompositionTests
             return Task.FromResult(AuthenticateResult.Success(
                 new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme)));
         }
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 }

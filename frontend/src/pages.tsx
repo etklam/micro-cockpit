@@ -282,7 +282,7 @@ export function TodayPage() {
 
   return (
     <>
-      <PageHeader title={greeting} subtitle={bootstrap.data ? formatLongDate(bootstrap.data.currentLocalDate) : undefined} />
+      <PageHeader title={greeting} subtitle={bootstrap.data ? formatLongDate(bootstrap.data.currentJournalDay) : undefined} />
 
       <Card className="quick-note" as="section">
         <label className="quick-note__label" htmlFor="qn">{t('today.quickNote.label')}</label>
@@ -698,7 +698,7 @@ export function CalendarPage() {
   const params = useParams()
   const { t } = useI18n()
   const bootstrap = useBootstrapQuery()
-  const accountToday = bootstrap.data?.currentLocalDate
+  const accountToday = bootstrap.data?.currentJournalDay
   const year = Number(params.year) || (accountToday ? Number(accountToday.slice(0, 4)) : new Date().getFullYear())
   const month = Number(params.month) || (accountToday ? Number(accountToday.slice(5, 7)) : new Date().getMonth() + 1)
   const cursor = { year, month }

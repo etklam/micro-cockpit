@@ -12,6 +12,9 @@ internal static class BootstrapEndpoints
             var user = await transport.GetAsync<IdentityUserResponse>("identity", "/internal/auth/me", context);
             if (!user.IsSuccess) return transport.ProblemFor(user, context);
             var value = user.Value!;
+            DateOnly journalDay;
+            try { journalDay = CockpitComposition.ResolveJournalDay(value.Timezone, value.JournalDayRollover, time.GetUtcNow()); }
+            catch (ArgumentException) { return EdgeProblems.InvalidRequest(context, "Saved timezone or Journal Day rollover is invalid."); }
             return Results.Ok(new AppBootstrapResponse(
                 new CurrentUserResponse(value.Id, value.Email, value.DisplayName),
                 value.Timezone,
@@ -22,7 +25,7 @@ internal static class BootstrapEndpoints
                 value.AccentTheme,
                 value.Role,
                 value.AccountType,
-                CockpitComposition.ResolveLocalDate(value.Timezone, time.GetUtcNow()),
+                journalDay,
                 ProductAreas));
         });
     }

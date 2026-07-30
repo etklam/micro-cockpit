@@ -137,7 +137,7 @@ describe('authenticated locale from bootstrap', () => {
     const bootstrap = {
       currentUser: { id: '11111111-1111-1111-1111-111111111111', email: 'owner@example.com', displayName: 'Owner' },
       timezone: 'Asia/Taipei', baseCurrency: 'USD', appearance: 'system', accentTheme: 'green', locale: 'zh-Hant',
-      role: 'user', accountType: 'human', currentLocalDate: '2026-07-16',
+      role: 'user', accountType: 'human', currentJournalDay: '2026-07-16',
       availableProductAreas: ['today', 'diary', 'calendar'],
     }
     let putBody: unknown

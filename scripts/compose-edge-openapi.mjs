@@ -130,7 +130,7 @@ const calendarSchema = {
 }
 const bootstrapSchema = {
   type: 'object',
-  required: ['currentUser', 'timezone', 'journalDayRollover', 'baseCurrency', 'appearance', 'locale', 'accentTheme', 'role', 'accountType', 'currentLocalDate', 'availableProductAreas'],
+  required: ['currentUser', 'timezone', 'journalDayRollover', 'baseCurrency', 'appearance', 'locale', 'accentTheme', 'role', 'accountType', 'currentJournalDay', 'availableProductAreas'],
   properties: {
     currentUser: {
       type: 'object', required: ['id', 'email', 'displayName'],
@@ -138,7 +138,7 @@ const bootstrapSchema = {
     },
     timezone: { type: 'string' }, journalDayRollover: { type: 'string' }, baseCurrency: { type: 'string' }, appearance: { type: 'string' }, locale: { type: 'string' }, accentTheme: { type: 'string' },
     role: { type: 'string' }, accountType: { type: 'string' },
-    currentLocalDate: { type: 'string', format: 'date' },
+    currentJournalDay: { type: 'string', format: 'date' },
     availableProductAreas: { type: 'array', items: { type: 'string' } },
   },
 }

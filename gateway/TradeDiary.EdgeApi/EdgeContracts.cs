@@ -23,7 +23,7 @@ public sealed record AppBootstrapResponse(
     string AccentTheme,
     string Role,
     string AccountType,
-    DateOnly CurrentLocalDate,
+    DateOnly CurrentJournalDay,
     IReadOnlyList<string> AvailableProductAreas);
 
 public sealed record UserSettingsResponse(

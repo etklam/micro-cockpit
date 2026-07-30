@@ -19,7 +19,7 @@ const bootstrap = {
   locale: 'en',
   role: 'user',
   accountType: 'human',
-  currentLocalDate: '2026-07-16',
+  currentJournalDay: '2026-07-16',
   availableProductAreas: ['today', 'review', 'watchlist', 'calendar', 'tools', 'settings'],
 }
 

@@ -3439,7 +3439,7 @@
           "accentTheme",
           "role",
           "accountType",
-          "currentLocalDate",
+          "currentJournalDay",
           "availableProductAreas"
         ],
         "properties": {
@@ -3487,7 +3487,7 @@
           "accountType": {
             "type": "string"
           },
-          "currentLocalDate": {
+          "currentJournalDay": {
             "type": "string",
             "format": "date"
           },

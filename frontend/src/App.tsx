@@ -288,7 +288,7 @@ function Shell({ children }: { children?: ReactNode }) {
   if (bootstrap.isError || !bootstrap.data) return <SectionError onRetry={() => { void bootstrap.refetch() }} />
   const go = (page: Page) => {
     if (page === 'calendar') {
-      const ym = accountMonthYear(bootstrap.data.currentLocalDate)
+      const ym = accountMonthYear(bootstrap.data.currentJournalDay)
       navigate(ym ? `/calendar/${ym.year}/${String(ym.month).padStart(2, '0')}` : '/calendar')
     } else {
       navigate(PATHS[page])
@@ -314,7 +314,7 @@ function Shell({ children }: { children?: ReactNode }) {
 function CalendarRedirect() {
   const bootstrap = useBootstrapQuery()
   if (bootstrap.isLoading || !bootstrap.data) return null
-  const ym = accountMonthYear(bootstrap.data.currentLocalDate)
+  const ym = accountMonthYear(bootstrap.data.currentJournalDay)
   if (!ym) return <SectionError onRetry={() => { void bootstrap.refetch() }} />
   return <Navigate to={`/calendar/${ym.year}/${String(ym.month).padStart(2, '0')}`} replace />
 }
@@ -354,7 +354,7 @@ function MobileTop({ cockpit, onSignOut }: { cockpit: BootstrapData; onSignOut: 
   return (
     <header className="mobile-top">
       <Brand compact />
-      <span className="mobile-top__meta">{cockpit.currentLocalDate}</span>
+      <span className="mobile-top__meta">{cockpit.currentJournalDay}</span>
       <div className="mobile-top__actions">
         <ThemeControls compact />
         <IconButton icon="logout" label={t('common.signOut')} onClick={onSignOut} />
