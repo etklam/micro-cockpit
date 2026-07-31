@@ -155,6 +155,49 @@ export function useQuickObservationMutation() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: ({ content, key }: { content: string; key: string }) => api.saveQuickObservation(content, key),
+    onMutate: async ({ content }) => {
+      await client.cancelQueries({ queryKey: queryKeys.todayObservation })
+      const previous = client.getQueryData<api.MarketObservation | null>(queryKeys.todayObservation)
+      const optimisticId = `optimistic-${crypto.randomUUID()}`
+      const now = new Date().toISOString()
+      client.setQueryData<api.MarketObservation | null>(queryKeys.todayObservation, current => {
+        const observation = current ?? {
+          id: `optimistic-observation-${crypto.randomUUID()}`,
+          journalDay: now.slice(0, 10),
+          timezone: 'UTC',
+          rollover: '00:00',
+          updates: [],
+        }
+        return {
+          ...observation,
+          updates: [...observation.updates, {
+            id: optimisticId,
+            content,
+            recordedAt: now,
+            updatedAt: now,
+            signal: null,
+            interpretation: null,
+            mentalState: null,
+            tags: [],
+            primarySubject: null,
+            relatedSubjects: [],
+            evidence: null,
+          }],
+        }
+      })
+      return { optimisticId, previous }
+    },
+    onError: (_error, _variables, context) => {
+      if (!context) return
+      client.setQueryData<api.MarketObservation | null>(queryKeys.todayObservation, current => {
+        if (!current) return context.previous ?? null
+        const updates = current.updates.filter(update => update.id !== context.optimisticId)
+        if (updates.length === current.updates.length) return current
+        if (updates.length > 0) return { ...current, updates }
+        if (current.id.startsWith('optimistic-observation-')) return null
+        return context.previous ?? { ...current, updates }
+      })
+    },
     onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.todayObservation }) },
   })
 }
@@ -175,8 +218,61 @@ export const useUpdateDisciplineMutation = () => useInvalidatingMutation(
 )
 export const useSelectDisciplineMutation = () =>
   useInvalidatingMutation(api.selectDiscipline, [queryKeys.disciplines, queryKeys.todayDiscipline])
-export const useAddWatchlistMutation = () => useInvalidatingMutation(api.addWatchlist, [queryKeys.watchlist])
-export const useRemoveWatchlistMutation = () => useInvalidatingMutation(api.removeWatchlist, [queryKeys.watchlist])
+export function useAddWatchlistMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: api.addWatchlist,
+    onMutate: async instrumentId => {
+      await client.cancelQueries({ queryKey: queryKeys.watchlist })
+      const previous = client.getQueryData<api.WatchlistItem[]>(queryKeys.watchlist)
+      const exists = previous?.some(item => item.instrumentId === instrumentId) ?? false
+      if (!exists) {
+        const now = new Date().toISOString()
+        client.setQueryData<api.WatchlistItem[]>(queryKeys.watchlist, current => [
+          ...(current ?? []), { instrumentId, note: null, createdAt: now, updatedAt: now },
+        ])
+      }
+      return { previous, added: !exists }
+    },
+    onError: (_error, instrumentId, context) => {
+      if (!context?.added) return
+      client.setQueryData<api.WatchlistItem[]>(queryKeys.watchlist, current =>
+        current?.filter(item => item.instrumentId !== instrumentId),
+      )
+    },
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.watchlist }) },
+  })
+}
+
+export function useRemoveWatchlistMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: api.removeWatchlist,
+    onMutate: async instrumentId => {
+      await client.cancelQueries({ queryKey: queryKeys.watchlist })
+      const previous = client.getQueryData<api.WatchlistItem[]>(queryKeys.watchlist)
+      const index = previous?.findIndex(item => item.instrumentId === instrumentId) ?? -1
+      const removed = index >= 0 ? previous?.[index] : undefined
+      if (removed) {
+        client.setQueryData<api.WatchlistItem[]>(queryKeys.watchlist, current =>
+          current?.filter(item => item.instrumentId !== instrumentId),
+        )
+      }
+      return { removed, index }
+    },
+    onError: (_error, _instrumentId, context) => {
+      if (!context?.removed) return
+      client.setQueryData<api.WatchlistItem[]>(queryKeys.watchlist, current => {
+        const removed = context.removed
+        if (!removed || !current || current.some(item => item.instrumentId === removed.instrumentId)) return current
+        const next = [...current]
+        next.splice(Math.min(context.index, next.length), 0, removed)
+        return next
+      })
+    },
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.watchlist }) },
+  })
+}
 export const useSaveWatchlistNoteMutation = () => useInvalidatingMutation(
   ({ instrumentId, note }: { instrumentId: string; note: string }) => api.saveWatchlistNote(instrumentId, note),
   [queryKeys.watchlist],

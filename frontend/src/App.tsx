@@ -1,23 +1,27 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthProvider'
-import { LoginPage } from './auth/LoginPage'
-import { RegisterPage } from './auth/RegisterPage'
 import { Brand, Button, ErrorBox, IconButton, ThemeControls, ThemeToggle, useConfirm } from './ui'
 import { Icon } from './icons'
 import { cx } from './format'
 import './App.css'
-import { CalendarPage, ObservationHistoryPage, ReviewPage, TodayPage } from './pages'
-import { ToolsPage } from './screens/tools/ToolsPage'
-import { WatchlistPage } from './screens/watchlist'
-import { SettingsPage } from './screens/settings'
 import { useBootstrapQuery } from './features/queries'
 import { reconcileAccent, reconcileAppearance, subscribeSystemAppearance, type Appearance, isAppearance } from './features/appearance'
 import { TOOL_CATALOG } from './features/toolsCatalog'
 import { accountMonthYear } from './features/accountTime'
-import { CockpitProvider, SectionError, type Page } from './shell'
+import { CockpitProvider, PageSkeleton, SectionError, type Page } from './shell'
 import { isLocale, reconcileLocale, useI18n } from './i18n'
-import { LandingPage } from './LandingPage'
+
+const LazyLandingPage = lazy(() => import('./LandingPage').then(module => ({ default: module.LandingPage })))
+const LazyLoginPage = lazy(() => import('./auth/LoginPage').then(module => ({ default: module.LoginPage })))
+const LazyRegisterPage = lazy(() => import('./auth/RegisterPage').then(module => ({ default: module.RegisterPage })))
+const LazyTodayPage = lazy(() => import('./pages/today/TodayPage').then(module => ({ default: module.TodayPage })))
+const LazyObservationHistoryPage = lazy(() => import('./pages/observations/ObservationHistoryPage').then(module => ({ default: module.ObservationHistoryPage })))
+const LazyCalendarPage = lazy(() => import('./pages/calendar/CalendarPage').then(module => ({ default: module.CalendarPage })))
+const LazyReviewPage = lazy(() => import('./pages/review/ReviewPage').then(module => ({ default: module.ReviewPage })))
+const LazyToolsPage = lazy(() => import('./screens/tools/ToolsPage').then(module => ({ default: module.ToolsPage })))
+const LazyWatchlistPage = lazy(() => import('./screens/watchlist').then(module => ({ default: module.WatchlistPage })))
+const LazySettingsPage = lazy(() => import('./screens/settings/SettingsPage').then(module => ({ default: module.SettingsPage })))
 
 const PATHS: Record<Page, string> = {
   today: '/today', review: '/review', watchlist: '/watchlist',
@@ -34,24 +38,26 @@ const NAV: { id: Page; labelKey: 'nav.today' | 'nav.review' | 'nav.watchlist' | 
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/" element={<RootEntry />} />
-      <Route path="/tools" element={<ToolsEntry />} />
-      <Route element={<RequireAuth />}>
-        <Route element={<Shell />}>
-          <Route path="/today" element={<TodayPage />} />
-          <Route path="/today/observations" element={<ObservationHistoryPage />} />
-          <Route path="/review" element={<ReviewPage />} />
-          <Route path="/watchlist" element={<WatchlistPage />} />
-          <Route path="/calendar" element={<CalendarRedirect />} />
-          <Route path="/calendar/:year/:month" element={<CalendarPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<NotFoundPage />} />
+    <Suspense fallback={<PageSkeleton rows={2} />}>
+      <Routes>
+        <Route path="/login" element={<LazyLoginPage />} />
+        <Route path="/register" element={<LazyRegisterPage />} />
+        <Route path="/" element={<RootEntry />} />
+        <Route path="/tools" element={<ToolsEntry />} />
+        <Route element={<RequireAuth />}>
+          <Route element={<Shell />}>
+            <Route path="/today" element={<LazyTodayPage />} />
+            <Route path="/today/observations" element={<LazyObservationHistoryPage />} />
+            <Route path="/review" element={<LazyReviewPage />} />
+            <Route path="/watchlist" element={<LazyWatchlistPage />} />
+            <Route path="/calendar" element={<CalendarRedirect />} />
+            <Route path="/calendar/:year/:month" element={<LazyCalendarPage />} />
+            <Route path="/settings" element={<LazySettingsPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
         </Route>
-      </Route>
-    </Routes>
+      </Routes>
+    </Suspense>
   )
 }
 
@@ -59,14 +65,14 @@ function RootEntry() {
   const { state } = useAuth()
   if (state === 'restoring') return null
   if (state === 'authenticated') return <Navigate to="/today" replace />
-  return <PublicShell><LandingPage /></PublicShell>
+  return <PublicShell><LazyLandingPage /></PublicShell>
 }
 
 function ToolsEntry() {
   const { state } = useAuth()
   if (state === 'restoring') return null
-  if (state === 'authenticated') return <Shell><ToolsPage /></Shell>
-  return <PublicShell><ToolsPage /></PublicShell>
+  if (state === 'authenticated') return <Shell><LazyToolsPage /></Shell>
+  return <PublicShell><LazyToolsPage /></PublicShell>
 }
 
 function PublicShell({ children }: { children: ReactNode }) {

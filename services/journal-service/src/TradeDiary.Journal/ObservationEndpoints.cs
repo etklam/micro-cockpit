@@ -30,10 +30,11 @@ static class ObservationEndpoints
             var page = await ObservationQuery.ReadAsync(db, userId, parsed);
             if (httpFactory is not null)
             {
-                var enriched = new List<ObservationSearchItemResponse>();
-                foreach (var item in page.Items)
-                    enriched.Add(item with { Update = await ObservationInstruments.AttachDailyCloseAsync(
-                        httpFactory, item.Update, item.JournalDay, request.HttpContext.RequestAborted) });
+                var enriched = await Task.WhenAll(page.Items.Select(async item => item with
+                {
+                    Update = await ObservationInstruments.AttachDailyCloseAsync(
+                        httpFactory, item.Update, item.JournalDay, request.HttpContext.RequestAborted),
+                }));
                 page = page with { Items = enriched };
             }
             return Results.Ok(page);
@@ -106,9 +107,8 @@ static class ObservationEndpoints
             var updates = new List<ObservationUpdateResponse>();
             await using (var reader = await updatesCommand.ExecuteReaderAsync())
                 while (await reader.ReadAsync()) updates.Add(ObservationEnrichment.Read(reader));
-            for (var index = 0; index < updates.Count; index++)
-                updates[index] = await ObservationInstruments.AttachDailyCloseAsync(
-                    httpFactory, updates[index], storedDay, request.HttpContext.RequestAborted);
+            updates = (await Task.WhenAll(updates.Select(update => ObservationInstruments.AttachDailyCloseAsync(
+                httpFactory, update, storedDay, request.HttpContext.RequestAborted)))).ToList();
             return Results.Ok(new MarketObservationResponse(observationId, storedDay, storedTimezone, storedRollover, updates));
         })
         .Produces<MarketObservationResponse>(200).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);

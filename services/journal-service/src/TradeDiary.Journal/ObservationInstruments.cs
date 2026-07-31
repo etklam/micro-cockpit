@@ -8,14 +8,10 @@ static class ObservationInstruments
         var client = factory.CreateClient("market-data");
         var primary = await ResolveSubject(client, value.PrimarySubject, cancellationToken);
         if (primary.Error is not null) return new(null, primary.Error, primary.StatusCode);
-        var related = new List<ObservationSubjectResponse>();
-        foreach (var subject in value.RelatedSubjects)
-        {
-            var resolved = await ResolveSubject(client, subject, cancellationToken);
-            if (resolved.Error is not null) return new(null, resolved.Error, resolved.StatusCode);
-            related.Add(resolved.Subject!);
-        }
-        return new(value with { PrimarySubject = primary.Subject, RelatedSubjects = related }, null, 200);
+        var related = await Task.WhenAll(value.RelatedSubjects.Select(subject => ResolveSubject(client, subject, cancellationToken)));
+        var relatedError = related.FirstOrDefault(result => result.Error is not null);
+        if (relatedError is not null) return new(null, relatedError.Error, relatedError.StatusCode);
+        return new(value with { PrimarySubject = primary.Subject, RelatedSubjects = related.Select(result => result.Subject!).ToList() }, null, 200);
     }
 
     private static async Task<SubjectResolution> ResolveSubject(HttpClient client, ObservationSubjectResponse? subject, CancellationToken cancellationToken)
@@ -43,11 +39,14 @@ static class ObservationInstruments
         CancellationToken cancellationToken)
     {
         var client = factory.CreateClient("market-data");
-        var primary = await Attach(client, update.PrimarySubject, onOrBefore, cancellationToken);
-        var related = new List<ObservationSubjectResponse>();
-        foreach (var subject in update.RelatedSubjects)
-            related.Add((await Attach(client, subject, onOrBefore, cancellationToken))!);
-        return update with { PrimarySubject = primary, RelatedSubjects = related };
+        var subjects = new ObservationSubjectResponse?[] { update.PrimarySubject }
+            .Concat(update.RelatedSubjects.Select(subject => (ObservationSubjectResponse?)subject));
+        var attached = await Task.WhenAll(subjects.Select(subject => Attach(client, subject, onOrBefore, cancellationToken)));
+        return update with
+        {
+            PrimarySubject = attached[0],
+            RelatedSubjects = attached.Skip(1).Select(subject => subject!).ToList(),
+        };
     }
 
     private static async Task<ObservationSubjectResponse?> Attach(

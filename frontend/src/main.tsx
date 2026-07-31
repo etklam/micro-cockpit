@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './auth/AuthProvider.tsx'
 import { bootAppearanceFromMirror } from './features/appearance'
 import { bootLocaleFromMirror, I18nProvider } from './i18n'
+import { AppErrorBoundary } from './shell'
 
 // Mirror last-known appearance/locale before React paints to reduce flash.
 bootAppearanceFromMirror()
@@ -19,14 +20,16 @@ export const queryClient = new QueryClient({ defaultOptions: { queries: { retry:
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <I18nProvider>
-            <App />
-          </I18nProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <I18nProvider>
+      <AppErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </BrowserRouter>
+        </QueryClientProvider>
+      </AppErrorBoundary>
+    </I18nProvider>
   </StrictMode>,
 )

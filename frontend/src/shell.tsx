@@ -1,4 +1,5 @@
-import { createContext, useContext } from 'react'
+import { Component, createContext, useContext } from 'react'
+import type { ErrorInfo, ReactNode } from 'react'
 import { ErrorBox } from './ui'
 import type { ConfirmOpts } from './ui'
 import { useI18n } from './i18n'
@@ -10,6 +11,40 @@ type Cockpit = { go: (page: Page) => void; confirm: (options: ConfirmOpts) => Pr
 const CockpitContext = createContext<Cockpit>(null!)
 export const useCockpit = () => useContext(CockpitContext)
 export const CockpitProvider = CockpitContext.Provider
+
+type ErrorBoundaryProps = {
+  children: ReactNode
+  fallback: (reset: () => void) => ReactNode
+}
+
+type ErrorBoundaryState = { error: Error | null }
+
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { error: null }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { error }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Unhandled render error', error, info)
+  }
+
+  private reset = () => this.setState({ error: null })
+
+  render() {
+    return this.state.error ? this.props.fallback(this.reset) : this.props.children
+  }
+}
+
+export function AppErrorBoundary({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
+  return (
+    <ErrorBoundary fallback={reset => <ErrorBox message={t('common.somethingWentWrong')} onRetry={reset} />}>
+      {children}
+    </ErrorBoundary>
+  )
+}
 
 export function SectionError({ onRetry }: { onRetry: () => void }) {
   const { t } = useI18n()

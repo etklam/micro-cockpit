@@ -75,6 +75,28 @@ public sealed class QuickObservationApiTests
     }
 
     [Fact]
+    public async Task Daily_close_5xx_is_degraded_without_failing_the_today_response()
+    {
+        await using var fixture = await Fixture.StartAsync(new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero), dailyCloseUnavailable: true);
+        var owner = Guid.NewGuid();
+        using var client = fixture.Client(owner);
+        using var created = await Post(client, "Initial note", "daily-close-failure");
+        var updateId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("observationUpdateId").GetGuid();
+
+        using var enriched = await client.PutAsJsonAsync($"/internal/observation-updates/{updateId}", new
+        {
+            content = "Initial note",
+            primarySubject = new { type = "instrument", instrumentId = KnownInstrumentId, market = "US", symbol = "AAPL", displayName = "Apple Inc." },
+        });
+        Assert.Equal(HttpStatusCode.OK, enriched.StatusCode);
+
+        using var today = await client.GetAsync("/internal/market-observations/today");
+        Assert.Equal(HttpStatusCode.OK, today.StatusCode);
+        var body = await today.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("unavailable", body.GetProperty("updates")[0].GetProperty("primarySubject").GetProperty("dailyCloseStatus").GetString());
+    }
+
+    [Fact]
     public async Task Owner_can_enrich_an_update_without_blurring_subjects_tags_or_evidence()
     {
         await using var fixture = await Fixture.StartAsync(new DateTimeOffset(2026, 7, 14, 12, 0, 0, TimeSpan.Zero));
@@ -655,14 +677,14 @@ public sealed class QuickObservationApiTests
             this.clock = clock;
         }
 
-        internal static async Task<Fixture> StartAsync(DateTimeOffset now)
+        internal static async Task<Fixture> StartAsync(DateTimeOffset now, bool dailyCloseUnavailable = false)
         {
             var postgres = new PostgreSqlBuilder().WithImage("postgres:17-alpine").WithDatabase("test").WithUsername("postgres").WithPassword("postgres").Build();
             await postgres.StartAsync();
             await using var setup = new NpgsqlConnection(postgres.GetConnectionString());
             await setup.OpenAsync();
             var root = Path.GetFullPath("../../../../..", AppContext.BaseDirectory);
-            foreach (var file in new[] { "0001_initial_journal_performance.sql", "0013_journal_idempotency.sql", "0026_market_observations.sql", "0028_observation_enrichment.sql", "0029_expectations.sql", "0030_expectation_reviews.sql", "0031_action_decisions_trades.sql", "0032_watchlist.sql", "0033_pattern_review_discipline_principles.sql", "0037_incremental_record_changes.sql" })
+            foreach (var file in new[] { "0001_initial_journal_performance.sql", "0013_journal_idempotency.sql", "0026_market_observations.sql", "0028_observation_enrichment.sql", "0029_expectations.sql", "0030_expectation_reviews.sql", "0031_action_decisions_trades.sql", "0032_watchlist.sql", "0033_pattern_review_discipline_principles.sql", "0037_incremental_record_changes.sql", "0042_observation_search_indexes.sql" })
                 await new NpgsqlCommand(await File.ReadAllTextAsync(Path.Combine(root, "platform/postgres/migrations", file)), setup).ExecuteNonQueryAsync();
 
             var dataSource = NpgsqlDataSource.Create(postgres.GetConnectionString());
@@ -674,7 +696,7 @@ public sealed class QuickObservationApiTests
                 services.RemoveAll<TimeProvider>();
                 services.AddSingleton(dataSource);
                 services.AddSingleton<TimeProvider>(clock);
-                services.AddHttpClient("market-data").ConfigurePrimaryHttpMessageHandler(() => new InstrumentDirectoryHandler());
+                services.AddHttpClient("market-data").ConfigurePrimaryHttpMessageHandler(() => new InstrumentDirectoryHandler(dailyCloseUnavailable));
                 services.AddAuthentication(options =>
                 {
                     options.DefaultAuthenticateScheme = TestAuth.Scheme;
@@ -735,12 +757,13 @@ public sealed class QuickObservationApiTests
         }
     }
 
-    private sealed class InstrumentDirectoryHandler : HttpMessageHandler
+    private sealed class InstrumentDirectoryHandler(bool dailyCloseUnavailable = false) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var dailyClose = request.RequestUri?.AbsolutePath.EndsWith("/daily-close", StringComparison.OrdinalIgnoreCase) is true
                 && request.RequestUri.AbsolutePath.Contains(KnownInstrumentId.ToString(), StringComparison.OrdinalIgnoreCase);
+            if (dailyClose && dailyCloseUnavailable) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
             if (dailyClose) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = JsonContent.Create(new

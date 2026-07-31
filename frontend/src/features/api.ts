@@ -145,6 +145,7 @@ export const createAgent = (name: string) => G.postApiAppAgents({
 export const rotateAgentToken = (id: string) => G.postApiAppAgentsIdToken(id, { scopes: agentScopes })
 export const revokeAgentToken = (id: string) => G.deleteApiAppAgentsIdToken(id)
 export type AgentManagement = G.AgentManagementResponse
+export type AccessGrant = G.AccessGrantResponse
 export const getAccessGrants = () => G.getApiAppAccessGrants()
 export const createAccessGrant = (body: G.AccessGrantWrite) => G.postApiAppAccessGrants(body)
 export const revokeAccessGrant = (id: string) => G.deleteApiAppAccessGrantsId(id)

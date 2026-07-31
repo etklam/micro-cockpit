@@ -205,6 +205,11 @@
       "id": "0041",
       "filename": "0041_market_observation_cutover.sql",
       "sha256": "d2db914ba6649066d4c738fd63969e927ac57a51cd83c5fa838a9716aa471ff0"
+    },
+    {
+      "id": "0042",
+      "filename": "0042_observation_search_indexes.sql",
+      "sha256": "b77c7e1dcd29912d07ac2ffeb8a97d894696f049d5bbec280a622e1f9e707b71"
     }
   ]
 }

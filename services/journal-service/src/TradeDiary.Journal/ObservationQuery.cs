@@ -78,17 +78,17 @@ static class ObservationQuery
         }
         if (query.SubjectType is { } subjectType && query.Subject is { } subject)
         {
-            sql.Append(CultureInfo.InvariantCulture, $" AND ((u.primary_subject->>'type' IN (${index},${index + 1}) AND lower(u.primary_subject->>'name')=lower(${index + 2})) OR EXISTS (SELECT 1 FROM jsonb_array_elements(u.related_subjects) s WHERE s->>'type' IN (${index},${index + 1}) AND lower(s->>'name')=lower(${index + 2})))");
-            parameters.Add(subjectType.ToString()); parameters.Add(((int)subjectType).ToString(CultureInfo.InvariantCulture)); parameters.Add(subject); index += 3;
+            sql.Append(CultureInfo.InvariantCulture, $" AND journal.observation_subject_search_key(u.primary_subject,u.related_subjects) @> jsonb_build_array(jsonb_build_object('type',${index},'name',lower(${index + 1})))");
+            parameters.Add(subjectType.ToString().ToLowerInvariant()); parameters.Add(subject); index += 2;
         }
         if (query.InstrumentId is { } instrumentId)
         {
-            sql.Append(CultureInfo.InvariantCulture, $" AND (u.primary_subject->>'instrumentId'=${index} OR EXISTS (SELECT 1 FROM jsonb_array_elements(u.related_subjects) s WHERE s->>'instrumentId'=${index}))");
+            sql.Append(CultureInfo.InvariantCulture, $" AND journal.observation_subject_search_key(u.primary_subject,u.related_subjects) @> jsonb_build_array(jsonb_build_object('instrumentId',${index}))");
             parameters.Add(instrumentId.ToString()); index++;
         }
         if (query.Market is { } market && query.Symbol is { } symbol)
         {
-            sql.Append(CultureInfo.InvariantCulture, $" AND ((u.primary_subject->>'type' IN ('instrument','3') AND upper(u.primary_subject->>'market')=${index} AND upper(u.primary_subject->>'symbol')=${index + 1}) OR EXISTS (SELECT 1 FROM jsonb_array_elements(u.related_subjects) s WHERE s->>'type' IN ('instrument','3') AND upper(s->>'market')=${index} AND upper(s->>'symbol')=${index + 1}))");
+            sql.Append(CultureInfo.InvariantCulture, $" AND journal.observation_subject_search_key(u.primary_subject,u.related_subjects) @> jsonb_build_array(jsonb_build_object('type','instrument','market',${index},'symbol',${index + 1}))");
             parameters.Add(market); parameters.Add(symbol); index += 2;
         }
         if (query.Tag is { } tag)

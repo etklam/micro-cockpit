@@ -73,6 +73,13 @@ export function accountLocalDate(isoOrDate: string | Date, timeZone: string): st
   return `${String(wall.year).padStart(4, '0')}-${String(wall.month).padStart(2, '0')}-${String(wall.day).padStart(2, '0')}`
 }
 
+/** Current hour in the account timezone, with UTC as the safe fallback. */
+export function accountLocalHour(isoOrDate: string | Date, timeZone?: string): number {
+  const date = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate
+  const wall = partsInZone(date, timeZone || 'UTC') ?? partsInZone(date, 'UTC')
+  return wall?.hour ?? date.getUTCHours()
+}
+
 /** Account-local `datetime-local` value (YYYY-MM-DDTHH:mm) for a UTC instant. */
 export function utcToAccountDateTimeLocal(isoOrDate: string | Date, timeZone: string): string {
   const date = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate

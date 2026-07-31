@@ -4,6 +4,15 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('/node_modules/') && /(react-markdown|remark-|unified|mdast-|hast-|micromark|vfile|unist-)/.test(id)) return 'markdown'
+        },
+      },
+    },
+  },
   server: {
     // Dev: same-origin /api proxied to the Edge API, matching how nginx serves
     // the built app in Compose. Avoids cross-origin (CORS) calls in dev.

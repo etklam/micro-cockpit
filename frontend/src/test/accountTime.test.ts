@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   accountDateTimeLocalToUtc,
   accountLocalDate,
+  accountLocalHour,
   accountMonthYear,
   utcToAccountDateTimeLocal,
 } from '../features/accountTime'
@@ -53,5 +54,11 @@ describe('account time conversion', () => {
 
   test('month/year from account local date', () => {
     expect(accountMonthYear('2026-07-18')).toEqual({ year: 2026, month: 7 })
+  })
+
+  test('hour follows the account timezone and falls back to UTC', () => {
+    const instant = new Date('2026-07-18T03:30:00.000Z')
+    expect(accountLocalHour(instant, 'Asia/Taipei')).toBe(11)
+    expect(accountLocalHour(instant, '')).toBe(3)
   })
 })

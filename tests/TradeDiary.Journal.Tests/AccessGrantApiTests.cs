@@ -226,7 +226,7 @@ public sealed class AccessGrantApiTests
                 "0026_market_observations.sql", "0028_observation_enrichment.sql", "0029_expectations.sql",
                 "0030_expectation_reviews.sql", "0031_action_decisions_trades.sql", "0032_watchlist.sql",
                 "0033_pattern_review_discipline_principles.sql", "0036_agent_access_grants.sql",
-                "0037_incremental_record_changes.sql",
+                "0037_incremental_record_changes.sql", "0042_observation_search_indexes.sql",
             })
                 await new NpgsqlCommand(await File.ReadAllTextAsync(Path.Combine(root, "platform/postgres/migrations", file)), setup).ExecuteNonQueryAsync();
 

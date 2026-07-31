@@ -163,13 +163,11 @@ static class ComparisonEndpoints
             }
         }
 
-        var observations = new List<ComparisonObservationResponse>(ordered.Count);
-        foreach (var item in ordered)
-            observations.Add(new(
-                item.JournalDay,
-                await ObservationInstruments.AttachDailyCloseAsync(
-                    clients, item.Update, item.JournalDay, cancellationToken),
-                item.Expectations));
+        var observations = (await Task.WhenAll(ordered.Select(async item => new ComparisonObservationResponse(
+            item.JournalDay,
+            await ObservationInstruments.AttachDailyCloseAsync(
+                clients, item.Update, item.JournalDay, cancellationToken),
+            item.Expectations)))).ToList();
         return new(
             ownerId,
             ownerType,
