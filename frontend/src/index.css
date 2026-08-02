@@ -214,6 +214,27 @@ html[data-theme="light"][data-accent="green"] {
   --ring: 0 0 0 3px color-mix(in oklch, var(--primary) 26%, transparent);
 }
 
+/* Semantic aliases consumed by dashboard components. Keep these separate from
+   the existing implementation names so chrome can evolve without coupling UI. */
+:root {
+  --color-background: var(--bg);
+  --color-sidebar: var(--sidebar);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--bg-elevated);
+  --color-surface-hover: var(--overlay);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text-primary: var(--ink);
+  --color-text-secondary: var(--muted);
+  --color-text-muted: var(--faint);
+  --color-accent: var(--primary);
+  --color-accent-hover: var(--primary-hover);
+  --color-positive: var(--gain);
+  --color-negative: var(--loss);
+  --color-warning: var(--warn);
+  --focus-ring: var(--ring);
+}
+
 /* ---------------- Reset ---------------- */
 *, *::before, *::after { box-sizing: border-box; }
 * { margin: 0; }

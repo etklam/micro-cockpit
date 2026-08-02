@@ -41,7 +41,7 @@ export function ActionDecisionPanel({ updateId, expectations }: { updateId: stri
     setEditing(null)
   }
 
-  return <section className="stack" aria-label={t('today.decisions.title')}>
+  return <section className="stack decision-panel" aria-label={t('today.decisions.title')}>
     <div className="form-actions">
       <strong>{t('today.decisions.title')}</strong>
       {!editing ? <Button variant="ghost" size="sm" onClick={() => begin()}>{t('today.decisions.add')}</Button> : null}

@@ -5,6 +5,7 @@ import type { SVGProps } from 'react'
 
 export type IconName =
   | 'today' | 'diary' | 'calendar' | 'compass' | 'bell'
+  | 'search'
   | 'plus' | 'trash' | 'edit' | 'check' | 'close'
   | 'left' | 'right' | 'arrow' | 'logout' | 'sparkle' | 'dot' | 'layers'
   | 'sun' | 'moon' | 'monitor'
@@ -15,6 +16,7 @@ const PATHS: Record<IconName, string> = {
   calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v3.5M16 3v3.5"/><circle cx="8.5" cy="13.5" r=".9" fill="currentColor" stroke="none"/>',
   compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/><circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none"/>',
   bell: '<path d="M6 9a6 6 0 0 1 12 0c0 5 1.5 6.5 1.5 6.5h-15S6 14 6 9"/><path d="M10.5 19a1.8 1.8 0 0 0 3 0"/>',
+  search: '<circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.5 4.5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   trash: '<path d="M4 6.5h16M9.5 6.5V5a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v1.5M6 6.5 7 20a2 2 0 0 0 2 1.8h6A2 2 0 0 0 17 20l1-13.5"/><path d="M10 10.5v6M14 10.5v6"/>',
   edit: '<path d="M14.5 5.5 18.5 9.5 8 20l-4.5 1 1-4.5z"/><path d="m13 7 4 4"/>',

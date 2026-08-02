@@ -29,6 +29,7 @@ function authenticatedHandlers() {
       HttpResponse.json({ accessToken: 'memory-only-token', expiresAt: '2026-07-16T12:00:00Z' })),
     http.get('/api/app/bootstrap', () => HttpResponse.json(bootstrap)),
     http.get('/api/app/market-observations/today', () => new HttpResponse(null, { status: 404 })),
+    http.get('/api/app/market-observations', () => HttpResponse.json({ items: [], nextCursor: null })),
     http.get('/api/app/expectations', () => HttpResponse.json({ items: [] })),
     http.get('/api/app/discipline-principles/today', () => new HttpResponse(null, { status: 404 })),
     http.get('/api/app/market/symbols', () => HttpResponse.json({ items: [] })),
@@ -92,6 +93,30 @@ test('quick observation is the Today golden-path entry point', async () => {
   await userEvent.type(await screen.findByLabelText('What did you notice today?'), 'Breadth weakened into the close.')
   await userEvent.click(screen.getByRole('button', { name: 'Save observation' }))
   await waitFor(() => expect(content).toBe('Breadth weakened into the close.'))
+})
+
+test('Today shows recent real Observation Updates and honest unavailable controls', async () => {
+  server.use(...authenticatedHandlers())
+  server.use(http.get('/api/app/market-observations', () => HttpResponse.json({
+    items: [{
+      marketObservationId: '77777777-7777-7777-7777-777777777777',
+      journalDay: '2026-07-15',
+      authorId: bootstrap.currentUser.id,
+      update: {
+        id: '88888888-8888-8888-8888-888888888888',
+        content: 'Breadth recovered\nVolume remained muted.',
+        recordedAt: '2026-07-15T10:00:00Z',
+        updatedAt: '2026-07-15T10:00:00Z',
+        signal: null, interpretation: null, mentalState: null, tags: ['breadth'],
+        primarySubject: null, relatedSubjects: [], evidence: null,
+      },
+    }],
+    nextCursor: null,
+  })))
+  renderApp('/today')
+  expect(await screen.findByRole('heading', { name: 'Recent observations' })).toBeInTheDocument()
+  expect(screen.getByText('Breadth recovered')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Alerts' })).toBeDisabled()
 })
 
 test('calendar deep links remain first-class', async () => {
