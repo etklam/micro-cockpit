@@ -50,6 +50,7 @@ SettingsEndpoints.Map(app);
 CalendarEndpoints.Map(app);
 JournalEndpoints.Map(app);
 ResearchEndpoints.Map(app);
+ToolEndpoints.Map(app);
 
 app.Run();
 

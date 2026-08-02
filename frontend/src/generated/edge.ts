@@ -17,6 +17,8 @@ export type AgentTokenResponse = { "keyId": string; "apiToken": string; "scopes"
 export type ApiKeyTokenRequest = { "apiKey": string }
 export type ApiKeyTokenResponse = { "accessToken": string; "expiresAt": string }
 export type AppBootstrapResponse = { "currentUser": { "id": string; "email": string; "displayName": string }; "timezone": string; "journalDayRollover": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string; "role": string; "accountType": string; "currentJournalDay": string; "availableProductAreas": Array<string> }
+export type AverageCost = { "currentQuantity": number; "currentAverageCost": number; "addedQuantity": number; "addedPrice": number }
+export type AverageCostResponse = { "averageCost": number; "totalQuantity": number; "totalCost": number; "averageCostChange": number }
 export type BarsResponse = { "contractVersion": number | string; "symbol": string; "items": Array<PublishedBarResponse> }
 export type CalendarResponse = { "year": number; "month": number; "days": Array<{ "date": string; "marketObservationId": string | null; "updateCount": number; "readyForReviewCount": number | null }> }
 export type CollectionResponseOfAccessGrantResponse = { "items": Array<AccessGrantResponse> }
@@ -71,6 +73,11 @@ export type OwnerComparisonResponse = { "human": ComparisonOwnerResponse; "agent
 export type PatternEvidenceResponse = { "expectationId": string; "url": string }
 export type PatternLabelResponse = { "kind": ReasoningLabelKind; "key": string; "name": string; "system": boolean; "count": number | string; "denominator": number | string; "evidence": Array<PatternEvidenceResponse> }
 export type PatternReviewResponse = { "from": string; "to": string; "reviewedExpectationCount": number | string; "labels": Array<PatternLabelResponse> }
+export type PositionSizing = { "accountValue": number; "riskPercent": number; "entryPrice": number; "stopPrice": number }
+export type PositionSizingResponse = { "quantity": number; "plannedLoss": number; "riskBudget": number; "positionValue": number; "perUnitRisk": number }
+export type PresetWrite = { "name": string; "toolType": string; "inputs": JsonElement; "currency": null | string }
+export type ProfitLoss = { "side": string; "entryPrice": number; "exitPrice": number; "quantity": number; "entryFee": number; "exitFee": number }
+export type ProfitLossResponse = { "netPnl": number; "returnPercent": number; "grossPnl": number; "totalFees": number; "exitValue": number }
 export type ProviderHealthResponse = { "provider": string; "lastSuccessAt": string; "healthy": boolean }
 export type ProvidersHealthResponse = { "contractVersion": number | string; "healthy": boolean; "items": Array<ProviderHealthResponse> }
 export type PublishedBarResponse = { "tradingDate": string; "open": number; "high": number; "low": number; "close": number; "rawClose": number; "adjustedClose": number; "volume": number; "provider": string; "publishedAt": string }
@@ -83,6 +90,9 @@ export type ReasoningLabelWrite = { "kind": ReasoningLabelKind; "name": string }
 export type ReasoningQuality = "sound" | "mixed" | "weak"
 export type RegisterRequest = { "email": string; "password": string; "displayName": string; "timezone": string; "baseCurrency": string }
 export type RegisterResponse = { "id": string; "email": string; "displayName": string; "timezone": string; "baseCurrency": string }
+export type RiskReward = { "entryPrice": number; "stopPrice": number; "targetPrice": number }
+export type RiskRewardResponse = { "ratio": number; "riskPerUnit": number; "rewardPerUnit": number; "breakevenWinRate": number }
+export type SavedCalculationWrite = { "toolType": string; "inputs": JsonElement; "currency": string; "symbol": null | string; "note": null | string }
 export type SessionTokens = { "accessToken": string; "expiresAt": string }
 export type SymbolsResponse = { "contractVersion": number | string; "items": Array<PublishedSymbolResponse> }
 export type TradeEvidenceResponse = { "id": string; "actionDecisionId": string; "symbol": string; "side": TradeSide; "quantity": number; "price": number; "currency": string; "executedAt": string; "note": null | string; "createdAt": string; "updatedAt": string }
@@ -181,6 +191,18 @@ export const postApiAppDisciplinePrinciplesIdSelect = (id: string, extra?: Reque
 export const getApiAppMarketSymbols = (extra?: RequestInit) => request<SymbolsResponse>("/api/app/market/symbols", { method: "GET", ...extra })
 export const getApiAppMarketBarsSymbol = (symbol: string, query: { "from"?: string; "to"?: string }, extra?: RequestInit) => request<BarsResponse>(`/api/app/market/bars/${encodeURIComponent(String(symbol))}` + withQuery(query), { method: "GET", ...extra })
 export const getApiAppMarketProvidersHealth = (extra?: RequestInit) => request<ProvidersHealthResponse>("/api/app/market/providers/health", { method: "GET", ...extra })
+export const postApiAppToolsPositionSizing = (body: PositionSizing, extra?: RequestInit) => request<PositionSizingResponse>("/api/app/tools/position-sizing", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppToolsRiskReward = (body: RiskReward, extra?: RequestInit) => request<RiskRewardResponse>("/api/app/tools/risk-reward", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppToolsAverageCost = (body: AverageCost, extra?: RequestInit) => request<AverageCostResponse>("/api/app/tools/average-cost", { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppToolsProfitLoss = (body: ProfitLoss, extra?: RequestInit) => request<ProfitLossResponse>("/api/app/tools/profit-loss", { method: "POST", body: JSON.stringify(body), ...extra })
+export const getApiAppToolPresets = (extra?: RequestInit) => request<unknown>("/api/app/tool-presets", { method: "GET", ...extra })
+export const postApiAppToolPresets = (body: PresetWrite, extra?: RequestInit) => request<unknown>("/api/app/tool-presets", { method: "POST", body: JSON.stringify(body), ...extra })
+export const putApiAppToolPresetsId = (id: string, body: PresetWrite, extra?: RequestInit) => request<unknown>(`/api/app/tool-presets/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
+export const deleteApiAppToolPresetsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/tool-presets/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
+export const postApiAppToolPresetsIdUse = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/tool-presets/${encodeURIComponent(String(id))}/use`, { method: "POST", ...extra })
+export const getApiAppSavedCalculations = (query: { "limit"?: number | string }, extra?: RequestInit) => request<unknown>("/api/app/saved-calculations" + withQuery(query), { method: "GET", ...extra })
+export const postApiAppSavedCalculations = (body: SavedCalculationWrite, extra?: RequestInit) => request<unknown>("/api/app/saved-calculations", { method: "POST", body: JSON.stringify(body), ...extra })
+export const deleteApiAppSavedCalculationsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/saved-calculations/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const getApiAppBootstrap = (extra?: RequestInit) => request<AppBootstrapResponse>("/api/app/bootstrap", { method: "GET", ...extra })
 export const getApiAppCalendar = (query: { "year": number; "month": number }, extra?: RequestInit) => request<CalendarResponse>("/api/app/calendar" + withQuery(query), { method: "GET", ...extra })
 export const getApiAppSettings = (extra?: RequestInit) => request<UserSettingsResponse>("/api/app/settings", { method: "GET", ...extra })
