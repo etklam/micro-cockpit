@@ -16,7 +16,15 @@ var app = builder.Build();
 app.MapOpenApi("/openapi.json").AllowAnonymous();
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
-app.MapGet("/health/ready", async (NpgsqlDataSource db) => { try { await db.OpenConnectionAsync(); return Results.Ok(new { status="ready" }); } catch { return Results.Json(new { status="not_ready" }, statusCode:503); } }).AllowAnonymous();
+app.MapGet("/health/ready", async (NpgsqlDataSource db) =>
+{
+    try
+    {
+        await using var connection = await db.OpenConnectionAsync();
+        return Results.Ok(new { status = "ready" });
+    }
+    catch { return Results.Json(new { status = "not_ready" }, statusCode: 503); }
+}).AllowAnonymous();
 app.MapGet("/version", () => Results.Ok(new { service="market-data-service", version="0.1.0", contract="v1" })).AllowAnonymous();
 
 app.MapPut("/internal/admin/symbols/{raw}", async (string raw, SymbolWrite input, HttpRequest request, NpgsqlDataSource db, IConfiguration config) =>

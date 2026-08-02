@@ -52,7 +52,11 @@ app.MapOpenApi("/openapi.json").AllowAnonymous();
 app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 app.MapGet("/health/ready", async (NpgsqlDataSource db) =>
 {
-    try { await db.OpenConnectionAsync(); return Results.Ok(new { status = "ready" }); }
+    try
+    {
+        await using var connection = await db.OpenConnectionAsync();
+        return Results.Ok(new { status = "ready" });
+    }
     catch { return Results.Json(new { status = "not_ready" }, statusCode: 503); }
 }).AllowAnonymous();
 app.MapGet("/version", () => Results.Ok(new { service = "identity-service", version = "0.1.0" })).AllowAnonymous();

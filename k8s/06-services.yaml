@@ -46,6 +46,7 @@ spec:
             httpGet:
               path: /health/ready
               port: 8080
+            timeoutSeconds: 5
             initialDelaySeconds: 5
             periodSeconds: 10
             failureThreshold: 12
@@ -120,6 +121,7 @@ spec:
             httpGet:
               path: /health/ready
               port: 8080
+            timeoutSeconds: 5
             initialDelaySeconds: 5
             periodSeconds: 10
             failureThreshold: 12
@@ -183,6 +185,7 @@ spec:
             httpGet:
               path: /health/ready
               port: 8080
+            timeoutSeconds: 5
             initialDelaySeconds: 5
             periodSeconds: 10
             failureThreshold: 12
@@ -243,6 +246,7 @@ spec:
             httpGet:
               path: /health/ready
               port: 8080
+            timeoutSeconds: 5
             initialDelaySeconds: 5
             periodSeconds: 10
             failureThreshold: 12
