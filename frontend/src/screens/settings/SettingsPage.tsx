@@ -257,7 +257,7 @@ export function SettingsPage() {
         rotatePending={id => busyAgentId === id && rotateAgent.isPending} onRotate={id => { void onRotateAgent(id) }} onRevoke={id => { void onRevokeAgent(id) }} formatAgentTime={formatAgentTime}
       />
       <AccessGrantsSection
-        agents={agents.data?.items} grants={grants.data?.items} grantAgentId={grantAgentId} setGrantAgentId={setGrantAgentId}
+        agents={agents.data?.items} agentsLoading={agents.isLoading} agentsError={agents.isError} grants={grants.data?.items} grantAgentId={grantAgentId} setGrantAgentId={setGrantAgentId}
         grantMode={grantMode} setGrantMode={setGrantMode} grantFrom={grantFrom} setGrantFrom={setGrantFrom} grantTo={grantTo} setGrantTo={setGrantTo}
         grantScope={grantScope} setGrantScope={setGrantScope} grantSubject={grantSubject} setGrantSubject={setGrantSubject} grantExpiry={grantExpiry} setGrantExpiry={setGrantExpiry}
         onCreate={onCreateGrant} createPending={createGrant.isPending} busyAgentId={busyAgentId} onRevoke={id => { void onRevokeGrant(id) }}

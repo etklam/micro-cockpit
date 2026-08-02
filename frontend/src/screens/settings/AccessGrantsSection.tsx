@@ -7,6 +7,8 @@ type GrantScope = 'all' | 'broad_market' | 'sector' | 'theme' | 'instrument'
 
 type AccessGrantsSectionProps = {
   agents: AgentManagement[] | undefined
+  agentsLoading: boolean
+  agentsError: boolean
   grants: AccessGrant[] | undefined
   grantAgentId: string
   setGrantAgentId: (value: string) => void
@@ -29,7 +31,7 @@ type AccessGrantsSectionProps = {
 }
 
 export function AccessGrantsSection({
-  agents, grants, grantAgentId, setGrantAgentId, grantMode, setGrantMode, grantFrom, setGrantFrom,
+  agents, agentsLoading, agentsError, grants, grantAgentId, setGrantAgentId, grantMode, setGrantMode, grantFrom, setGrantFrom,
   grantTo, setGrantTo, grantScope, setGrantScope, grantSubject, setGrantSubject, grantExpiry,
   setGrantExpiry, onCreate, createPending, busyAgentId, onRevoke,
 }: AccessGrantsSectionProps) {
@@ -38,8 +40,8 @@ export function AccessGrantsSection({
     <h2>{t('settings.agents.grantsTitle')}</h2>
     <p className="form-hint">{t('settings.agents.revokeWarning')}</p>
     <form className="stack" onSubmit={onCreate}>
-      <Field label={t('settings.agents.grantAgent')}><SelectBox required value={grantAgentId} onChange={event => setGrantAgentId(event.target.value)}>
-        <option value="" disabled>{t('settings.agents.grantAgentPlaceholder')}</option>
+      <Field label={t('settings.agents.grantAgent')} hint={!agentsLoading && !agentsError && !agents?.length ? t('settings.agents.noAgentsForGrantHint') : undefined}><SelectBox required disabled={agentsLoading || agentsError || !agents?.length} value={grantAgentId} onChange={event => setGrantAgentId(event.target.value)}>
+        <option value="" disabled>{agentsLoading ? t('common.loading') : agents?.length ? t('settings.agents.grantAgentPlaceholder') : t('settings.agents.noAgentsForGrantOption')}</option>
         {agents?.map(agent => <option key={agent.userId} value={agent.userId}>{agent.displayName}</option>)}
       </SelectBox></Field>
       <Field label={t('settings.agents.grantMode')}><SelectBox value={grantMode} onChange={event => setGrantMode(event.target.value as 'fixed' | 'ongoing')}>
@@ -54,7 +56,7 @@ export function AccessGrantsSection({
       </SelectBox></Field>
       {grantScope !== 'all' ? <Field label={grantScope === 'instrument' ? t('settings.agents.grantInstrument') : t('settings.agents.grantSubject')}><TextInput required value={grantSubject} onChange={event => setGrantSubject(event.target.value)} /></Field> : null}
       <Field label={t('settings.agents.grantExpiry')} hint={t('settings.agents.grantExpiryHint')}><TextInput type="datetime-local" value={grantExpiry} onChange={event => setGrantExpiry(event.target.value)} /></Field>
-      <div className="form-actions"><Button variant="primary" type="submit" loading={createPending}>{t('settings.agents.grantCreate')}</Button></div>
+      <div className="form-actions"><Button variant="primary" type="submit" disabled={agentsError || !agents?.length} loading={createPending}>{t('settings.agents.grantCreate')}</Button></div>
     </form>
     {grants?.length === 0 ? <p className="form-hint">{t('settings.agents.grantsEmpty')}</p> : null}
     {grants?.map(grant => {

@@ -54,8 +54,8 @@ export function ActionDecisionPanel({ updateId, expectations }: { updateId: stri
         <option value="avoid_trade">{t('today.decisions.intent.avoidTrade')}</option>
       </SelectBox></Field>
       <Field label={t('today.decisions.reason')}><TextArea value={reason} onChange={event => setReason(event.target.value)} /></Field>
-      <Field label={t('today.decisions.expectation')}><SelectBox value={expectationId} onChange={event => setExpectationId(event.target.value)}>
-        <option value="">{t('common.optional')}</option>
+      <Field label={t('today.decisions.expectation')} hint={expectations.length === 0 ? t('today.decisions.noExpectationsHint') : undefined}><SelectBox value={expectationId} disabled={expectations.length === 0} onChange={event => setExpectationId(event.target.value)}>
+        <option value="">{expectations.length ? t('common.optional') : t('today.decisions.noExpectationsOption')}</option>
         {expectations.map(item => <option key={item.id} value={item.id}>{item.expectedBehavior}</option>)}
       </SelectBox></Field>
       {editing !== 'new' ? <Field label={t('today.decisions.execution')}><SelectBox value={executionReview} onChange={event => setExecutionReview(event.target.value as '' | NonNullable<ExecutionReview>)}>

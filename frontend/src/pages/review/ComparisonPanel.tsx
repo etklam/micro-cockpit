@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import type { ComparisonQuery, OwnerComparison } from '../../features/api'
 import { useAgentsQuery, useComparisonQuery, useInstrumentDirectoryQuery } from '../../features/queries'
 import { Button, Card, EmptyBox, Field, SelectBox, TextInput } from '../../ui'
@@ -20,6 +21,8 @@ export function ComparisonPanel() {
   const [query, setQuery] = useState<ComparisonQuery | null>(null)
   const comparison = useComparisonQuery(query)
   const agentName = agents.data?.items.find(agent => agent.userId === query?.agentUserId)?.displayName ?? t('comparison.agent')
+  const agentItems = agents.data?.items ?? []
+  const instrumentItems = instruments.data ?? []
   const valid = !!agentUserId && !!from && !!to && from <= to && (subjectType === 'instrument' ? !!instrumentId : !!subject.trim())
 
   function submit(event: FormEvent) {
@@ -37,16 +40,16 @@ export function ComparisonPanel() {
         <legend>{t('comparison.setupTitle')}</legend>
         <p className="form-hint">{t('comparison.setupHint')}</p>
         <div className="comparison-filters">
-          <Field label={t('comparison.agent')}><SelectBox value={agentUserId} onChange={event => setAgentUserId(event.target.value)} required>
-            <option value="">{t('comparison.chooseAgent')}</option>
-            {(agents.data?.items ?? []).map(agent => <option key={agent.userId} value={agent.userId}>{agent.displayName}</option>)}
-          </SelectBox></Field>
+          <div className="stack"><Field label={t('comparison.agent')}><SelectBox value={agentUserId} disabled={agents.isLoading || agents.isError || agentItems.length === 0} onChange={event => setAgentUserId(event.target.value)} required>
+            <option value="">{agents.isLoading ? t('common.loading') : agentItems.length ? t('comparison.chooseAgent') : t('comparison.noAgentsOption')}</option>
+            {agentItems.map(agent => <option key={agent.userId} value={agent.userId}>{agent.displayName}</option>)}
+          </SelectBox></Field>{!agents.isLoading && !agents.isError && agentItems.length === 0 ? <p className="form-hint">{t('comparison.noAgentsHint')} <Link className="text-link" to="/settings">{t('comparison.openSettings')}</Link></p> : null}</div>
           <Field label={t('comparison.subjectType')}><SelectBox value={subjectType} onChange={event => setSubjectType(event.target.value as typeof subjectType)}>
             <option value="theme">{t('today.observations.subject.theme')}</option><option value="sector">{t('today.observations.subject.sector')}</option><option value="broad_market">{t('today.observations.subject.broadMarket')}</option><option value="instrument">{t('today.observations.subject.instrument')}</option>
           </SelectBox></Field>
-          {subjectType === 'instrument' ? <Field label={t('comparison.instrument')}><SelectBox value={instrumentId} onChange={event => setInstrumentId(event.target.value)} required>
-            <option value="">{t('comparison.chooseInstrument')}</option>
-            {(instruments.data ?? []).map(instrument => <option key={instrument.instrumentId} value={instrument.instrumentId}>{instrument.symbol} · {instrument.name}</option>)}</SelectBox></Field> : <Field label={t('comparison.subject')}><TextInput value={subject} onChange={event => setSubject(event.target.value)} required maxLength={120} /></Field>}
+          {subjectType === 'instrument' ? <Field label={t('comparison.instrument')} hint={!instruments.isLoading && !instruments.isError && instrumentItems.length === 0 ? t('comparison.noInstrumentsHint') : undefined}><SelectBox value={instrumentId} disabled={instruments.isLoading || instruments.isError || instrumentItems.length === 0} onChange={event => setInstrumentId(event.target.value)} required>
+            <option value="">{instruments.isLoading ? t('common.loading') : instrumentItems.length ? t('comparison.chooseInstrument') : t('comparison.noInstrumentsOption')}</option>
+            {instrumentItems.map(instrument => <option key={instrument.instrumentId} value={instrument.instrumentId}>{instrument.symbol} · {instrument.name}</option>)}</SelectBox></Field> : <Field label={t('comparison.subject')}><TextInput value={subject} onChange={event => setSubject(event.target.value)} required maxLength={120} /></Field>}
           <Field label={t('comparison.from')}><TextInput type="date" value={from} onChange={event => setFrom(event.target.value)} required /></Field>
           <Field label={t('comparison.to')}><TextInput type="date" value={to} onChange={event => setTo(event.target.value)} required /></Field>
           <Button variant="primary" type="submit" disabled={!valid}>{t('comparison.open')}</Button>

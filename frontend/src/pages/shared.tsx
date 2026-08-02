@@ -61,7 +61,7 @@ export function DailyCloseEvidence({ subject }: { subject: NonNullable<Observati
     : t('today.observations.dailyCloseUnavailable')}</span>
 }
 
-export function SubjectFields({ subject, onChange, instruments, prefix }: { subject: SubjectDraft; onChange: (subject: SubjectDraft) => void; instruments: InstrumentDirectoryItem[]; prefix: string }) {
+export function SubjectFields({ subject, onChange, instruments, instrumentsLoading = false, prefix }: { subject: SubjectDraft; onChange: (subject: SubjectDraft) => void; instruments: InstrumentDirectoryItem[]; instrumentsLoading?: boolean; prefix: string }) {
   const { t } = useI18n()
   const set = (patch: Partial<SubjectDraft>) => onChange({ ...subject, ...patch })
   return <div className="stack">
@@ -77,12 +77,12 @@ export function SubjectFields({ subject, onChange, instruments, prefix }: { subj
     {subject.type && subject.type !== 'instrument' ? <Field label={t('today.observations.subjectName')}><TextInput value={subject.name} onChange={event => set({ name: event.target.value })} /></Field> : null}
     {subject.type === 'instrument' ? <>
       <Field label={t('today.observations.market')}><TextInput value={subject.market} onChange={event => set({ market: event.target.value, instrumentId: '', symbol: '', displayName: '' })} /></Field>
-      {subject.market.trim().toUpperCase() === 'US' ? <Field label={t('today.observations.usInstrument')}>
-        <SelectBox value={subject.instrumentId} onChange={event => {
+      {subject.market.trim().toUpperCase() === 'US' ? <Field label={t('today.observations.usInstrument')} hint={!instrumentsLoading && instruments.length === 0 ? t('today.observations.noInstrumentsHint') : undefined}>
+        <SelectBox value={subject.instrumentId} disabled={instrumentsLoading || instruments.length === 0} onChange={event => {
           const selected = instruments.find(item => item.instrumentId === event.target.value)
           set({ instrumentId: event.target.value, symbol: selected?.symbol ?? '', displayName: selected?.name ?? '' })
         }}>
-          <option value="">{t('today.observations.chooseInstrument')}</option>
+          <option value="">{instrumentsLoading ? t('common.loading') : instruments.length ? t('today.observations.chooseInstrument') : t('today.observations.noInstruments')}</option>
           {instruments.map(item => <option key={item.instrumentId} value={item.instrumentId}>{item.symbol} · {item.name}</option>)}
         </SelectBox>
       </Field> : <>

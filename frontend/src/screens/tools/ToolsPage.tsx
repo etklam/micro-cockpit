@@ -131,6 +131,7 @@ export function ToolsPage() {
   const [savingResult, setSavingResult] = useState(false)
   const [persistenceLoading, setPersistenceLoading] = useState(false)
   const saveKey = useRef<string | null>(null)
+  const toolPresets = presets.filter(item => item.toolType === tool)
 
   useEffect(() => {
     if (requested !== tool) setSearchParams({ tool }, { replace: true })
@@ -285,7 +286,7 @@ export function ToolsPage() {
           <div><h2 id="active-tool-title">{t(selected.titleKey)}</h2><p>{t(selected.bodyKey)}</p></div>
         </div>
         {context ? <div className="tool-context" role="status"><span>{t('tools.workflow.prefilled', { source: context.label })}</span><div><Link to={context.returnTo}>{t('tools.workflow.return')}</Link><Button variant="ghost" onClick={clearContext}>{t('tools.workflow.clearContext')}</Button></div></div> : null}
-        {authState === 'authenticated' ? <Card as="section" className="tool-presets"><h3>{t('tools.workflow.presets')}</h3><div className="tool-inline-actions"><SelectBox aria-label={t('tools.workflow.presets')} value={selectedPresetId} onChange={event => { void applyPreset(event.target.value) }}><option value="">{t('tools.workflow.choosePreset')}</option>{presets.filter(item => item.toolType === tool).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectBox><TextInput aria-label={t('tools.workflow.presetName')} maxLength={80} value={presetName} onChange={event => setPresetName(event.target.value)} placeholder={t('tools.workflow.presetName')} /><Button onClick={() => { void savePreset() }}>{t('tools.workflow.savePreset')}</Button>{selectedPresetId ? <><Button onClick={() => { void updatePreset() }}>{t('tools.workflow.updatePreset')}</Button><Button variant="danger" onClick={() => { void removePreset() }}>{t('common.delete')}</Button></> : null}</div></Card> : null}
+        {authState === 'authenticated' ? <Card as="section" className="tool-presets"><h3>{t('tools.workflow.presets')}</h3><div className="tool-inline-actions"><SelectBox aria-label={t('tools.workflow.presets')} disabled={persistenceLoading || toolPresets.length === 0} value={selectedPresetId} onChange={event => { void applyPreset(event.target.value) }}><option value="">{persistenceLoading ? t('common.loading') : toolPresets.length ? t('tools.workflow.choosePreset') : t('tools.workflow.noPresets')}</option>{toolPresets.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectBox><TextInput aria-label={t('tools.workflow.presetName')} maxLength={80} value={presetName} onChange={event => setPresetName(event.target.value)} placeholder={t('tools.workflow.presetName')} /><Button onClick={() => { void savePreset() }}>{t('tools.workflow.savePreset')}</Button>{selectedPresetId ? <><Button onClick={() => { void updatePreset() }}>{t('tools.workflow.updatePreset')}</Button><Button variant="danger" onClick={() => { void removePreset() }}>{t('common.delete')}</Button></> : null}</div>{!persistenceLoading && !persistenceError && toolPresets.length === 0 ? <p className="form-hint">{t('tools.workflow.noPresetsHint')}</p> : null}</Card> : null}
         <div className="tool-workspace__grid">
           <Card as="section" className="tool-form-card">
             <form onSubmit={submit} noValidate>

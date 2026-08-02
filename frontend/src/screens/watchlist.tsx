@@ -24,6 +24,7 @@ export function WatchlistPage() {
   const items = list.data ?? []
   const available = (instruments.data ?? []).filter(item => !items.some(member => member.instrumentId === item.instrumentId))
   const instrument = (id: string) => instruments.data?.find(item => item.instrumentId === id)
+  const noAvailableInstruments = !instruments.isLoading && !instruments.isError && available.length === 0
 
   async function add(event: FormEvent) {
     event.preventDefault()
@@ -42,8 +43,8 @@ export function WatchlistPage() {
     <Card as="section" className="stack" aria-labelledby="watchlist-add-title">
       <div><h2 id="watchlist-add-title">{t('watchlist.setupTitle')}</h2><p className="form-hint">{t('watchlist.setupHint')}</p></div>
       <form className="inline-form watchlist-add-form" onSubmit={add}>
-        <Field label={t('watchlist.instrument')}><SelectBox required value={instrumentId} onChange={event => setInstrumentId(event.target.value)}>
-          <option value="">{t('watchlist.choose')}</option>
+        <Field label={t('watchlist.instrument')} hint={noAvailableInstruments ? items.length ? t('watchlist.noMoreInstrumentsHint') : t('watchlist.noInstrumentsHint') : undefined}><SelectBox required disabled={!instruments.data || noAvailableInstruments} value={instrumentId} onChange={event => setInstrumentId(event.target.value)}>
+          <option value="">{instruments.isLoading ? t('common.loading') : available.length ? t('watchlist.choose') : items.length ? t('watchlist.noMoreInstruments') : t('watchlist.noInstruments')}</option>
           {available.map(item => <option key={item.instrumentId} value={item.instrumentId}>{item.symbol} · {item.name}</option>)}
         </SelectBox></Field>
         <Button variant="primary" icon="plus" type="submit" disabled={!instrumentId} loading={addWatchlist.isPending}>{t('watchlist.add')}</Button>

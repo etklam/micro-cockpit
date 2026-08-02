@@ -109,6 +109,17 @@ test('empty watchlist explains its purpose and the next step', async () => {
   expect(screen.getByText('After adding it, note why it matters and revisit its observation timeline when new evidence appears.')).toBeInTheDocument()
   expect(await screen.findByText('Nothing to follow yet')).toBeInTheDocument()
   expect(screen.getByText('Choose an instrument above to start a focused observation list.')).toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: /Instrument/ })).toBeDisabled()
+  expect(screen.getByText('No instruments are available to add right now.')).toBeInTheDocument()
+})
+
+test('comparison explains how to create an Agent when none are available', async () => {
+  server.use(...authenticatedHandlers())
+  server.use(http.get('/api/app/agents', () => HttpResponse.json({ items: [] })))
+  renderApp('/review')
+  const agent = await screen.findByRole('combobox', { name: 'Agent' })
+  expect(agent).toBeDisabled()
+  expect(await screen.findByText(/No Agent Users are available yet/)).toBeInTheDocument()
 })
 
 test('comparison keeps Human and Agent records explicitly separate and read-only', async () => {
