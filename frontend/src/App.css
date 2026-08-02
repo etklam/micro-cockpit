@@ -1119,6 +1119,10 @@
   gap: var(--sp-3);
   align-items: end;
 }
+.comparison-setup { min-width: 0; margin: 0; padding: var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-md); }
+.comparison-setup legend { padding: 0 var(--sp-2); font-weight: 650; color: var(--ink); }
+.comparison-setup > .form-hint { margin: 0 0 var(--sp-3); }
+.comparison-result { padding-top: var(--sp-2); border-top: 1px solid var(--hairline); }
 .comparison-columns { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); align-items: start; }
 .comparison-owner { min-width: 0; border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-4); }
 .comparison-owner__label { color: var(--muted); font-size: var(--fs-sm); }
@@ -1294,6 +1298,7 @@
 .inline-form { display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: end; }
 .inline-form .input { flex: 1 1 240px; min-width: 0; }
 .inline-form .btn { flex: 0 0 auto; }
+.watchlist-add-form .field { flex: 1 1 320px; }
 .principle-list { display: flex; flex-direction: column; gap: var(--sp-3); }
 .principle { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); }
 .principle__text {

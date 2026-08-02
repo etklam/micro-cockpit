@@ -39,16 +39,16 @@ export function WatchlistPage() {
 
   return <>
     <PageHeader title={t('watchlist.title')} subtitle={t('watchlist.subtitle')} />
-    <Card flush>
-      <form className="inline-form-wrap inline-form" onSubmit={add}>
-        <SelectBox aria-label={t('watchlist.instrument')} required value={instrumentId} onChange={event => setInstrumentId(event.target.value)}>
+    <Card as="section" className="stack" aria-labelledby="watchlist-add-title">
+      <div><h2 id="watchlist-add-title">{t('watchlist.setupTitle')}</h2><p className="form-hint">{t('watchlist.setupHint')}</p></div>
+      <form className="inline-form watchlist-add-form" onSubmit={add}>
+        <Field label={t('watchlist.instrument')}><SelectBox required value={instrumentId} onChange={event => setInstrumentId(event.target.value)}>
           <option value="">{t('watchlist.choose')}</option>
           {available.map(item => <option key={item.instrumentId} value={item.instrumentId}>{item.symbol} · {item.name}</option>)}
-        </SelectBox>
+        </SelectBox></Field>
         <Button variant="primary" icon="plus" type="submit" disabled={!instrumentId} loading={addWatchlist.isPending}>{t('watchlist.add')}</Button>
       </form>
     </Card>
-    <p className="form-hint">{t('watchlist.meaning')}</p>
     {list.isLoading || instruments.isLoading ? <PageSkeleton rows={2} /> :
       list.isError || instruments.isError ? <SectionError onRetry={() => { void list.refetch(); void instruments.refetch() }} /> :
       !items.length ? <EmptyBox title={t('watchlist.emptyTitle')} hint={t('watchlist.emptyHint')} /> :

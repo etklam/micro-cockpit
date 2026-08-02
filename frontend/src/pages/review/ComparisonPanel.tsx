@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { ComparisonQuery, OwnerComparison } from '../../features/api'
 import { useAgentsQuery, useComparisonQuery, useInstrumentDirectoryQuery } from '../../features/queries'
-import { Button, Card, Field, SelectBox, TextInput } from '../../ui'
+import { Button, Card, EmptyBox, Field, SelectBox, TextInput } from '../../ui'
 import { SectionError } from '../../shell'
 import { useI18n } from '../../i18n'
 import { DailyCloseEvidence, subjectLabel } from '../shared'
@@ -32,25 +32,31 @@ export function ComparisonPanel() {
 
   return <Card as="section" className="stack" aria-labelledby="comparison-title">
     <div><h2 id="comparison-title">{t('comparison.title')}</h2><p className="form-hint">{t('comparison.subtitle')}</p></div>
-    <form className="comparison-filters" onSubmit={submit}>
-      <Field label={t('comparison.agent')}><SelectBox value={agentUserId} onChange={event => setAgentUserId(event.target.value)} required>
-        <option value="">{t('comparison.chooseAgent')}</option>
-        {(agents.data?.items ?? []).map(agent => <option key={agent.userId} value={agent.userId}>{agent.displayName}</option>)}
-      </SelectBox></Field>
-      <Field label={t('comparison.subjectType')}><SelectBox value={subjectType} onChange={event => setSubjectType(event.target.value as typeof subjectType)}>
-        <option value="theme">{t('today.observations.subject.theme')}</option><option value="sector">{t('today.observations.subject.sector')}</option><option value="broad_market">{t('today.observations.subject.broadMarket')}</option><option value="instrument">{t('today.observations.subject.instrument')}</option>
-      </SelectBox></Field>
-      {subjectType === 'instrument' ? <Field label={t('comparison.instrument')}><SelectBox value={instrumentId} onChange={event => setInstrumentId(event.target.value)} required>
-        <option value="">{t('comparison.chooseInstrument')}</option>
-        {(instruments.data ?? []).map(instrument => <option key={instrument.instrumentId} value={instrument.instrumentId}>{instrument.symbol} · {instrument.name}</option>)}
-      </SelectBox></Field> : <Field label={t('comparison.subject')}><TextInput value={subject} onChange={event => setSubject(event.target.value)} required maxLength={120} /></Field>}
-      <Field label={t('comparison.from')}><TextInput type="date" value={from} onChange={event => setFrom(event.target.value)} required /></Field>
-      <Field label={t('comparison.to')}><TextInput type="date" value={to} onChange={event => setTo(event.target.value)} required /></Field>
-      <Button variant="primary" type="submit" disabled={!valid}>{t('comparison.open')}</Button>
+    <form onSubmit={submit}>
+      <fieldset className="comparison-setup">
+        <legend>{t('comparison.setupTitle')}</legend>
+        <p className="form-hint">{t('comparison.setupHint')}</p>
+        <div className="comparison-filters">
+          <Field label={t('comparison.agent')}><SelectBox value={agentUserId} onChange={event => setAgentUserId(event.target.value)} required>
+            <option value="">{t('comparison.chooseAgent')}</option>
+            {(agents.data?.items ?? []).map(agent => <option key={agent.userId} value={agent.userId}>{agent.displayName}</option>)}
+          </SelectBox></Field>
+          <Field label={t('comparison.subjectType')}><SelectBox value={subjectType} onChange={event => setSubjectType(event.target.value as typeof subjectType)}>
+            <option value="theme">{t('today.observations.subject.theme')}</option><option value="sector">{t('today.observations.subject.sector')}</option><option value="broad_market">{t('today.observations.subject.broadMarket')}</option><option value="instrument">{t('today.observations.subject.instrument')}</option>
+          </SelectBox></Field>
+          {subjectType === 'instrument' ? <Field label={t('comparison.instrument')}><SelectBox value={instrumentId} onChange={event => setInstrumentId(event.target.value)} required>
+            <option value="">{t('comparison.chooseInstrument')}</option>
+            {(instruments.data ?? []).map(instrument => <option key={instrument.instrumentId} value={instrument.instrumentId}>{instrument.symbol} · {instrument.name}</option>)}</SelectBox></Field> : <Field label={t('comparison.subject')}><TextInput value={subject} onChange={event => setSubject(event.target.value)} required maxLength={120} /></Field>}
+          <Field label={t('comparison.from')}><TextInput type="date" value={from} onChange={event => setFrom(event.target.value)} required /></Field>
+          <Field label={t('comparison.to')}><TextInput type="date" value={to} onChange={event => setTo(event.target.value)} required /></Field>
+          <Button variant="primary" type="submit" disabled={!valid}>{t('comparison.open')}</Button>
+        </div>
+      </fieldset>
     </form>
     {agents.isError ? <p role="alert">{t('comparison.agentsUnavailable')}</p> : null}
     {query && comparison.isLoading ? <div className="skel" style={{ height: 64, marginTop: 16 }} role="status" aria-label={t('common.loading')} /> : null}
     {comparison.isError ? <SectionError onRetry={() => { void comparison.refetch() }} /> : null}
+    {!query ? <EmptyBox dense icon="compass" title={t('comparison.emptyTitle')} hint={t('comparison.emptyHint')} /> : null}
     {comparison.data ? <ComparisonResult comparison={comparison.data} agentName={agentName} /> : null}
   </Card>
 }
@@ -63,12 +69,13 @@ function ComparisonResult({ comparison, agentName }: { comparison: OwnerComparis
     : Number(comparison.difference.confidenceDifference) === 0
       ? t('comparison.same')
       : t('comparison.confidenceDifference', { value: Number(comparison.difference.confidenceDifference) > 0 ? `+${comparison.difference.confidenceDifference}` : comparison.difference.confidenceDifference })
-  return <div className="stack">
+  return <section className="comparison-result stack" aria-labelledby="comparison-result-title">
+    <div><h3 id="comparison-result-title">{t('comparison.resultTitle')}</h3><p className="form-hint">{t('comparison.resultHint')}</p></div>
     <dl className="comparison-differences" aria-label={t('comparison.objectiveDifferences')}>
       <div><dt>{t('comparison.outcomeConsistency')}</dt><dd>{outcome}</dd></div><div><dt>{t('comparison.confidence')}</dt><dd>{confidence}</dd></div>
     </dl>
     <div className="comparison-columns"><ComparisonOwner title={t('comparison.human')} owner={comparison.human} /><ComparisonOwner title={agentName} owner={comparison.agent} /></div>
-  </div>
+  </section>
 }
 
 function ComparisonOwner({ title, owner }: { title: string; owner: OwnerComparison['human'] }) {

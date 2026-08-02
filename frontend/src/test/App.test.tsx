@@ -101,6 +101,16 @@ test('calendar deep links remain first-class', async () => {
   expect(window.location.pathname).toBe('/calendar/2026/07')
 })
 
+test('empty watchlist explains its purpose and the next step', async () => {
+  server.use(...authenticatedHandlers())
+  server.use(http.get('/api/app/watchlist', () => HttpResponse.json({ items: [] })))
+  renderApp('/watchlist')
+  expect(await screen.findByRole('heading', { name: 'Add an instrument to follow' })).toBeInTheDocument()
+  expect(screen.getByText('After adding it, note why it matters and revisit its observation timeline when new evidence appears.')).toBeInTheDocument()
+  expect(await screen.findByText('Nothing to follow yet')).toBeInTheDocument()
+  expect(screen.getByText('Choose an instrument above to start a focused observation list.')).toBeInTheDocument()
+})
+
 test('comparison keeps Human and Agent records explicitly separate and read-only', async () => {
   server.use(...authenticatedHandlers())
   server.use(http.get('/api/app/comparison', () => HttpResponse.json({
@@ -143,6 +153,9 @@ test('comparison keeps Human and Agent records explicitly separate and read-only
     difference: { outcomeConsistent: false, confidenceDifference: 1 },
   })))
   renderApp('/review')
+  expect(await screen.findByText('Choose who and what to compare')).toBeInTheDocument()
+  expect(screen.getByText('Select an Agent, a subject, and a date range.')).toBeInTheDocument()
+  expect(screen.getByText('Your comparison will appear here.')).toBeInTheDocument()
   await screen.findByRole('option', { name: 'Atlas' })
   await userEvent.selectOptions(screen.getByLabelText('Agent'), '22222222-2222-2222-2222-222222222222')
   await userEvent.type(screen.getByLabelText('Subject'), 'AI')
@@ -152,6 +165,8 @@ test('comparison keeps Human and Agent records explicitly separate and read-only
   expect(screen.getByText('Human-owned records')).toBeInTheDocument()
   expect(screen.getByText('Agent-owned records')).toBeInTheDocument()
   expect(screen.getByText('Different')).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Comparison result' })).toBeInTheDocument()
+  expect(screen.getByText('These differences describe the records; they do not decide which view is better.')).toBeInTheDocument()
 })
 
 test.each([
