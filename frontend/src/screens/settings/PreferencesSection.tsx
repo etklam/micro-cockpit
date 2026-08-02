@@ -43,6 +43,7 @@ export function PreferencesSection({
   const localeOptions: { value: Locale; label: string }[] = [
     { value: 'en', label: t('settings.language.en') },
     { value: 'zh-Hant', label: t('settings.language.zhHant') },
+    { value: 'zh-Hans', label: t('settings.language.zhHans') },
   ]
   const tzMismatch = timezone && deviceTz && timezone !== deviceTz
 

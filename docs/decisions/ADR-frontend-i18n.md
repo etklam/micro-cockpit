@@ -6,18 +6,18 @@ Accepted (2026-07-20)
 
 ## Context
 
-Production replacement requires English and Traditional Chinese for the diary workflow. The codebase already persists account preferences (`timezone`, `baseCurrency`, `appearance`) through Identity → Edge → bootstrap/settings. No i18n library was installed.
+Production replacement requires English, Traditional Chinese, and Simplified Chinese for the diary workflow. The codebase already persists account preferences (`timezone`, `baseCurrency`, `appearance`) through Identity → Edge → bootstrap/settings. No i18n library was installed.
 
 ## Decision
 
 Use a small internal typed i18n layer instead of `react-i18next` / FormatJS:
 
 - Stable message keys (not English-as-key).
-- Catalogs: `en`, `zh-Hant`.
+- Catalogs: `en`, `zh-Hant`, `zh-Hans`.
 - `I18nProvider` + `useI18n` / `t`.
 - English fallback and dev missing-key warnings.
 - Locale-aware `Intl` formatters centralized in `i18n/format.ts`.
-- Authenticated locale stored on `identity.users.locale` (migration `0020`), exposed on bootstrap and settings.
+- Authenticated locale stored on `identity.users.locale` (migrations `0020` and `0043`), exposed on bootstrap and settings.
 - Anonymous preference mirrored in `localStorage` (`td_locale`) only.
 
 ## Consequences

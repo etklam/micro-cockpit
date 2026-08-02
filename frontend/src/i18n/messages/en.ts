@@ -692,6 +692,7 @@ export const en = {
   'settings.languageHint': 'Applied immediately. Save to keep it with your account.',
   'settings.language.en': 'English',
   'settings.language.zhHant': '繁體中文',
+  'settings.language.zhHans': '简体中文',
   'settings.save': 'Save settings',
   'settings.saved': 'Settings saved.',
   'settings.error.displayName': 'Display name must be 1–100 characters.',

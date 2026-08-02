@@ -565,7 +565,7 @@ static bool TryNormalizeSettings(
     }
 
     locale = input.Locale.Trim();
-    if (locale is not ("en" or "zh-Hant"))
+    if (locale is not ("en" or "zh-Hant" or "zh-Hans"))
     {
         problem = "invalid_locale";
         return false;

@@ -73,7 +73,7 @@ Mobile is the reference layout. Forms stack in reading order; comparison content
 
 ## 6. Internationalization
 
-English and Traditional Chinese use the typed message catalogue. New interface copy must be added to both locales and accessed through `MessageKey`; do not add raw strings to core workflows.
+English, Traditional Chinese, and Simplified Chinese use the typed message catalogue. New interface copy must be added to all locales and accessed through `MessageKey`; do not add raw strings to core workflows.
 
 ## 7. Privacy and ownership
 
@@ -109,5 +109,5 @@ Every core page must provide:
 - visible labels and validation;
 - keyboard-operable actions and focus behavior;
 - non-color status labels;
-- English and Traditional Chinese copy;
+- English, Traditional Chinese, and Simplified Chinese copy;
 - a usable narrow-phone layout.

@@ -683,6 +683,7 @@ export const zhHant: Messages = {
   'settings.languageHint': '立即套用。儲存後會與帳戶一起保留。',
   'settings.language.en': 'English',
   'settings.language.zhHant': '繁體中文',
+  'settings.language.zhHans': '简体中文',
   'settings.save': '儲存設定',
   'settings.saved': '設定已儲存。',
   'settings.error.displayName': '顯示名稱須為 1–100 個字元。',

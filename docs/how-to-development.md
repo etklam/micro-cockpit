@@ -19,7 +19,7 @@ npm --prefix frontend run build
 npm --prefix frontend test -- --run
 ```
 
-Use typed message keys in both locales. Put remote state in query hooks, form state in the page, and deterministic calculations in pure modules. Core changes need phone layout, keyboard behavior, empty/error states, and non-color labels.
+Use typed message keys in all locales. Put remote state in query hooks, form state in the page, and deterministic calculations in pure modules. Core changes need phone layout, keyboard behavior, empty/error states, and non-color labels.
 
 ## Contracts and architecture
 

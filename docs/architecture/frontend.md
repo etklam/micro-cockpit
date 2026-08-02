@@ -16,4 +16,4 @@ Authenticated routes are `/today`, `/today/observations`, `/review`, `/watchlist
 
 Quick Observation is the lowest-friction write. Tools are independent calculators; authenticated persistence stores presets and Calculation Snapshots, not Diary or Trade drafts.
 
-Core flows must work on narrow phones, through a keyboard, without color-only meaning, and in both English and Traditional Chinese.
+Core flows must work on narrow phones, through a keyboard, without color-only meaning, and in English, Traditional Chinese, and Simplified Chinese.

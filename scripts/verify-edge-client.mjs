@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { resolve } from 'node:path'
+import { relative, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 const generated = resolve(root, 'frontend/src/generated/edge.ts')
@@ -9,6 +9,25 @@ const result = spawnSync(process.execPath, [resolve(root, 'scripts/generate-edge
 if (result.status !== 0) process.exit(result.status ?? 1)
 if (readFileSync(generated, 'utf8') !== before) throw new Error('Generated Edge client is stale; run npm run api:generate')
 
-const frontend = spawnSync('rg', ['-n', String.raw`\bfetch\s*\(`, 'src', '--glob', '!src/generated/**'], { cwd: resolve(root, 'frontend'), encoding: 'utf8' })
-if (frontend.status === 0) throw new Error(`Raw fetch outside generated client:\n${frontend.stdout}`)
-if (frontend.status !== 1) throw new Error(frontend.stderr || 'Unable to scan frontend source')
+const frontendRoot = resolve(root, 'frontend')
+const sourceRoot = resolve(frontendRoot, 'src')
+const rawFetchPattern = /\bfetch\s*\(/u
+
+function findRawFetch(directory, matches = []) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = resolve(directory, entry.name)
+    if (entry.isDirectory()) {
+      if (path !== resolve(sourceRoot, 'generated')) findRawFetch(path, matches)
+      continue
+    }
+    const source = readFileSync(path, 'utf8')
+    const lines = source.split(/\r?\n/u)
+    lines.forEach((line, index) => {
+      if (rawFetchPattern.test(line)) matches.push(`${relative(frontendRoot, path)}:${index + 1}:${line.trim()}`)
+    })
+  }
+  return matches
+}
+
+const rawFetch = findRawFetch(sourceRoot)
+if (rawFetch.length) throw new Error(`Raw fetch outside generated client:\n${rawFetch.join('\n')}`)

@@ -210,6 +210,11 @@
       "id": "0042",
       "filename": "0042_observation_search_indexes.sql",
       "sha256": "b77c7e1dcd29912d07ac2ffeb8a97d894696f049d5bbec280a622e1f9e707b71"
+    },
+    {
+      "id": "0043",
+      "filename": "0043_identity_user_simplified_locale.sql",
+      "sha256": "b209944d28a1fd9da7ce5c5eaeb0736f2259def79e94df401a61f87c40a267ed"
     }
   ]
 }

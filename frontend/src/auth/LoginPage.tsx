@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthProvider'
 import { Brand, Button, Field, TextInput, ThemeToggle } from '../ui'
-import { useI18n } from '../i18n'
+import { useI18n, type Locale } from '../i18n'
 
 export function LoginPage() {
   const { state, login } = useAuth()
@@ -29,7 +29,7 @@ export function LoginPage() {
     <main className="login">
       <div className="login__glow" aria-hidden="true" />
       <div className="login__theme">
-        <LanguageToggle locale={locale} onChange={next => { void setLocale(next) }} />
+        <LanguageToggle label={t('settings.language')} locale={locale} onChange={next => { void setLocale(next) }} />
         <ThemeToggle />
       </div>
       <form className="login__card" onSubmit={submit}>
@@ -58,11 +58,12 @@ export function LoginPage() {
   )
 }
 
-function LanguageToggle({ locale, onChange }: { locale: 'en' | 'zh-Hant'; onChange: (l: 'en' | 'zh-Hant') => void }) {
+function LanguageToggle({ label, locale, onChange }: { label: string; locale: Locale; onChange: (l: Locale) => void }) {
   return (
-    <div className="lang-toggle" role="group" aria-label="Language">
+    <div className="lang-toggle" role="group" aria-label={label}>
       <button type="button" className={locale === 'en' ? 'is-active' : undefined} onClick={() => onChange('en')}>EN</button>
       <button type="button" className={locale === 'zh-Hant' ? 'is-active' : undefined} onClick={() => onChange('zh-Hant')}>繁</button>
+      <button type="button" className={locale === 'zh-Hans' ? 'is-active' : undefined} onClick={() => onChange('zh-Hans')}>简</button>
     </div>
   )
 }

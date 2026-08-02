@@ -52,4 +52,4 @@ It never gamifies, flashes green-red dopamine, congratulates, scolds, or pressur
 - `prefers-reduced-motion` honored; every transition has a still or crossfade fallback.
 - Direction and result are never encoded by color alone; always pair color with a sign, icon, or label.
 - Numerics are tabular-aligned; money is always labeled with currency.
-- English and Traditional Chinese are first-class interface languages under the existing typed i18n architecture.
+- English, Traditional Chinese, and Simplified Chinese are first-class interface languages under the existing typed i18n architecture.

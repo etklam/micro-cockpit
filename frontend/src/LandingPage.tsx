@@ -189,6 +189,7 @@ export function LandingPage() {
           <div className="lang-toggle" role="group" aria-label={t('settings.language')}>
             <button type="button" className={locale === 'en' ? 'is-active' : undefined} onClick={() => { void setLocale('en') }}>EN</button>
             <button type="button" className={locale === 'zh-Hant' ? 'is-active' : undefined} onClick={() => { void setLocale('zh-Hant') }}>繁</button>
+            <button type="button" className={locale === 'zh-Hans' ? 'is-active' : undefined} onClick={() => { void setLocale('zh-Hans') }}>简</button>
           </div>
           <ThemeControls />
         </div>

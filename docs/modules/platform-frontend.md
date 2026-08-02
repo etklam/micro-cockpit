@@ -55,7 +55,7 @@ If refresh fails after the settings write, persistence remains successful but th
 
 ## Localization and errors
 
-`I18nProvider` supplies locale and message lookup. English and Traditional Chinese messages live under `i18n/messages`. Stable API problem codes are translated through `i18n/errors.ts`; raw server exception text is not shown to users.
+`I18nProvider` supplies locale and message lookup. English, Traditional Chinese, and Simplified Chinese messages live under `i18n/messages`. Stable API problem codes are translated through `i18n/errors.ts`; raw server exception text is not shown to users.
 
 ## Side effects to remember
 

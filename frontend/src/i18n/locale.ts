@@ -1,7 +1,7 @@
 /** Supported UI locales. Unknown values fall back to English. */
-export type Locale = 'en' | 'zh-Hant'
+export type Locale = 'en' | 'zh-Hant' | 'zh-Hans'
 
-export const LOCALES: readonly Locale[] = ['en', 'zh-Hant'] as const
+export const LOCALES: readonly Locale[] = ['en', 'zh-Hant', 'zh-Hans'] as const
 export const DEFAULT_LOCALE: Locale = 'en'
 export const LOCALE_STORAGE_KEY = 'td_locale'
 
@@ -9,10 +9,11 @@ export const LOCALE_STORAGE_KEY = 'td_locale'
 export const INTL_LOCALE: Record<Locale, string> = {
   en: 'en-US',
   'zh-Hant': 'zh-Hant-TW',
+  'zh-Hans': 'zh-Hans-CN',
 }
 
 export function isLocale(value: unknown): value is Locale {
-  return value === 'en' || value === 'zh-Hant'
+  return value === 'en' || value === 'zh-Hant' || value === 'zh-Hans'
 }
 
 /** Normalize any stored/API/browser tag to a supported Locale. */
@@ -31,6 +32,15 @@ export function normalizeLocale(value: unknown): Locale {
     || lower.startsWith('zh-hant')
     || lower === 'zh-cht'
   ) return 'zh-Hant'
+  // Simplified Chinese family (and common aliases).
+  if (
+    lower === 'zh-hans'
+    || lower === 'zh-cn'
+    || lower === 'zh-sg'
+    || lower === 'zh-my'
+    || lower.startsWith('zh-hans')
+    || lower === 'zh-chs'
+  ) return 'zh-Hans'
   // Bare "zh" is ambiguous; prefer English rather than assuming script.
   return DEFAULT_LOCALE
 }
@@ -59,7 +69,9 @@ export function detectBrowserLocale(): Locale {
       if (isLocale(tag) || (typeof tag === 'string' && (
         tag.toLowerCase().startsWith('en')
         || tag.toLowerCase().includes('hant')
+        || tag.toLowerCase().includes('hans')
         || /zh[-_](tw|hk|mo)/i.test(tag)
+        || /zh[-_](cn|sg|my)/i.test(tag)
       ))) return normalized
     }
   } catch { /* ignore */ }
@@ -73,7 +85,7 @@ export function resolveAnonymousLocale(): Locale {
 
 /** Apply document language for a11y/CSS. */
 export function applyDocumentLocale(locale: Locale) {
-  document.documentElement.lang = locale === 'zh-Hant' ? 'zh-Hant' : 'en'
+  document.documentElement.lang = locale === 'zh-Hant' ? 'zh-Hant' : locale === 'zh-Hans' ? 'zh-Hans' : 'en'
 }
 
 export function bootLocaleFromMirror() {

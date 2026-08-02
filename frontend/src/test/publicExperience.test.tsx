@@ -121,4 +121,14 @@ describe('public experience', () => {
     expect(await screen.findByRole('heading', { name: '培養市場觀點的駕駛艙。' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '使用方式' })).toBeInTheDocument()
   })
+
+  it('switches public copy to Simplified Chinese', async () => {
+    renderPublic('/')
+    await userEvent.click((await screen.findAllByRole('button', { name: 'EN' }))[0])
+    await screen.findByRole('heading', { name: 'A cockpit for developing a market view.' })
+    const lang = screen.getAllByRole('group', { name: 'Language' })[0]
+    await userEvent.click(within(lang).getByRole('button', { name: '简' }))
+    expect(await screen.findByRole('heading', { name: '培养市场观点的驾驶舱。' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '使用方式' })).toBeInTheDocument()
+  })
 })

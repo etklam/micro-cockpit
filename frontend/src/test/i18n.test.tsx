@@ -22,9 +22,10 @@ import { server } from './setup'
 import App from '../App'
 
 describe('locale helpers', () => {
-  it('accepts only en and zh-Hant', () => {
+  it('accepts English and both Chinese scripts', () => {
     expect(isLocale('en')).toBe(true)
     expect(isLocale('zh-Hant')).toBe(true)
+    expect(isLocale('zh-Hans')).toBe(true)
     expect(isLocale('zh')).toBe(false)
     expect(isLocale('fr')).toBe(false)
   })
@@ -32,8 +33,10 @@ describe('locale helpers', () => {
   it('normalizes browser/API tags and unknown values', () => {
     expect(normalizeLocale('zh-TW')).toBe('zh-Hant')
     expect(normalizeLocale('zh_HK')).toBe('zh-Hant')
+    expect(normalizeLocale('zh-Hans')).toBe('zh-Hans')
+    expect(normalizeLocale('zh-CN')).toBe('zh-Hans')
+    expect(normalizeLocale('zh_SG')).toBe('zh-Hans')
     expect(normalizeLocale('en-GB')).toBe('en')
-    expect(normalizeLocale('zh-Hans')).toBe('en')
     expect(normalizeLocale('fr-FR')).toBe('en')
     expect(normalizeLocale(null)).toBe('en')
   })
@@ -45,6 +48,7 @@ describe('locale helpers', () => {
     expect(translate('en', 'nav.today')).toBe('Today')
     expect(translate('en', 'comparison.title')).toMatch(/Human/)
     expect(translate('zh-Hant', 'comparison.title')).toMatch(/對照/)
+    expect(translate('zh-Hans', 'nav.settings')).toBe('设置')
     warn.mockRestore()
   })
 })
@@ -129,6 +133,11 @@ describe('anonymous locale persistence', () => {
     await userEvent.click(screen.getByRole('button', { name: 'EN' }))
     expect(await screen.findByRole('button', { name: 'Sign in' })).toBeInTheDocument()
     expect(memory.get(LOCALE_STORAGE_KEY)).toBe('en')
+  })
+
+  it('applies Simplified Chinese to the document', () => {
+    applyDocumentLocale('zh-Hans')
+    expect(document.documentElement.lang).toBe('zh-Hans')
   })
 })
 

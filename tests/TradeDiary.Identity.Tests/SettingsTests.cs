@@ -46,7 +46,7 @@ public sealed class SettingsTests : IAsyncLifetime
                 updated_at timestamptz NOT NULL DEFAULT now(),
                 created_at timestamptz NOT NULL DEFAULT now(),
                 CONSTRAINT users_appearance_check CHECK (appearance IN ('system', 'light', 'dark')),
-                CONSTRAINT users_locale_check CHECK (locale IN ('en', 'zh-Hant')),
+                CONSTRAINT users_locale_check CHECK (locale IN ('en', 'zh-Hant', 'zh-Hans')),
                 CONSTRAINT users_accent_theme_check CHECK (accent_theme IN ('green', 'red'))
             );
             CREATE TABLE identity.user_credentials (
@@ -147,6 +147,7 @@ public sealed class SettingsTests : IAsyncLifetime
     [Theory]
     [InlineData("en")]
     [InlineData("zh-Hant")]
+    [InlineData("zh-Hans")]
     public async Task Accepts_every_locale_value(string locale)
     {
         var tokens = await RegisterAndLoginAsync($"{locale.Replace('-', '_')}@example.test");
@@ -183,7 +184,6 @@ public sealed class SettingsTests : IAsyncLifetime
             Body(baseCurrency: "US1"),
             Body(appearance: "dim"),
             Body(locale: "zh"),
-            Body(locale: "zh-Hans"),
             Body(locale: "fr"),
             Body(accentTheme: "amber"),
             Body(accentTheme: "blue"),
