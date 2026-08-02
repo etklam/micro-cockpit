@@ -20,16 +20,16 @@ export const queryClient = new QueryClient({ defaultOptions: { queries: { retry:
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <I18nProvider>
-      <AppErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
-            <AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <I18nProvider>
+            <AppErrorBoundary>
               <App />
-            </AuthProvider>
-          </BrowserRouter>
-        </QueryClientProvider>
-      </AppErrorBoundary>
-    </I18nProvider>
+            </AppErrorBoundary>
+          </I18nProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   </StrictMode>,
 )
