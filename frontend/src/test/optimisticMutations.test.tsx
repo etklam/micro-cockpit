@@ -99,7 +99,7 @@ test('watchlist add and remove are immediate, then rollback on failure', async (
   client.setQueryData(queryKeys.watchlist, watchlist)
   const { result: addResult } = renderHook(() => useAddWatchlistMutation(), { wrapper })
 
-  const addRequest = addResult.current.mutateAsync('instrument-2')
+  const addRequest = addResult.current.mutateAsync({ instrumentId: 'instrument-2', note: 'Follow the next evidence.' })
   await waitFor(() => expect(client.getQueryData<WatchlistItem[]>(queryKeys.watchlist)?.map(item => item.instrumentId))
     .toEqual(['instrument-1', 'instrument-2']))
   await act(async () => {

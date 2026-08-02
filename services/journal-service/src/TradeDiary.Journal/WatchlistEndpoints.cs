@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -20,9 +21,12 @@ static class WatchlistEndpoints
             return Results.Ok(new CollectionResponse<WatchlistItemResponse>(items));
         }).Produces<CollectionResponse<WatchlistItemResponse>>(200).ProducesProblem(401);
 
-        journal.MapPost("/watchlist/{instrumentId:guid}", async (Guid instrumentId, HttpRequest request, NpgsqlDataSource db, IHttpClientFactory clients, CancellationToken cancellationToken) =>
+        journal.MapPost("/watchlist/{instrumentId:guid}", async (Guid instrumentId, [FromBody] WatchlistCreateWrite? input, HttpRequest request, NpgsqlDataSource db, IHttpClientFactory clients, CancellationToken cancellationToken) =>
         {
             if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
+            var note = string.IsNullOrWhiteSpace(input?.Note) ? null : input.Note.Trim();
+            if (note is null) return Results.Problem("note_required", statusCode: 400);
+            if (note.Length > 500) return Results.Problem("note_too_long", statusCode: 400);
             try
             {
                 using var response = await clients.CreateClient("market-data").GetAsync($"/internal/v1/instruments/{instrumentId}", cancellationToken);
@@ -34,17 +38,18 @@ static class WatchlistEndpoints
                 return Results.Problem("instrument_directory_unavailable", statusCode: 503);
             }
             await using var command = db.CreateCommand("""
-                INSERT INTO journal.watchlist_items(user_id,instrument_id) VALUES($1,$2)
+                INSERT INTO journal.watchlist_items(user_id,instrument_id,note) VALUES($1,$2,$3)
                 ON CONFLICT DO NOTHING
                 RETURNING instrument_id,note,created_at,updated_at
                 """);
             command.Parameters.AddWithValue(userId);
             command.Parameters.AddWithValue(instrumentId);
+            command.Parameters.AddWithValue(note);
             await using var reader = await command.ExecuteReaderAsync();
             return await reader.ReadAsync()
                 ? Results.Created($"/internal/watchlist/{instrumentId}", Read(reader))
                 : Results.NoContent();
-        }).Produces<WatchlistItemResponse>(201).Produces(204).ProducesProblem(401).ProducesProblem(404).ProducesProblem(503);
+        }).Accepts<WatchlistCreateWrite>("application/json").Produces<WatchlistItemResponse>(201).Produces(204).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404).ProducesProblem(503);
 
         journal.MapPut("/watchlist/{instrumentId:guid}/note", async (Guid instrumentId, WatchlistNoteWrite input, HttpRequest request, NpgsqlDataSource db) =>
         {

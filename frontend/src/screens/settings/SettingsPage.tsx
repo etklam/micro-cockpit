@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { isAppearance, normalizeAccent, reconcileAccent, reconcileAppearance } from '../../features/appearance'
 import { useAppearance } from '../../features/useAppearance'
 import { deviceTimezone } from '../../features/accountTime'
@@ -43,6 +43,9 @@ export function SettingsPage() {
   const { logout } = useAuth()
   const { confirm, confirmNode } = useConfirm()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
+  const returnToReview = returnTo?.startsWith('/review') ? returnTo : null
   const deviceTz = useMemo(() => deviceTimezone(), [])
 
   const [displayName, setDisplayName] = useState('')
@@ -238,7 +241,11 @@ export function SettingsPage() {
   }
 
   return <>
-    <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
+    <PageHeader
+      title={t('settings.title')}
+      subtitle={t('settings.subtitle')}
+      actions={returnToReview ? <Link className="text-link" to={returnToReview}>{t('comparison.open')}</Link> : undefined}
+    />
     <PreferencesSection
       email={settings.data.email}
       displayName={displayName} setDisplayName={setDisplayName}

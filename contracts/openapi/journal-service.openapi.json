@@ -2488,6 +2488,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistCreateWrite"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "201": {
             "description": "Created",
@@ -5177,6 +5187,17 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "WatchlistCreateWrite": {
+        "required": [
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
           }
         }
       },

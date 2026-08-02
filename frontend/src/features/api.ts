@@ -68,8 +68,8 @@ export async function getTodayMarketObservation(): Promise<MarketObservation | n
     throw error
   }
 }
-export const saveQuickObservation = (content: string, key?: string) =>
-  G.postApiAppQuickObservations({ content }, idempotencyHeader(key))
+export const saveQuickObservation = (content: string, key?: string, sourceLabel?: string) =>
+  G.postApiAppQuickObservations({ content, sourceLabel: sourceLabel || null }, idempotencyHeader(key))
 export const updateObservation = (id: string, body: ObservationUpdateWrite) =>
   G.putApiAppObservationUpdatesId(id, body)
 export const getObservationHistory = (filters: ObservationSearchFilters, cursor?: string) =>
@@ -127,7 +127,8 @@ export type ComparisonQuery = Parameters<typeof G.getApiAppComparison>[0]
 export const getComparison = (query: ComparisonQuery) => G.getApiAppComparison(query)
 
 export const getWatchlist = async () => (await G.getApiAppWatchlist()).items
-export const addWatchlist = (instrumentId: string) => G.postApiAppWatchlistInstrumentId(instrumentId)
+export const addWatchlist = (instrumentId: string, note: string) =>
+  G.postApiAppWatchlistInstrumentId(instrumentId, { note: note.trim() })
 export const removeWatchlist = (instrumentId: string) => G.deleteApiAppWatchlistInstrumentId(instrumentId)
 export const saveWatchlistNote = (instrumentId: string, note: string) =>
   G.putApiAppWatchlistInstrumentIdNote(instrumentId, { note: note || null })

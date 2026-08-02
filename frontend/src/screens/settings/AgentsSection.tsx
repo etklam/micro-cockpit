@@ -28,7 +28,7 @@ export function AgentsSection({
   clearAgentToken, agentError, busyAgentId, rotatePending, onRotate, onRevoke, formatAgentTime,
 }: AgentsSectionProps) {
   const { t } = useI18n()
-  return <section className="stack">
+  return <section id="agents" className="stack">
     <h2>{t('settings.agents.title')}</h2>
     <p className="form-hint">{t('settings.agents.hint')}</p>
     <form className="inline-form" onSubmit={onCreate}>

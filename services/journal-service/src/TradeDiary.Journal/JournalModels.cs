@@ -157,6 +157,7 @@ record TradeEvidenceResponse(
     DateTime CreatedAt,
     DateTime UpdatedAt);
 record WatchlistItemResponse(Guid InstrumentId, string? Note, DateTime CreatedAt, DateTime UpdatedAt);
+record WatchlistCreateWrite(string Note);
 record WatchlistNoteWrite(string? Note);
 record PatternEvidenceResponse(Guid ExpectationId, string Url);
 record PatternLabelResponse(

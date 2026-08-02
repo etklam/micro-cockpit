@@ -503,9 +503,11 @@ public sealed class QuickObservationApiTests
         var owner = Guid.NewGuid();
         using var client = fixture.Client(owner);
 
-        Assert.Equal(HttpStatusCode.Created, (await client.PostAsync($"/internal/watchlist/{KnownInstrumentId}", null)).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync($"/internal/watchlist/{KnownInstrumentId}", null)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync($"/internal/watchlist/{Guid.NewGuid()}", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync($"/internal/watchlist/{KnownInstrumentId}", new { note = " " })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync($"/internal/watchlist/{KnownInstrumentId}", new { note = new string('x', 501) })).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync($"/internal/watchlist/{KnownInstrumentId}", new { note = "Track margin stabilization." })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsJsonAsync($"/internal/watchlist/{KnownInstrumentId}", new { note = "Duplicate should be idempotent." })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync($"/internal/watchlist/{Guid.NewGuid()}", new { note = "Unknown instrument." })).StatusCode);
 
         using var note = await client.PutAsJsonAsync($"/internal/watchlist/{KnownInstrumentId}/note", new { note = " Watch while margins stabilize. " });
         Assert.Equal(HttpStatusCode.OK, note.StatusCode);
@@ -515,6 +517,7 @@ public sealed class QuickObservationApiTests
         var list = await client.GetFromJsonAsync<JsonElement>("/internal/watchlist");
         Assert.Single(list.GetProperty("items").EnumerateArray());
         Assert.Equal(KnownInstrumentId, list.GetProperty("items")[0].GetProperty("instrumentId").GetGuid());
+        Assert.Equal("Track margin stabilization.", list.GetProperty("items")[0].GetProperty("note").GetString());
         using var other = fixture.Client(Guid.NewGuid());
         Assert.Empty((await other.GetFromJsonAsync<JsonElement>("/internal/watchlist")).GetProperty("items").EnumerateArray());
         Assert.Equal(HttpStatusCode.NotFound, (await other.DeleteAsync($"/internal/watchlist/{KnownInstrumentId}")).StatusCode);
@@ -562,7 +565,7 @@ public sealed class QuickObservationApiTests
         fixture.SetNow(new DateTimeOffset(2026, 7, 18, 12, 0, 0, TimeSpan.Zero));
         Assert.Empty((await ingestion.GetFromJsonAsync<JsonElement>("/internal/v1/tracked-us-instruments")).GetProperty("items").EnumerateArray());
 
-        Assert.Equal(HttpStatusCode.Created, (await client.PostAsync($"/internal/watchlist/{KnownInstrumentId}", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync($"/internal/watchlist/{KnownInstrumentId}", new { note = "Keep tracking the instrument." })).StatusCode);
         Assert.Single((await ingestion.GetFromJsonAsync<JsonElement>("/internal/v1/tracked-us-instruments")).GetProperty("items").EnumerateArray());
     }
 

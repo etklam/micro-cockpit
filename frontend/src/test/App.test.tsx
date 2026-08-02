@@ -130,21 +130,46 @@ test('empty watchlist explains its purpose and the next step', async () => {
   server.use(...authenticatedHandlers())
   server.use(http.get('/api/app/watchlist', () => HttpResponse.json({ items: [] })))
   renderApp('/watchlist')
-  expect(await screen.findByRole('heading', { name: 'Add an instrument to follow' })).toBeInTheDocument()
-  expect(screen.getByText('After adding it, note why it matters and revisit its observation timeline when new evidence appears.')).toBeInTheDocument()
-  expect(await screen.findByText('Nothing to follow yet')).toBeInTheDocument()
-  expect(screen.getByText('Choose an instrument above to start a focused observation list.')).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Nothing to follow yet' })).toBeInTheDocument()
+  expect(screen.getByText('A focused list of instruments you want to revisit—not a portfolio or price alert.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Add your first instrument' })).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Add your first instrument' }))
+  expect(await screen.findByRole('heading', { name: 'Add an instrument to your Watchlist' })).toBeInTheDocument()
   expect(screen.getByRole('combobox', { name: /Instrument/ })).toBeDisabled()
   expect(screen.getByText('No instruments are available to add right now.')).toBeInTheDocument()
+})
+
+test('populated watchlist exposes real fields and filters by note', async () => {
+  const nvdaId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+  const spyId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/watchlist', () => HttpResponse.json({ items: [
+      { instrumentId: nvdaId, note: 'Watch margin stabilization', createdAt: '2026-07-14T10:00:00Z', updatedAt: '2026-07-16T10:00:00Z' },
+      { instrumentId: spyId, note: 'Review breadth confirmation', createdAt: '2026-07-14T11:00:00Z', updatedAt: '2026-07-15T10:00:00Z' },
+    ] })),
+    http.get('/api/app/market/symbols', () => HttpResponse.json({ items: [
+      { instrumentId: nvdaId, symbol: 'NVDA', name: 'NVIDIA Corporation', exchange: 'NASDAQ', currency: 'USD', timezone: 'America/New_York' },
+      { instrumentId: spyId, symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', exchange: 'NYSEARCA', currency: 'USD', timezone: 'America/New_York' },
+    ] })),
+  )
+  renderApp('/watchlist')
+  expect(await screen.findByText('NVIDIA Corporation')).toBeInTheDocument()
+  expect(screen.getByText('Watch margin stabilization')).toBeInTheDocument()
+  expect(screen.getAllByRole('link', { name: 'Open observation timeline' })[0]).toHaveAttribute('href', `/today/observations?instrumentId=${nvdaId}`)
+  const search = screen.getByRole('searchbox', { name: 'Search Watchlist' })
+  await userEvent.type(search, 'breadth')
+  expect(screen.getByText('SPDR S&P 500 ETF Trust')).toBeInTheDocument()
+  expect(screen.queryByText('NVIDIA Corporation')).not.toBeInTheDocument()
 })
 
 test('comparison explains how to create an Agent when none are available', async () => {
   server.use(...authenticatedHandlers())
   server.use(http.get('/api/app/agents', () => HttpResponse.json({ items: [] })))
   renderApp('/review')
-  const agent = await screen.findByRole('combobox', { name: 'Agent' })
-  expect(agent).toBeDisabled()
-  expect(await screen.findByText(/No Agent Users are available yet/)).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Create an AI Agent to compare views' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Create AI Agent' })).toHaveAttribute('href', expect.stringContaining('/settings'))
+  expect(screen.getByText(/No Agent Users are available yet/)).toBeInTheDocument()
 })
 
 test('comparison keeps Human and Agent records explicitly separate and read-only', async () => {
@@ -189,13 +214,13 @@ test('comparison keeps Human and Agent records explicitly separate and read-only
     difference: { outcomeConsistent: false, confidenceDifference: 1 },
   })))
   renderApp('/review')
-  expect(await screen.findByText('Choose who and what to compare')).toBeInTheDocument()
-  expect(screen.getByText('Select an Agent, a subject, and a date range.')).toBeInTheDocument()
+  expect(await screen.findByText('Comparison target')).toBeInTheDocument()
+  expect(screen.getByText('Select a target type and the subject to compare.')).toBeInTheDocument()
   expect(screen.getByText('Your comparison will appear here.')).toBeInTheDocument()
   await screen.findByRole('option', { name: 'Atlas' })
   await userEvent.selectOptions(screen.getByLabelText('Agent'), '22222222-2222-2222-2222-222222222222')
   await userEvent.type(screen.getByLabelText('Subject'), 'AI')
-  await userEvent.click(screen.getByRole('button', { name: 'Compare' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Create comparison' }))
   expect(await screen.findByText('Human breadth view')).toBeInTheDocument()
   expect(screen.getByText('Agent breadth view')).toBeInTheDocument()
   expect(screen.getByText('Human-owned records')).toBeInTheDocument()

@@ -154,7 +154,7 @@ export function useCreateTradeEvidenceMutation(decisionId: string) {
 export function useQuickObservationMutation() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: ({ content, key }: { content: string; key: string }) => api.saveQuickObservation(content, key),
+    mutationFn: ({ content, key, sourceLabel }: { content: string; key: string; sourceLabel?: string }) => api.saveQuickObservation(content, key, sourceLabel),
     onMutate: async ({ content }) => {
       await client.cancelQueries({ queryKey: queryKeys.todayObservation })
       const previous = client.getQueryData<api.MarketObservation | null>(queryKeys.todayObservation)
@@ -221,23 +221,26 @@ export const useSelectDisciplineMutation = () =>
 export function useAddWatchlistMutation() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: api.addWatchlist,
-    onMutate: async instrumentId => {
+    mutationFn: (input: { instrumentId: string; note: string }) =>
+      api.addWatchlist(input.instrumentId, input.note),
+    onMutate: async input => {
+      const instrumentId = input.instrumentId
+      const note = input.note.trim() || null
       await client.cancelQueries({ queryKey: queryKeys.watchlist })
       const previous = client.getQueryData<api.WatchlistItem[]>(queryKeys.watchlist)
       const exists = previous?.some(item => item.instrumentId === instrumentId) ?? false
       if (!exists) {
         const now = new Date().toISOString()
         client.setQueryData<api.WatchlistItem[]>(queryKeys.watchlist, current => [
-          ...(current ?? []), { instrumentId, note: null, createdAt: now, updatedAt: now },
+          ...(current ?? []), { instrumentId, note, createdAt: now, updatedAt: now },
         ])
       }
       return { previous, added: !exists }
     },
-    onError: (_error, instrumentId, context) => {
+    onError: (_error, input, context) => {
       if (!context?.added) return
       client.setQueryData<api.WatchlistItem[]>(queryKeys.watchlist, current =>
-        current?.filter(item => item.instrumentId !== instrumentId),
+        current?.filter(item => item.instrumentId !== input.instrumentId),
       )
     },
     onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.watchlist }) },

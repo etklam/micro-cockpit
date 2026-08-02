@@ -1,10 +1,12 @@
-import { useState, type FormEvent } from 'react'
-import type { Discipline, DisciplinePrincipleStatus } from '../../features/api'
+import { useMemo, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
+import type { Discipline, DisciplinePrincipleStatus, Expectation, ObservationSearchItem } from '../../features/api'
 import {
   useCreateDisciplineMutation,
   useDisciplinesQuery,
   useExpectationsQuery,
   usePatternReviewQuery,
+  useObservationHistoryQuery,
   useSelectDisciplineMutation,
   useUpdateDisciplineMutation,
 } from '../../features/queries'
@@ -13,6 +15,23 @@ import { SectionError } from '../../shell'
 import { useI18n } from '../../i18n'
 import { ExpectationReviewForm } from '../today/ExpectationReviewForm'
 import { ComparisonPanel } from './ComparisonPanel'
+
+function comparisonHref(expectation: Expectation, item: ObservationSearchItem | undefined) {
+  const subject = item?.update.primarySubject
+  if (!item || !subject) return null
+  const from = item.journalDay
+  const deadline = expectation.deadline.slice(0, 10)
+  const to = deadline >= from ? deadline : from
+  const params = new URLSearchParams({ from, to })
+  if (subject.type === 'instrument') {
+    if (!subject.instrumentId) return null
+    params.set('instrumentId', subject.instrumentId)
+  } else if (subject.name) {
+    params.set('subjectType', subject.type)
+    params.set('subject', subject.name)
+  } else return null
+  return `/review?${params.toString()}`
+}
 
 export function ReviewPage() {
   const { t } = useI18n()
@@ -25,7 +44,9 @@ export function ReviewPage() {
   const [to, setTo] = useState('')
   const [reviewExpectationId, setReviewExpectationId] = useState<string | null>(null)
   const expectations = useExpectationsQuery()
+  const observationHistory = useObservationHistoryQuery({})
   const reviewable = (expectations.data ?? []).filter(item => item.readiness !== 'active')
+  const updates = useMemo(() => new Map((observationHistory.data?.pages.flatMap(page => page.items) ?? []).map(item => [item.update.id, item])), [observationHistory.data?.pages])
   const patterns = usePatternReviewQuery(range, from, to)
   const createDiscipline = useCreateDisciplineMutation()
   const updateDiscipline = useUpdateDisciplineMutation()
@@ -50,7 +71,7 @@ export function ReviewPage() {
     <Card as="section" className="stack">
       <h2>{t('review.expectations')}</h2>
       {expectations.isLoading ? <div className="stack" role="status" aria-label={t('common.loading')}><div className="skel" style={{ height: 24, width: '75%' }} /><div className="skel" style={{ height: 18, width: '48%' }} /></div> : expectations.isError ? <SectionError onRetry={() => { void expectations.refetch() }} /> : reviewable.length === 0 ? <p className="form-hint">{t('review.expectationsEmpty')}</p> : <ol className="principle-list">{reviewable.map(expectation => <li key={expectation.id}>
-        <article className="stack"><strong>{expectation.expectedBehavior}</strong><span>{t('today.expectations.confidence')}: {expectation.confidence}</span><span>{t('today.expectations.readiness')}: {expectation.readiness}</span><Button variant="ghost" size="sm" onClick={() => setReviewExpectationId(expectation.id)}>{expectation.readiness === 'reviewed' ? t('today.review.edit') : t('today.review.open')}</Button></article>
+        <article className="stack"><strong>{expectation.expectedBehavior}</strong><span>{t('today.expectations.confidence')}: {expectation.confidence}</span><span>{t('today.expectations.readiness')}: {expectation.readiness}</span><Button variant="ghost" size="sm" onClick={() => setReviewExpectationId(expectation.id)}>{expectation.readiness === 'reviewed' ? t('today.review.edit') : t('today.review.open')}</Button>{comparisonHref(expectation, updates.get(expectation.observationUpdateId)) ? <Link className="text-link" to={comparisonHref(expectation, updates.get(expectation.observationUpdateId))!}>{t('comparison.open')}</Link> : null}</article>
       </li>)}</ol>}
     </Card>
     {reviewExpectationId ? <ExpectationReviewForm expectationId={reviewExpectationId} onClose={() => setReviewExpectationId(null)} /> : null}

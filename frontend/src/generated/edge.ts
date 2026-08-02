@@ -101,6 +101,7 @@ export type TradeSide = "buy" | "sell"
 export type UserSettingsResponse = { "email": string; "displayName": string; "timezone": string; "journalDayRollover": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string; "updatedAt": string }
 export type UserSettingsWrite = { "displayName": string; "timezone": string; "journalDayRollover": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string }
 export type WatchlistItemResponse = { "instrumentId": string; "note": null | string; "createdAt": string; "updatedAt": string }
+export type WatchlistCreateWrite = { "note": string }
 export type WatchlistNoteWrite = { "note": null | string }
 
 export type RequestOptions = { baseUrl?: string; token?: string | null; refresh?: () => Promise<string | null>; onUnauthorized?: () => void }
@@ -178,7 +179,7 @@ export const postApiAppActionDecisionsDecisionIdTrades = (decisionId: string, bo
 export const putApiAppActionDecisionsDecisionIdTradesId = (decisionId: string, id: string, body: TradeEvidenceWrite, extra?: RequestInit) => request<TradeEvidenceResponse>(`/api/app/action-decisions/${encodeURIComponent(String(decisionId))}/trades/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const deleteApiAppActionDecisionsDecisionIdTradesId = (decisionId: string, id: string, extra?: RequestInit) => request<unknown>(`/api/app/action-decisions/${encodeURIComponent(String(decisionId))}/trades/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const getApiAppWatchlist = (extra?: RequestInit) => request<CollectionResponseOfWatchlistItemResponse>("/api/app/watchlist", { method: "GET", ...extra })
-export const postApiAppWatchlistInstrumentId = (instrumentId: string, extra?: RequestInit) => request<WatchlistItemResponse>(`/api/app/watchlist/${encodeURIComponent(String(instrumentId))}`, { method: "POST", ...extra })
+export const postApiAppWatchlistInstrumentId = (instrumentId: string, body: WatchlistCreateWrite, extra?: RequestInit) => request<WatchlistItemResponse>(`/api/app/watchlist/${encodeURIComponent(String(instrumentId))}`, { method: "POST", body: JSON.stringify(body), ...extra })
 export const deleteApiAppWatchlistInstrumentId = (instrumentId: string, extra?: RequestInit) => request<unknown>(`/api/app/watchlist/${encodeURIComponent(String(instrumentId))}`, { method: "DELETE", ...extra })
 export const putApiAppWatchlistInstrumentIdNote = (instrumentId: string, body: WatchlistNoteWrite, extra?: RequestInit) => request<WatchlistItemResponse>(`/api/app/watchlist/${encodeURIComponent(String(instrumentId))}/note`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const getApiAppPatternReview = (query: { "range": string; "from"?: string; "to"?: string }, extra?: RequestInit) => request<PatternReviewResponse>("/api/app/pattern-review" + withQuery(query), { method: "GET", ...extra })

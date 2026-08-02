@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import type { Expectation, ExpectationConfidence, ExpectationDeadlinePreset, ObservationSubjectWrite, ObservationUpdate } from '../../features/api'
 import { useIdempotencyKey } from '../../features/api'
 import {
   useBootstrapQuery,
+  useAddWatchlistMutation,
   useCreateExpectationMutation,
   useExpectationsQuery,
   useInstrumentDirectoryQuery,
@@ -49,6 +50,7 @@ function truncate(value: string, max = 150) {
 export function TodayPage() {
   const { go } = useCockpit()
   const { t, locale } = useI18n()
+  const [search] = useSearchParams()
   const bootstrap = useBootstrapQuery()
   const observation = useTodayObservationQuery()
   const recentHistory = useObservationHistoryQuery({})
@@ -79,10 +81,13 @@ export function TodayPage() {
   const [expectationDeadline, setExpectationDeadline] = useState('')
   const [expectationError, setExpectationError] = useState<string | null>(null)
   const [reviewExpectationId, setReviewExpectationId] = useState<string | null>(null)
+  const [watchlistAdded, setWatchlistAdded] = useState<string[]>([])
+  const [watchlistError, setWatchlistError] = useState<string | null>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const idem = useIdempotencyKey()
   const expectationIdem = useIdempotencyKey()
   const saveQuickObservation = useQuickObservationMutation()
+  const addWatchlist = useAddWatchlistMutation()
   const updateObservation = useUpdateObservationMutation()
   const createExpectation = useCreateExpectationMutation()
   const updateExpectation = useUpdateExpectationMutation()
@@ -99,8 +104,47 @@ export function TodayPage() {
       .slice(0, 3)
   }, [bootstrap.data?.currentJournalDay, recentHistory.data?.pages])
   const readyExpectations = expectationItems.filter(item => item.readiness === 'ready_for_review')
+
+  const contextInstrumentId = search.get('instrumentId') ?? ''
+  const contextInstrument = instruments.data?.find(item => item.instrumentId === contextInstrumentId)
+  const contextInstrumentLabel = contextInstrument
+    ? `${contextInstrument.symbol} · ${contextInstrument.name}`
+    : contextInstrumentId
+
+  function comparisonHref(item: Expectation, subject: NonNullable<ObservationUpdate['primarySubject']> | null | undefined) {
+    if (!subject) return null
+    const from = observation.data?.journalDay ?? item.createdAt.slice(0, 10)
+    const deadline = item.deadline.slice(0, 10)
+    const to = deadline >= from ? deadline : from
+    const params = new URLSearchParams({ from, to })
+    if (subject.type === 'instrument') {
+      if (!subject.instrumentId) return null
+      params.set('instrumentId', subject.instrumentId)
+    } else if (subject.name) {
+      params.set('subjectType', subject.type)
+      params.set('subject', subject.name)
+    } else return null
+    return `/review?${params.toString()}`
+  }
+
+  async function addObservationInstrumentToWatchlist(update: ObservationUpdate) {
+    const subject = update.primarySubject
+    if (subject?.type !== 'instrument' || !subject.instrumentId) return
+    setWatchlistError(null)
+    try {
+      await addWatchlist.mutateAsync({
+        instrumentId: subject.instrumentId,
+        note: truncate(update.content, 500),
+      })
+      setWatchlistAdded(current => current.includes(subject.instrumentId!) ? current : [...current, subject.instrumentId!])
+    } catch {
+      setWatchlistError(t('error.unknown'))
+    }
+  }
+
   const renderExpectation = (item: Expectation, actions = false) => {
     const sourceSubject = observation.data?.updates.find(update => update.id === item.observationUpdateId)?.primarySubject
+    const comparison = comparisonHref(item, sourceSubject)
     return <article className="stack">
       <h3>{item.expectedBehavior}</h3>
       <p><strong>{t('today.expectations.invalidation')}:</strong> {item.invalidationCondition}</p>
@@ -117,6 +161,7 @@ export function TodayPage() {
         <Button variant="ghost" size="sm" onClick={() => beginExpectationEdit(item)}>{t('today.expectations.edit')}</Button>
         {item.readiness === 'active' ? <Button variant="ghost" size="sm" loading={invalidateExpectation.isPending} onClick={() => invalidateExpectation.mutate(item.id)}>{t('today.expectations.invalidate')}</Button> : null}
         {item.readiness !== 'active' ? <Button variant="ghost" size="sm" onClick={() => setReviewExpectationId(item.id)}>{item.readiness === 'reviewed' ? t('today.review.edit') : t('today.review.open')}</Button> : null}
+        {item.readiness !== 'active' && comparison ? <Link className="text-link" to={comparison}>{t('comparison.open')}</Link> : null}
       </div> : null}
     </article>
   }
@@ -124,7 +169,11 @@ export function TodayPage() {
   async function saveNote() {
     if (!note.trim()) return
     try {
-      await saveQuickObservation.mutateAsync({ content: note.trim(), key: idem.key() })
+      await saveQuickObservation.mutateAsync({
+        content: note.trim(),
+        key: idem.key(),
+        sourceLabel: contextInstrumentLabel ? `instrument:${contextInstrumentLabel}` : undefined,
+      })
       setNote('')
       idem.reset()
       setSaved(true)
@@ -254,6 +303,10 @@ export function TodayPage() {
           <p className="quick-note__description">{t('today.quickNote.description')}</p>
         </div>
       </div>
+      {contextInstrumentLabel ? <p className="form-hint" role="status">
+        {t('today.quickNote.instrumentContext', { instrument: contextInstrumentLabel })}{' '}
+        <Link className="text-link" to={`/today/observations?instrumentId=${encodeURIComponent(contextInstrumentId)}`}>{t('watchlist.timeline')}</Link>
+      </p> : null}
       <label className="visually-hidden" htmlFor="qn">{t('today.quickNote.label')}</label>
       <TextArea ref={composerRef} id="qn" value={note} onChange={event => setNote(event.target.value)} placeholder={t('today.quickNote.placeholder')} className="textarea--prose" />
       <div className="quick-note__foot">
@@ -305,6 +358,17 @@ export function TodayPage() {
             <div className="observation-card__actions" aria-label={t('today.observations.actions')}>
               <Button variant="subtle" size="sm" icon="edit" onClick={() => beginEdit(update)}>{t('today.observations.edit')}</Button>
               <Button variant="subtle" size="sm" icon="plus" onClick={() => { cancelExpectation(); setExpectationUpdateId(update.id) }}>{t('today.expectations.add')}</Button>
+              {update.primarySubject?.type === 'instrument' && update.primarySubject.instrumentId ? <>
+                <Button
+                  variant="subtle"
+                  size="sm"
+                  icon="plus"
+                  loading={addWatchlist.isPending}
+                  disabled={watchlistAdded.includes(update.primarySubject.instrumentId)}
+                  onClick={() => { void addObservationInstrumentToWatchlist(update) }}
+                >{watchlistAdded.includes(update.primarySubject.instrumentId) ? t('watchlist.added') : t('watchlist.add')}</Button>
+                <Link className="text-link" to={`/today?instrumentId=${encodeURIComponent(update.primarySubject.instrumentId)}`}>{t('today.observations.observeAgain')}</Link>
+              </> : null}
             </div>
             {(update.signal || update.interpretation || update.mentalState || update.relatedSubjects.length || update.evidence) ? <div className="observation-card__detail stack">
               {update.signal ? <p><strong>{t('today.observations.signal')}:</strong> {update.signal}</p> : null}
@@ -339,6 +403,7 @@ export function TodayPage() {
           <ActionDecisionPanel updateId={update.id} expectations={expectationItems.filter(item => item.observationUpdateId === update.id)} />
         </li>)}
       </ol> : <EmptyBox className="observation-empty" icon="diary" title={t('today.observations.emptyTitle')} hint={t('today.observations.emptyHint')} />}
+      {watchlistError ? <p className="form-error" role="alert">{watchlistError}</p> : null}
     </section>
 
     {recentUpdates.length ? <section className="recent" aria-labelledby="recent-observations-h">
