@@ -126,17 +126,78 @@ test('calendar deep links remain first-class', async () => {
   expect(window.location.pathname).toBe('/calendar/2026/07')
 })
 
+test('calendar historical add preserves the selected Journal Day', async () => {
+  let requestBody: Record<string, unknown> | null = null
+  server.use(
+    ...authenticatedHandlers(),
+    http.get('/api/app/calendar', () => HttpResponse.json({
+      year: 2026,
+      month: 7,
+      days: [
+        { date: '2026-07-15', marketObservationId: null, updateCount: 0, readyForReviewCount: 0 },
+        { date: '2026-07-16', marketObservationId: null, updateCount: 0, readyForReviewCount: 0 },
+      ],
+    })),
+    http.post('/api/app/quick-observations', async ({ request }) => {
+      requestBody = await request.json() as Record<string, unknown>
+      return HttpResponse.json({ marketObservationId: '1', observationUpdateId: '2', journalDay: '2026-07-15', recordedAt: '2026-07-16T12:00:00Z', appended: false })
+    }),
+  )
+  renderApp('/calendar/2026/07?day=2026-07-15')
+  expect(await screen.findByText('Nothing recorded for this day')).toBeInTheDocument()
+  const addButtons = screen.getAllByRole('button', { name: 'Add observation' })
+  expect(addButtons).toHaveLength(2)
+  await userEvent.click(addButtons[0])
+  const composer = await screen.findByRole('textbox', { name: 'New observation' })
+  expect(screen.getByText('This update will be recorded on Wednesday, July 15, 2026.')).toBeInTheDocument()
+  await userEvent.type(composer, 'The breadth reset held into the close.')
+  await userEvent.click(screen.getByRole('button', { name: 'Save observation' }))
+  await waitFor(() => expect(requestBody).toEqual({ content: 'The breadth reset held into the close.', sourceLabel: null, journalDay: '2026-07-15' }))
+})
+
 test('empty watchlist explains its purpose and the next step', async () => {
   server.use(...authenticatedHandlers())
   server.use(http.get('/api/app/watchlist', () => HttpResponse.json({ items: [] })))
   renderApp('/watchlist')
-  expect(await screen.findByRole('heading', { name: 'Nothing to follow yet' })).toBeInTheDocument()
-  expect(screen.getByText('A focused list of instruments you want to revisit—not a portfolio or price alert.')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Add your first instrument' })).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: 'Add your first instrument' }))
-  expect(await screen.findByRole('heading', { name: 'Add an instrument to your Watchlist' })).toBeInTheDocument()
-  expect(screen.getByRole('combobox', { name: /Instrument/ })).toBeDisabled()
-  expect(screen.getByText('No instruments are available to add right now.')).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'No observation targets yet' })).toBeInTheDocument()
+  expect(screen.getByText('A focused list of observation targets you want to revisit—not a portfolio or price alert.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Add your first observation target' })).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Add your first observation target' }))
+  expect(await screen.findByRole('heading', { name: 'Add an observation target' })).toBeInTheDocument()
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  expect(screen.getByText(/No published market instruments are available/)).toBeInTheDocument()
+})
+
+test('empty watchlist can add an existing supported instrument in one flow', async () => {
+  const instrumentId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+  let items: Array<{ instrumentId: string; note: string; createdAt: string; updatedAt: string }> = []
+  let requestBody: unknown
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/watchlist', () => HttpResponse.json({ items })),
+    http.get('/api/app/market/symbols', () => HttpResponse.json({ items: [
+      { instrumentId, symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', currency: 'USD', timezone: 'America/New_York' },
+    ] })),
+    http.post('/api/app/watchlist/:instrumentId', async ({ request, params }) => {
+      requestBody = await request.json()
+      const now = '2026-07-16T12:00:00Z'
+      items = [{ instrumentId: String(params.instrumentId), note: (requestBody as { note: string }).note, createdAt: now, updatedAt: now }]
+      return HttpResponse.json(items[0], { status: 201 })
+    }),
+  )
+  renderApp('/watchlist')
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Add your first observation target' }))
+  const target = await screen.findByRole('combobox', { name: 'Observation target' })
+  await userEvent.click(target)
+  await userEvent.keyboard('{ArrowDown}{Enter}')
+  await userEvent.type(screen.getByRole('textbox'), 'Review earnings evidence')
+  await userEvent.click(screen.getByRole('button', { name: 'Add to Watchlist' }))
+
+  await waitFor(() => expect(screen.getByText('Apple Inc.')).toBeInTheDocument())
+  expect(requestBody).toEqual({ note: 'Review earnings evidence' })
+  expect(screen.getByText('Added AAPL to your Watchlist.')).toBeInTheDocument()
+  expect(document.activeElement).toHaveAttribute('data-watchlist-instrument', instrumentId)
 })
 
 test('populated watchlist exposes real fields and filters by note', async () => {
@@ -167,6 +228,7 @@ test('comparison explains how to create an Agent when none are available', async
   server.use(...authenticatedHandlers())
   server.use(http.get('/api/app/agents', () => HttpResponse.json({ items: [] })))
   renderApp('/review')
+  await userEvent.click(await screen.findByText('Human / Agent comparison'))
   expect(await screen.findByRole('heading', { name: 'Create an AI Agent to compare views' })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Create AI Agent' })).toHaveAttribute('href', expect.stringContaining('/settings'))
   expect(screen.getByText(/No Agent Users are available yet/)).toBeInTheDocument()
@@ -214,6 +276,7 @@ test('comparison keeps Human and Agent records explicitly separate and read-only
     difference: { outcomeConsistent: false, confidenceDifference: 1 },
   })))
   renderApp('/review')
+  await userEvent.click(await screen.findByText('Human / Agent comparison'))
   expect(await screen.findByText('Comparison target')).toBeInTheDocument()
   expect(screen.getByText('Select a target type and the subject to compare.')).toBeInTheDocument()
   expect(screen.getByText('Your comparison will appear here.')).toBeInTheDocument()
@@ -228,6 +291,68 @@ test('comparison keeps Human and Agent records explicitly separate and read-only
   expect(screen.getByText('Different')).toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'Comparison result' })).toBeInTheDocument()
   expect(screen.getByText('These differences describe the records; they do not decide which view is better.')).toBeInTheDocument()
+})
+
+test('Review defaults to pending self-review without loading an Agent', async () => {
+  const expectationId = '99999999-9999-9999-9999-999999999999'
+  let reviewed = false
+  let agentCalls = 0
+  let reviewBody: Record<string, unknown> | null = null
+  server.use(...authenticatedHandlers())
+  server.use(
+    http.get('/api/app/agents', () => { agentCalls += 1; return HttpResponse.json({ items: [] }) }),
+    http.get('/api/app/expectations', () => HttpResponse.json({ items: [{
+      id: expectationId,
+      observationUpdateId: '88888888-8888-8888-8888-888888888888',
+      marketObservationId: '77777777-7777-7777-7777-777777777777',
+      journalDay: '2026-07-15',
+      expectedBehavior: 'Breadth should recover by the deadline.',
+      deadline: '2026-07-17T10:00:00Z',
+      invalidationCondition: 'Breadth closes below support.',
+      confidence: 'medium',
+      market: 'US',
+      invalidatedAt: null,
+      readiness: reviewed ? 'reviewed' : 'ready_for_review',
+      deadlineElapsed: true,
+      createdAt: '2026-07-15T09:00:00Z',
+      updatedAt: '2026-07-15T09:00:00Z',
+    }] })),
+    http.get(`/api/app/expectations/${expectationId}/review`, () => new HttpResponse(null, { status: 404 })),
+    http.get('/api/app/reasoning-labels', () => HttpResponse.json({ items: [] })),
+    http.put(`/api/app/expectations/${expectationId}/review`, async ({ request }) => {
+      reviewBody = await request.json() as Record<string, unknown>
+      reviewed = true
+      return HttpResponse.json({ id: 'review-1', expectationId, outcome: reviewBody.outcome, reasoningQuality: reviewBody.reasoningQuality, explanation: reviewBody.explanation, labels: [], createdAt: '2026-07-17T11:00:00Z', updatedAt: '2026-07-17T11:00:00Z' })
+    }),
+  )
+  renderApp('/review')
+
+  expect(await screen.findByRole('heading', { name: 'Review queue' })).toBeInTheDocument()
+  expect(await screen.findByText('Breadth should recover by the deadline.')).toBeInTheDocument()
+  expect(screen.getByText('Pending')).toBeInTheDocument()
+  expect(screen.queryByLabelText('Agent')).not.toBeInTheDocument()
+  expect(agentCalls).toBe(0)
+
+  await userEvent.click(screen.getByRole('button', { name: 'Start review' }))
+  expect(await screen.findByRole('heading', { name: 'Guided self-review' })).toBeInTheDocument()
+  expect(screen.getByText('Original Expectation context')).toBeInTheDocument()
+  expect(screen.getByText('Breadth closes below support.')).toBeInTheDocument()
+
+  const outcome = screen.getByRole('combobox', { name: 'Outcome' })
+  expect(screen.getByRole('option', { name: 'Confirmed' })).toBeInTheDocument()
+  expect(screen.getByRole('option', { name: 'Partially confirmed' })).toBeInTheDocument()
+  expect(screen.getByRole('option', { name: 'Invalidated' })).toBeInTheDocument()
+  expect(screen.getByRole('option', { name: 'Indeterminate' })).toBeInTheDocument()
+  await userEvent.selectOptions(outcome, 'partially_confirmed')
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+  expect(screen.getByText('Add a short explanation for this outcome.')).toBeInTheDocument()
+  expect(reviewBody).toBeNull()
+
+  await userEvent.type(screen.getByRole('textbox', { name: 'Your explanation' }), 'The condition was only partly met.')
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+  await waitFor(() => expect(reviewBody).toMatchObject({ outcome: 'partially_confirmed', reasoningQuality: 'sound', explanation: 'The condition was only partly met.' }))
+  expect(await screen.findByText('Your self-review is saved. It is now the completed record; optional comparison remains separate.')).toBeInTheDocument()
+  expect(agentCalls).toBe(0)
 })
 
 test.each([

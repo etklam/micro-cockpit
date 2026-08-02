@@ -127,7 +127,7 @@ static class ObservationEndpoints
             TimeOnly rolloverTime;
             try
             {
-                journalDay = JournalDay.Resolve(recordedAt, timezone, rollover);
+                journalDay = input.JournalDay ?? JournalDay.Resolve(recordedAt, timezone, rollover);
                 rolloverTime = TimeOnly.ParseExact(rollover, "HH:mm");
             }
             catch (ArgumentException error) { return Results.Problem(error.Message, statusCode: 400); }

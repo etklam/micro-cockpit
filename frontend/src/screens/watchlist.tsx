@@ -21,11 +21,13 @@ function InstrumentCombobox({
   value,
   onChange,
   disabled,
+  autoFocus,
 }: {
   options: InstrumentDirectoryItem[]
   value: string
   onChange: (value: string) => void
   disabled?: boolean
+  autoFocus?: boolean
 }) {
   const { t } = useI18n()
   const listboxId = useId()
@@ -44,6 +46,10 @@ function InstrumentCombobox({
   useEffect(() => {
     setActive(index => Math.min(index, Math.max(visible.length - 1, 0)))
   }, [visible.length])
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus()
+  }, [autoFocus])
 
   function choose(item: InstrumentDirectoryItem) {
     onChange(item.instrumentId)
@@ -124,6 +130,8 @@ function AddWatchlistDialog({
   directoryLoading,
   directoryError,
   existing,
+  onRetry,
+  onAdded,
 }: {
   open: boolean
   onClose: () => void
@@ -131,22 +139,27 @@ function AddWatchlistDialog({
   directoryLoading: boolean
   directoryError: boolean
   existing: WatchlistItem[]
+  onRetry: () => void
+  onAdded: (instrumentId: string) => void
 }) {
   const { t } = useI18n()
   const headingId = useId()
-  const noteRef = useRef<HTMLTextAreaElement>(null)
   const [instrumentId, setInstrumentId] = useState('')
   const [note, setNote] = useState('')
   const [validation, setValidation] = useState<{ instrument?: string; note?: string }>({})
   const [error, setError] = useState(false)
   const addWatchlist = useAddWatchlistMutation()
+  // The v1 contract accepts only an existing published instrumentId. Keep this
+  // flow honest until Subject/Event/Custom creation or external search has a
+  // user-authorized API and generated client contract.
   const available = options.filter(item => !existing.some(member => member.instrumentId === item.instrumentId))
 
   useEffect(() => {
     if (!open) return
+    setInstrumentId('')
+    setNote('')
     setValidation({})
     setError(false)
-    window.setTimeout(() => noteRef.current?.focus(), 0)
     const onKey = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); onClose() }
     }
@@ -167,6 +180,7 @@ function AddWatchlistDialog({
     setError(false)
     try {
       await addWatchlist.mutateAsync({ instrumentId, note: note.trim() })
+      onAdded(instrumentId)
       setInstrumentId('')
       setNote('')
       onClose()
@@ -178,26 +192,37 @@ function AddWatchlistDialog({
   return (
     <div className="watchlist-dialog" role="presentation">
       <button type="button" className="watchlist-dialog__backdrop" aria-label={t('common.cancel')} onClick={onClose} />
-      <section className="watchlist-dialog__panel" role="dialog" aria-modal="true" aria-labelledby={headingId}>
+      <section className="watchlist-dialog__panel" role="dialog" aria-modal="true" aria-labelledby={headingId} aria-describedby={`${headingId}-hint`}>
         <div className="watchlist-dialog__head">
-          <div><h2 id={headingId}>{t('watchlist.addTitle')}</h2><p className="form-hint">{t('watchlist.addHint')}</p></div>
+          <div>
+            <Badge tone="primary">{t('watchlist.supportedType')}</Badge>
+            <h2 id={headingId}>{t('watchlist.addTitle')}</h2>
+            <p id={`${headingId}-hint`} className="form-hint">{t('watchlist.addHint')}</p>
+          </div>
           <IconButton icon="close" label={t('common.cancel')} onClick={onClose} />
         </div>
-        {directoryError ? <p className="form-error" role="alert">{t('watchlist.directoryError')}</p> : null}
-        {!directoryError && !directoryLoading && !available.length ? <p className="form-hint" role="status">{existing.length ? t('watchlist.noMoreInstrumentsHint') : t('watchlist.noInstrumentsHint')}</p> : null}
-        <form className="stack" onSubmit={submit}>
-          <Field label={t('watchlist.instrument')} hint={validation.instrument ?? (directoryLoading ? t('common.loading') : undefined)} error={validation.instrument}>
-            <InstrumentCombobox options={available} value={instrumentId} onChange={id => { setInstrumentId(id); setValidation(current => ({ ...current, instrument: undefined })) }} disabled={directoryLoading || directoryError || !available.length} />
+        {directoryLoading ? <p className="form-hint" role="status">{t('common.loading')}</p> : null}
+        {directoryError ? <div className="watchlist-dialog__availability" role="alert">
+          <p className="form-error">{t('watchlist.directoryError')}</p>
+          <Button variant="ghost" size="sm" icon="right" onClick={onRetry}>{t('common.retry')}</Button>
+        </div> : null}
+        {!directoryLoading && !directoryError && !available.length ? <div className="watchlist-dialog__availability" role="status">
+          <p className="form-hint">{existing.length ? t('watchlist.noMoreInstrumentsHint') : t('watchlist.noInstrumentsHint')}</p>
+          {!existing.length ? <Button variant="ghost" size="sm" icon="right" onClick={onRetry}>{t('common.retry')}</Button> : null}
+        </div> : null}
+        {!directoryLoading && !directoryError && available.length ? <form className="stack" onSubmit={submit}>
+          <Field label={t('watchlist.instrument')} hint={validation.instrument} error={validation.instrument}>
+            <InstrumentCombobox options={available} value={instrumentId} onChange={id => { setInstrumentId(id); setValidation(current => ({ ...current, instrument: undefined })) }} autoFocus />
           </Field>
           <Field label={t('watchlist.note')} hint={t('watchlist.noteHint')} error={validation.note}>
-            <TextArea ref={noteRef} required maxLength={500} value={note} placeholder={t('watchlist.notePlaceholder')} onChange={event => { setNote(event.target.value); setValidation(current => ({ ...current, note: undefined })) }} />
+            <TextArea required maxLength={500} value={note} placeholder={t('watchlist.notePlaceholder')} onChange={event => { setNote(event.target.value); setValidation(current => ({ ...current, note: undefined })) }} />
           </Field>
           {error ? <p className="form-error" role="alert">{t('watchlist.addError')}</p> : null}
           <div className="form-actions">
             <Button variant="ghost" type="button" onClick={onClose}>{t('common.cancel')}</Button>
-            <Button variant="primary" icon="plus" type="submit" loading={addWatchlist.isPending} disabled={directoryLoading || directoryError || !available.length}>{t('watchlist.add')}</Button>
+            <Button variant="primary" icon="plus" type="submit" loading={addWatchlist.isPending}>{t('watchlist.add')}</Button>
           </div>
-        </form>
+        </form> : null}
       </section>
     </div>
   )
@@ -214,6 +239,9 @@ export function WatchlistPage() {
   const [sort, setSort] = useState<SortMode>('recent')
   const [editError, setEditError] = useState(false)
   const [removeError, setRemoveError] = useState(false)
+  const [announcement, setAnnouncement] = useState('')
+  const [focusInstrumentId, setFocusInstrumentId] = useState<string | null>(null)
+  const itemRefs = useRef(new Map<string, HTMLLIElement>())
   const { confirm, confirmNode } = useConfirm()
   const removeWatchlist = useRemoveWatchlistMutation()
   const saveNote = useSaveWatchlistNoteMutation()
@@ -232,6 +260,14 @@ export function WatchlistPage() {
       return sort === 'recent' ? right - left || a.instrumentId.localeCompare(b.instrumentId) : left - right || a.instrumentId.localeCompare(b.instrumentId)
     })
   }, [items, directory, search, sort])
+
+  useEffect(() => {
+    if (!focusInstrumentId) return
+    const item = itemRefs.current.get(focusInstrumentId)
+    if (!item) return
+    item.focus()
+    setFocusInstrumentId(null)
+  }, [focusInstrumentId, filteredItems])
 
   async function remove(item: WatchlistItem) {
     const details = instrument(item.instrumentId)
@@ -270,6 +306,7 @@ export function WatchlistPage() {
       subtitle={t('watchlist.subtitle')}
       actions={loadedEmpty ? undefined : <Button variant="primary" icon="plus" onClick={() => setDialogOpen(true)}>{t('watchlist.add')}</Button>}
     />
+    {announcement ? <p className="watchlist-announcement" role="status" aria-live="polite">{announcement}</p> : null}
     {loadedEmpty ? (
       <Card as="section" className="watchlist-onboarding" aria-labelledby="watchlist-onboarding-title">
         <div className="watchlist-onboarding__copy">
@@ -299,7 +336,7 @@ export function WatchlistPage() {
           <ul className="compact-list watchlist-items">{filteredItems.map(item => {
             const details = instrument(item.instrumentId)
             const isEditing = editingId === item.instrumentId
-            return <li key={item.instrumentId}>
+            return <li key={item.instrumentId} ref={node => { if (node) itemRefs.current.set(item.instrumentId, node); else itemRefs.current.delete(item.instrumentId) }} tabIndex={-1} data-watchlist-instrument={item.instrumentId}>
               <Card as="article" className="watchlist-item">
                 <div className="watchlist-item__header">
                   <div className="row-main"><strong>{details?.symbol ?? t('common.unavailable')}</strong><span>{details?.name ?? item.instrumentId}</span></div>
@@ -333,7 +370,20 @@ export function WatchlistPage() {
             </li>
           })}</ul>}
       </> : null}
-    <AddWatchlistDialog open={dialogOpen} onClose={() => setDialogOpen(false)} options={directory} directoryLoading={instruments.isLoading} directoryError={instruments.isError} existing={items} />
+    <AddWatchlistDialog
+      open={dialogOpen}
+      onClose={() => setDialogOpen(false)}
+      options={directory}
+      directoryLoading={instruments.isLoading}
+      directoryError={instruments.isError}
+      existing={items}
+      onRetry={() => { void instruments.refetch() }}
+      onAdded={instrumentId => {
+        const details = instrument(instrumentId)
+        setAnnouncement(t('watchlist.addSuccess', { target: details?.symbol ?? instrumentId }))
+        setFocusInstrumentId(instrumentId)
+      }}
+    />
     {confirmNode}
   </>
 }

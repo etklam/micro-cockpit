@@ -4936,6 +4936,13 @@
               "null",
               "string"
             ]
+          },
+          "journalDay": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
           }
         }
       },

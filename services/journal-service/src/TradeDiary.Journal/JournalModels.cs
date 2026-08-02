@@ -1,7 +1,7 @@
 using System.Text.Json;
 
 record StoredResult(int StatusCode, string? Location, JsonElement Body);
-record QuickObservationWrite(string Content, string? SourceLabel = null);
+record QuickObservationWrite(string Content, string? SourceLabel = null, DateOnly? JournalDay = null);
 record QuickObservationResponse(Guid MarketObservationId, Guid ObservationUpdateId, DateOnly JournalDay, DateTime RecordedAt, bool Appended);
 enum ObservationSubjectType { broad_market, sector, theme, instrument }
 record ObservationSubjectWrite(ObservationSubjectType Type, string? Name = null, Guid? InstrumentId = null, string? Market = null, string? Symbol = null, string? DisplayName = null);

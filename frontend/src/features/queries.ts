@@ -37,8 +37,8 @@ export const useAccessGrantsQuery = () => useQuery({ queryKey: queryKeys.accessG
 export const useTodayObservationQuery = () =>
   useQuery({ queryKey: queryKeys.todayObservation, queryFn: api.getTodayMarketObservation, refetchInterval: 60_000 })
 export const useExpectationsQuery = () => useQuery({ queryKey: queryKeys.expectations, queryFn: api.getExpectations })
-export const useExpectationReviewQuery = (id: string) =>
-  useQuery({ queryKey: queryKeys.expectationReview(id), queryFn: () => api.getExpectationReview(id), enabled: !!id })
+export const useExpectationReviewQuery = (id: string, enabled = true) =>
+  useQuery({ queryKey: queryKeys.expectationReview(id), queryFn: () => api.getExpectationReview(id), enabled: !!id && enabled })
 export const useReasoningLabelsQuery = () =>
   useQuery({ queryKey: queryKeys.reasoningLabels, queryFn: api.getReasoningLabels })
 export const useActionDecisionsQuery = (updateId: string) =>
@@ -154,8 +154,9 @@ export function useCreateTradeEvidenceMutation(decisionId: string) {
 export function useQuickObservationMutation() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: ({ content, key, sourceLabel }: { content: string; key: string; sourceLabel?: string }) => api.saveQuickObservation(content, key, sourceLabel),
-    onMutate: async ({ content }) => {
+    mutationFn: ({ content, key, sourceLabel, journalDay }: { content: string; key: string; sourceLabel?: string; journalDay?: string }) => api.saveQuickObservation(content, key, sourceLabel, journalDay),
+    onMutate: async ({ content, journalDay }) => {
+      if (journalDay) return null
       await client.cancelQueries({ queryKey: queryKeys.todayObservation })
       const previous = client.getQueryData<api.MarketObservation | null>(queryKeys.todayObservation)
       const optimisticId = `optimistic-${crypto.randomUUID()}`
@@ -198,7 +199,13 @@ export function useQuickObservationMutation() {
         return context.previous ?? { ...current, updates }
       })
     },
-    onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.todayObservation }) },
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.todayObservation }),
+        client.invalidateQueries({ queryKey: ['market-observations', 'history'] }),
+        client.invalidateQueries({ queryKey: calendarPrefix }),
+      ])
+    },
   })
 }
 export function useUpdateObservationMutation() {

@@ -68,8 +68,8 @@ export async function getTodayMarketObservation(): Promise<MarketObservation | n
     throw error
   }
 }
-export const saveQuickObservation = (content: string, key?: string, sourceLabel?: string) =>
-  G.postApiAppQuickObservations({ content, sourceLabel: sourceLabel || null }, idempotencyHeader(key))
+export const saveQuickObservation = (content: string, key?: string, sourceLabel?: string, journalDay?: string) =>
+  G.postApiAppQuickObservations({ content, sourceLabel: sourceLabel || null, ...(journalDay ? { journalDay } : {}) }, idempotencyHeader(key))
 export const updateObservation = (id: string, body: ObservationUpdateWrite) =>
   G.putApiAppObservationUpdatesId(id, body)
 export const getObservationHistory = (filters: ObservationSearchFilters, cursor?: string) =>

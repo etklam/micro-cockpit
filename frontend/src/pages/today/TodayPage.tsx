@@ -58,6 +58,7 @@ export function TodayPage() {
   const expectations = useExpectationsQuery()
   const instruments = useInstrumentDirectoryQuery()
   const [note, setNote] = useState('')
+  const [composerExpanded, setComposerExpanded] = useState(false)
   const [saved, setSaved] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
@@ -95,7 +96,7 @@ export function TodayPage() {
   const observationTime = useMemo(() => new Intl.DateTimeFormat(locale, {
     hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: observation.data?.timezone ?? 'UTC',
   }), [locale, observation.data?.timezone])
-  const expectationItems = expectations.data ?? []
+  const expectationItems = useMemo(() => expectations.data ?? [], [expectations.data])
   const recentUpdates = useMemo(() => {
     const currentDay = bootstrap.data?.currentJournalDay
     const items = recentHistory.data?.pages.flatMap(page => page.items) ?? []
@@ -103,7 +104,12 @@ export function TodayPage() {
       .filter(item => !currentDay || item.journalDay !== currentDay)
       .slice(0, 3)
   }, [bootstrap.data?.currentJournalDay, recentHistory.data?.pages])
-  const readyExpectations = expectationItems.filter(item => item.readiness === 'ready_for_review')
+  const todayUpdateIds = useMemo(() => new Set(observation.data?.updates.map(update => update.id) ?? []), [observation.data?.updates])
+  const todayExpectations = useMemo(
+    () => expectationItems.filter(item => todayUpdateIds.has(item.observationUpdateId)),
+    [expectationItems, todayUpdateIds],
+  )
+  const readyExpectations = todayExpectations.filter(item => item.readiness === 'ready_for_review')
 
   const contextInstrumentId = search.get('instrumentId') ?? ''
   const contextInstrument = instruments.data?.find(item => item.instrumentId === contextInstrumentId)
@@ -175,6 +181,7 @@ export function TodayPage() {
         sourceLabel: contextInstrumentLabel ? `instrument:${contextInstrumentLabel}` : undefined,
       })
       setNote('')
+      setComposerExpanded(false)
       idem.reset()
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
@@ -266,8 +273,11 @@ export function TodayPage() {
   }
 
   function focusComposer() {
-    composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    window.setTimeout(() => composerRef.current?.focus(), 180)
+    setComposerExpanded(true)
+    const composer = composerRef.current
+    if (!composer) return
+    if (typeof composer.scrollIntoView === 'function') composer.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    composer.focus()
   }
 
   const hour = accountLocalHour(new Date(), bootstrap.data?.timezone)
@@ -295,11 +305,11 @@ export function TodayPage() {
         <Button variant="primary" icon="plus" onClick={focusComposer} aria-label={t('today.header.quickCreate')}>{t('today.header.quickCreate')}</Button>
       </div>}
     />
-    <Card className="quick-note" as="section" id="composer">
+    <Card className={cx('quick-note', (composerExpanded || note.trim()) && 'is-expanded')} as="section" id="composer">
       <div className="quick-note__head">
         <span className="quick-note__icon"><Icon name="edit" size={24} /></span>
         <div className="quick-note__copy">
-          <h2 className="quick-note__label">{t('today.quickNote.label')}</h2>
+          <h2 className="quick-note__label" id="quick-note-label">{t('today.quickNote.label')}</h2>
           <p className="quick-note__description">{t('today.quickNote.description')}</p>
         </div>
       </div>
@@ -308,21 +318,33 @@ export function TodayPage() {
         <Link className="text-link" to={`/today/observations?instrumentId=${encodeURIComponent(contextInstrumentId)}`}>{t('watchlist.timeline')}</Link>
       </p> : null}
       <label className="visually-hidden" htmlFor="qn">{t('today.quickNote.label')}</label>
-      <TextArea ref={composerRef} id="qn" value={note} onChange={event => setNote(event.target.value)} placeholder={t('today.quickNote.placeholder')} className="textarea--prose" />
+      <TextArea
+        ref={composerRef}
+        id="qn"
+        value={note}
+        onFocus={() => setComposerExpanded(true)}
+        onChange={event => { setNote(event.target.value); setComposerExpanded(true) }}
+        placeholder={t('today.quickNote.placeholder')}
+        className="textarea--prose"
+        rows={composerExpanded || note.trim() ? 5 : 2}
+        aria-describedby="quick-note-hint"
+      />
       <div className="quick-note__foot">
-        <span className={cx('quick-note__status', saved && 'is-ok')}>
-          {saved ? <><Icon name="check" size={14} /> {t('common.saved')}</> : <><span>{t('today.quickNote.hint')}</span><span className="quick-note__count">{note.length}</span></>}
+        <span id="quick-note-hint" className={cx('quick-note__status', saved && 'is-ok')}>
+          {saved ? <><Icon name="check" size={14} /> {t('common.saved')}</> : note.trim() ? t('today.quickNote.draft') : t('today.quickNote.hint')}
         </span>
         <Button variant="primary" icon="plus" loading={saveQuickObservation.isPending} onClick={saveNote} disabled={!note.trim()}>{t('today.quickNote.save')}</Button>
       </div>
     </Card>
 
-    <section className="recent" aria-labelledby="observation-updates-h">
+    <div className="today-review-layout">
+      <div className="today-main">
+    <section className="recent today-observations" aria-labelledby="observation-updates-h">
       <div className="recent__head">
-        <div className="recent__heading"><h2 id="observation-updates-h">{t('today.observations.title')}</h2><span className="recent__meta">{t('today.observations.count', { count: observation.data?.updates.length ?? 0 })}</span></div>
+        <div className="recent__heading"><h2 id="observation-updates-h">{t('today.observations.title')}</h2><span className="recent__meta">{observation.isLoading || observation.isError ? t('common.emptyValue') : t('today.observations.count', { count: observation.data?.updates.length ?? 0 })}</span></div>
         <Link className="text-link" to="/today/observations">{t('observations.all')}</Link>
       </div>
-      {observation.data?.updates.length ? <ol className="observation-list">
+      {observation.isLoading ? <p className="today-section-state" role="status">{t('common.loading')}</p> : observation.isError ? <SectionError onRetry={() => { void observation.refetch() }} /> : observation.data?.updates.length ? <ol className="observation-list">
         {observation.data.updates.map(update => <li key={update.id}>
           {editingId === update.id ? <div className="observation-card observation-card__edit"><div className="stack">
             <p className="form-hint" role="note">{t('today.observations.honestyReminder')}</p>
@@ -402,21 +424,31 @@ export function TodayPage() {
           </ul> : null}
           <ActionDecisionPanel updateId={update.id} expectations={expectationItems.filter(item => item.observationUpdateId === update.id)} />
         </li>)}
-      </ol> : <EmptyBox className="observation-empty" icon="diary" title={t('today.observations.emptyTitle')} hint={t('today.observations.emptyHint')} />}
+      </ol> : <EmptyBox
+        className="observation-empty"
+        icon="diary"
+        dense
+        title={t('today.observations.emptyTitle')}
+        hint={t('today.observations.emptyHint')}
+        action={<div className="today-empty__actions">
+          <Button variant="primary" size="sm" icon="plus" onClick={focusComposer}>{t('today.header.quickCreate')}</Button>
+          <Link className="text-link" to="/today/observations">{t('observations.all')}</Link>
+        </div>}
+      />}
       {watchlistError ? <p className="form-error" role="alert">{watchlistError}</p> : null}
     </section>
 
-    {recentUpdates.length ? <section className="recent" aria-labelledby="recent-observations-h">
+    {recentUpdates.length ? <section className="recent today-recent" aria-labelledby="recent-observations-h">
       <div className="recent__head"><div className="recent__heading"><h2 id="recent-observations-h">{t('today.recent.observations')}</h2><span className="recent__meta">{t('today.recent.observationsHint')}</span></div><Link className="text-link" to="/today/observations">{t('today.recent.viewAll')} <Icon name="arrow" size={14} /></Link></div>
       <div className="recent-grid">
         {recentUpdates.map(item => {
           const copy = observationCopy(item.update.content)
-          return <article className="recent-card" key={item.update.id}>
+          return <Link className="recent-card" key={item.update.id} to={`/today/observations?from=${encodeURIComponent(item.journalDay)}&to=${encodeURIComponent(item.journalDay)}`}>
             <div className="recent-card__head"><span className="recent-card__date">{formatLongDate(item.journalDay)}</span><time dateTime={item.update.recordedAt}>{observationTime.format(new Date(item.update.recordedAt))}</time></div>
             <h3 className="recent-card__title">{copy.title}</h3>
             <p className="recent-card__preview">{truncate(copy.preview || item.update.content)}</p>
             <div className="recent-card__foot">{item.update.primarySubject ? <Badge tone="primary">{subjectLabel(item.update.primarySubject)}</Badge> : null}{item.update.tags.slice(0, 1).map(tag => <Badge key={tag}>{tag}</Badge>)}</div>
-          </article>
+          </Link>
         })}
       </div>
     </section> : null}
@@ -425,14 +457,25 @@ export function TodayPage() {
       <div className="recent__head"><h2 id="ready-expectations-h">{t('today.expectations.ready')}</h2></div>
       <ul className="stack">{readyExpectations.map(item => <li key={item.id}>{renderExpectation(item, true)}</li>)}</ul>
     </section> : null}
-    {reviewExpectationId ? <ExpectationReviewForm expectationId={reviewExpectationId} onClose={() => setReviewExpectationId(null)} /> : null}
-    <Card className="panel discipline-card" as="section">
-      <span className="panel__label">{t('today.discipline.label')}</span>
-      <div className="panel__body">
-        {todayDiscipline.data ? <blockquote className="panel__quote">{todayDiscipline.data.content}</blockquote> : !todayDiscipline.isError ? <p className="panel__sub">{t('today.discipline.empty')}</p> : <p className="panel__sub is-muted">{t('common.unavailable')}</p>}
       </div>
-      <PanelLink onClick={() => go('review')}>{t('today.discipline.manage')}</PanelLink>
-    </Card>
-    {bootstrap.isError || observation.isError || expectations.isError || recentHistory.isError ? <SectionError onRetry={() => { void bootstrap.refetch(); void observation.refetch(); void expectations.refetch(); void recentHistory.refetch() }} /> : null}
+      <aside className="today-secondary" aria-label={t('today.summary.title')}>
+        <Card className="panel today-summary-card" as="section">
+          <h2 className="panel__label">{t('today.summary.title')}</h2>
+          <dl className="today-summary__stats">
+            <div><dt>{t('today.summary.observations')}</dt><dd>{observation.isLoading || observation.isError ? t('common.emptyValue') : observation.data?.updates.length ?? 0}</dd></div>
+            <div><dt>{t('today.summary.expectations')}</dt><dd>{expectations.isLoading || expectations.isError ? t('common.emptyValue') : todayExpectations.length}</dd></div>
+          </dl>
+        </Card>
+        <Card className="panel discipline-card" as="section">
+          <h2 className="panel__label">{t('today.discipline.label')}</h2>
+          <div className="panel__body">
+            {todayDiscipline.isLoading ? <p className="panel__sub">{t('common.loading')}</p> : todayDiscipline.data ? <blockquote className="panel__quote">{todayDiscipline.data.content}</blockquote> : !todayDiscipline.isError ? <p className="panel__sub">{t('today.discipline.empty')}</p> : <p className="panel__sub is-muted">{t('common.unavailable')}</p>}
+          </div>
+          <PanelLink onClick={() => go('review')}>{t('today.discipline.manage')}</PanelLink>
+        </Card>
+      </aside>
+    </div>
+    {reviewExpectationId ? <ExpectationReviewForm expectationId={reviewExpectationId} onClose={() => setReviewExpectationId(null)} /> : null}
+    {bootstrap.isError || expectations.isError || recentHistory.isError ? <SectionError onRetry={() => { void bootstrap.refetch(); void expectations.refetch(); void recentHistory.refetch() }} /> : null}
   </>
 }
