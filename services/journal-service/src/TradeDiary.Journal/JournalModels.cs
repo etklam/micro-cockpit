@@ -119,6 +119,19 @@ record ExpectationReviewResponse(
     IReadOnlyList<ReasoningLabelResponse> Labels,
     DateTime CreatedAt,
     DateTime UpdatedAt);
+enum ReviewContextAvailability { available, partial }
+record ReviewContextObservationResponse(Guid Id, DateOnly JournalDay);
+record ReviewContextActionDecisionResponse(
+    ActionDecisionResponse Decision,
+    IReadOnlyList<TradeEvidenceResponse> Trades);
+record ExpectationReviewContextResponse(
+    Guid ExpectationId,
+    Guid ObservationUpdateId,
+    ReviewContextAvailability Availability,
+    IReadOnlyList<string> UnavailableContext,
+    ReviewContextObservationResponse? MarketObservation,
+    ObservationUpdateResponse? ObservationUpdate,
+    IReadOnlyList<ReviewContextActionDecisionResponse> ActionDecisions);
 record ReasoningLabelWrite(ReasoningLabelKind Kind, string Name);
 enum ActionDecisionIntent { trade, continue_observing, avoid_trade }
 enum ExecutionReview { followed, partially_followed, deviated }
@@ -159,7 +172,31 @@ record TradeEvidenceResponse(
 record WatchlistItemResponse(Guid InstrumentId, string? Note, DateTime CreatedAt, DateTime UpdatedAt);
 record WatchlistCreateWrite(string Note);
 record WatchlistNoteWrite(string? Note);
-record PatternEvidenceResponse(Guid ExpectationId, string Url);
+record PatternEvidenceResponse(
+    Guid ExpectationId,
+    Guid ReviewId,
+    DateOnly JournalDay,
+    string Subject,
+    string ExpectedBehavior,
+    ExpectationOutcome Outcome,
+    ReasoningQuality ReasoningQuality,
+    string ObservationExcerpt,
+    string? ReviewExplanation,
+    DateTime ReviewedAt,
+    string Url);
+enum PatternTrendStatus { supported, insufficient_evidence }
+enum PatternTrendDirection { higher, lower, same }
+record PatternTrendBucketResponse(
+    DateOnly From,
+    DateOnly To,
+    int OccurrenceCount,
+    int ReviewedExpectationCount,
+    IReadOnlyList<PatternEvidenceResponse> Evidence);
+record PatternTrendResponse(
+    PatternTrendStatus Status,
+    PatternTrendDirection? Direction,
+    PatternTrendBucketResponse Current,
+    PatternTrendBucketResponse? Previous);
 record PatternLabelResponse(
     ReasoningLabelKind Kind,
     string Key,
@@ -167,20 +204,39 @@ record PatternLabelResponse(
     bool System,
     int Count,
     int Denominator,
-    IReadOnlyList<PatternEvidenceResponse> Evidence);
+    Guid? ConfirmedPatternId,
+    bool PatternIsConfirmed,
+    DateTime? FirstSeen,
+    DateTime? MostRecent,
+    IReadOnlyList<PatternEvidenceResponse> Evidence,
+    PatternTrendResponse Trend);
 record PatternReviewResponse(
     DateOnly From,
     DateOnly To,
     int ReviewedExpectationCount,
     IReadOnlyList<PatternLabelResponse> Labels);
+record ConfirmedPatternCreate(ReasoningLabelKind Kind, string Key);
+record ConfirmedPatternResponse(
+    Guid Id,
+    ReasoningLabelKind Kind,
+    string Key,
+    string Name,
+    bool System,
+    bool IsConfirmed,
+    DateTime FirstConfirmedAt,
+    DateTime ConfirmedAt,
+    DateTime? UnconfirmedAt,
+    DateTime UpdatedAt);
 enum DisciplinePrincipleStatus { active, disabled, archived }
-record DisciplinePrincipleCreate(string Content);
+record DisciplinePrincipleCreate(string Content, Guid? ConfirmedPatternId = null);
 record DisciplinePrincipleUpdate(string Content, DisciplinePrincipleStatus Status);
 record DisciplinePrincipleResponse(
     Guid Id,
     string Content,
     DisciplinePrincipleStatus Status,
     bool SelectedForToday,
+    Guid? ConfirmedPatternId,
+    string? ConfirmedPatternLabel,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 record TrackedInstrumentResponse(Guid InstrumentId);

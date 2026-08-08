@@ -3,7 +3,7 @@
 | Schema | Owner | Core data |
 |---|---|---|
 | `identity` | Identity | users, credentials, refresh families, API keys, Agent managers, settings |
-| `journal` | Journal | Market Observations, updates, Expectations, reviews, decisions, Trades, Watchlist, principles, grants, change logs |
+| `journal` | Journal | Market Observations, updates, Expectations, reviews, confirmed patterns, decisions, Trades, Watchlist, principles, grants, change logs |
 | `market` | Market Data | Instruments, symbol history, provider runs, Daily Close bars |
 | `market_data_public` | Market Data | versioned published evidence views |
 | `tool` | Tool | presets and saved Calculation Snapshots |
@@ -13,6 +13,7 @@ Important constraints:
 
 - one active API token per Agent User;
 - child Journal records preserve owner identity;
+- Confirmed Patterns require recurring owner-held review evidence, retain owner-scoped source-review links, and sourced Discipline Principles preserve that provenance;
 - Access Grant dates, subject shapes, and distinct owners are checked;
 - stable Instrument IDs are separate from display symbols;
 - raw and adjusted Daily Close are both published;

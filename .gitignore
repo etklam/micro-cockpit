@@ -9,3 +9,10 @@ k8s/*secret*.local.yaml
 *.secret.env
 __pycache__/
 .gstack/
+
+# Local K3s deployment bundles and checksums
+.deploy/
+*.k3s-deploy.tgz
+*.k3s-images.tar
+*.k3s-images.tar.gz
+*.k3s.sha256

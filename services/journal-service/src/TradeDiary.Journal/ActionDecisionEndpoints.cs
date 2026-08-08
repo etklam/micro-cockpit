@@ -208,12 +208,12 @@ static class ActionDecisionEndpoints
         return await reader.ReadAsync() ? ReadDecision(reader) : null;
     }
 
-    private static ActionDecisionResponse ReadDecision(NpgsqlDataReader reader) => new(
-        reader.GetGuid(0), reader.GetGuid(1), reader.IsDBNull(2) ? null : reader.GetGuid(2),
-        Enum.Parse<ActionDecisionIntent>(reader.GetString(3)), reader.GetString(4),
-        DateTime.SpecifyKind(reader.GetDateTime(5), DateTimeKind.Utc),
-        reader.IsDBNull(6) ? null : Enum.Parse<ExecutionReview>(reader.GetString(6)),
-        DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc));
+    internal static ActionDecisionResponse ReadDecision(NpgsqlDataReader reader, int offset = 0) => new(
+        reader.GetGuid(offset), reader.GetGuid(offset + 1), reader.IsDBNull(offset + 2) ? null : reader.GetGuid(offset + 2),
+        Enum.Parse<ActionDecisionIntent>(reader.GetString(offset + 3)), reader.GetString(offset + 4),
+        DateTime.SpecifyKind(reader.GetDateTime(offset + 5), DateTimeKind.Utc),
+        reader.IsDBNull(offset + 6) ? null : Enum.Parse<ExecutionReview>(reader.GetString(offset + 6)),
+        DateTime.SpecifyKind(reader.GetDateTime(offset + 7), DateTimeKind.Utc));
 
     private static string? ValidateTrade(TradeEvidenceWrite input, out string symbol, out string currency, out string? note)
     {
@@ -246,9 +246,9 @@ static class ActionDecisionEndpoints
         command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Text, Value = (object?)note ?? DBNull.Value });
     }
 
-    private static TradeEvidenceResponse ReadTrade(NpgsqlDataReader reader) => new(
-        reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), Enum.Parse<TradeSide>(reader.GetString(3)),
-        reader.GetDecimal(4), reader.GetDecimal(5), reader.GetString(6).Trim(),
-        DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc), reader.IsDBNull(8) ? null : reader.GetString(8),
-        DateTime.SpecifyKind(reader.GetDateTime(9), DateTimeKind.Utc), DateTime.SpecifyKind(reader.GetDateTime(10), DateTimeKind.Utc));
+    internal static TradeEvidenceResponse ReadTrade(NpgsqlDataReader reader, int offset = 0) => new(
+        reader.GetGuid(offset), reader.GetGuid(offset + 1), reader.GetString(offset + 2), Enum.Parse<TradeSide>(reader.GetString(offset + 3)),
+        reader.GetDecimal(offset + 4), reader.GetDecimal(offset + 5), reader.GetString(offset + 6).Trim(),
+        DateTime.SpecifyKind(reader.GetDateTime(offset + 7), DateTimeKind.Utc), reader.IsDBNull(offset + 8) ? null : reader.GetString(offset + 8),
+        DateTime.SpecifyKind(reader.GetDateTime(offset + 9), DateTimeKind.Utc), DateTime.SpecifyKind(reader.GetDateTime(offset + 10), DateTimeKind.Utc));
 }

@@ -12,6 +12,28 @@ public static class JournalDay
         return instant.UtcDateTime < boundary ? localDate.AddDays(-1) : localDate;
     }
 
+    public static bool TryUtcWindow(
+        DateOnly from,
+        DateOnly to,
+        string timezone,
+        string rollover,
+        int maxDays,
+        out DateTime startUtc,
+        out DateTime endUtc)
+    {
+        startUtc = default;
+        endUtc = default;
+        if (to < from || to == DateOnly.MaxValue || to.DayNumber - from.DayNumber + 1 > maxDays)
+            return false;
+        if (!TimeZoneInfo.TryFindSystemTimeZoneById(timezone, out var zone)
+            || !TimeOnly.TryParseExact(rollover, "HH:mm", out var rolloverTime))
+            return false;
+
+        startUtc = BoundaryUtc(from, rolloverTime, zone);
+        endUtc = BoundaryUtc(to.AddDays(1), rolloverTime, zone);
+        return true;
+    }
+
     private static DateTime BoundaryUtc(DateOnly date, TimeOnly rollover, TimeZoneInfo zone)
     {
         var local = date.ToDateTime(rollover, DateTimeKind.Unspecified);

@@ -7,11 +7,17 @@ vi.mock('../features/api', () => ({
   createExpectation: vi.fn().mockResolvedValue({}),
   updateExpectation: vi.fn().mockResolvedValue({}),
   invalidateExpectation: vi.fn().mockResolvedValue({}),
+  saveExpectationReview: vi.fn().mockResolvedValue({}),
+  confirmPattern: vi.fn().mockResolvedValue({}),
+  unconfirmPattern: vi.fn().mockResolvedValue(undefined),
 }))
 
 import {
   useCreateExpectationMutation,
+  useConfirmPatternMutation,
+  useUnconfirmPatternMutation,
   useInvalidateExpectationMutation,
+  useSaveExpectationReviewMutation,
   useUpdateExpectationMutation,
 } from '../features/queries'
 
@@ -61,4 +67,22 @@ test('expectation edit and invalidation refresh expectations and calendar', asyn
   await act(() => invalidate.result.current.mutateAsync('expectation-1'))
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['expectations'] })
   expect(invalidation).toHaveBeenCalledWith({ queryKey: ['calendar'] })
+})
+
+test('review save and pattern confirmation refresh objective pattern evidence', async () => {
+  const invalidation = vi.spyOn(client, 'invalidateQueries')
+  const review = renderHook(() => useSaveExpectationReviewMutation('expectation-1'), { wrapper })
+  await act(() => review.result.current.mutateAsync({
+    outcome: 'confirmed',
+    reasoningQuality: 'sound',
+    explanation: null,
+    systemIssueKeys: ['insufficient_evidence'],
+    systemStrengthKeys: [],
+    customLabelIds: [],
+  }))
+  const confirm = renderHook(() => useConfirmPatternMutation(), { wrapper })
+  await act(() => confirm.result.current.mutateAsync({ kind: 'issue', key: 'insufficient_evidence' }))
+  const unconfirm = renderHook(() => useUnconfirmPatternMutation(), { wrapper })
+  await act(() => unconfirm.result.current.mutateAsync('pattern-1'))
+  expect(invalidation).toHaveBeenCalledWith({ queryKey: ['pattern-review'] })
 })

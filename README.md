@@ -54,4 +54,4 @@ python3 scripts/validate-openapi.py
 
 The manually dispatched E2E workflow starts the complete stack and runs the Market Observation release smoke, retired-route checks, and runtime database-role isolation.
 
-Start with [PRODUCT.md](PRODUCT.md), [CONTEXT.md](CONTEXT.md), [DESIGN.md](DESIGN.md), and the [developer documentation index](docs/README.md).
+Start with [PRODUCT.md](PRODUCT.md), the product source of truth; [CONTEXT.md](CONTEXT.md), the domain-language source of truth; and [ROADMAP.md](ROADMAP.md), the active roadmap. [DESIGN.md](DESIGN.md) and the [developer documentation index](docs/README.md) provide implementation guidance.

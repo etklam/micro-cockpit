@@ -97,6 +97,13 @@ static class ExpectationReviewEndpoints
             if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
             await using var connection = await db.OpenConnectionAsync();
             await using var tx = await connection.BeginTransactionAsync();
+            await using (var confirmed = new NpgsqlCommand("SELECT EXISTS(SELECT 1 FROM journal.confirmed_patterns WHERE custom_label_id=$1 AND user_id=$2)", connection, tx))
+            {
+                confirmed.Parameters.AddWithValue(id);
+                confirmed.Parameters.AddWithValue(userId);
+                if ((bool)(await confirmed.ExecuteScalarAsync())!)
+                    return Results.Problem("confirmed_pattern_in_use", statusCode: 409);
+            }
             await using (var links = new NpgsqlCommand("DELETE FROM journal.expectation_review_labels WHERE custom_label_id=$1 AND user_id=$2", connection, tx))
             { links.Parameters.AddWithValue(id); links.Parameters.AddWithValue(userId); await links.ExecuteNonQueryAsync(); }
             await using var command = new NpgsqlCommand("DELETE FROM journal.reasoning_labels WHERE id=$1 AND user_id=$2", connection, tx);
@@ -104,7 +111,7 @@ static class ExpectationReviewEndpoints
             if (await command.ExecuteNonQueryAsync() == 0) return Results.Problem("not_found", statusCode: 404);
             await tx.CommitAsync();
             return Results.NoContent();
-        }).Produces(204).ProducesProblem(401).ProducesProblem(404);
+        }).Produces(204).ProducesProblem(401).ProducesProblem(404).ProducesProblem(409);
 
         journal.MapGet("/expectations/{id:guid}/review", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
         {
@@ -113,11 +120,110 @@ static class ExpectationReviewEndpoints
             return review is null ? Results.Problem("not_found", statusCode: 404) : Results.Ok(review);
         }).Produces<ExpectationReviewResponse>(200).ProducesProblem(401).ProducesProblem(404);
 
+        journal.MapGet("/expectations/{id:guid}/review-context", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
+        {
+            if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
+            await using var connection = await db.OpenConnectionAsync();
+            await using var tx = await connection.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
+
+            Guid updateId;
+            await using (var expectation = new NpgsqlCommand("""
+                SELECT observation_update_id FROM journal.expectations
+                WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
+                """, connection, tx))
+            {
+                expectation.Parameters.AddWithValue(id);
+                expectation.Parameters.AddWithValue(userId);
+                var value = await expectation.ExecuteScalarAsync();
+                if (value is not Guid sourceId) return Results.Problem("not_found", statusCode: 404);
+                updateId = sourceId;
+            }
+
+            ReviewContextObservationResponse? observation = null;
+            ObservationUpdateResponse? update = null;
+            await using (var source = new NpgsqlCommand("""
+                SELECT o.id,o.journal_day,
+                       u.id,u.content,u.recorded_at,u.updated_at,u.signal,u.interpretation,u.mental_state,u.tags,
+                       u.primary_subject::text,u.related_subjects::text,u.evidence::text
+                FROM journal.observation_updates u
+                LEFT JOIN journal.market_observations o
+                  ON o.id=u.market_observation_id AND o.user_id=u.user_id AND o.deleted_at IS NULL
+                WHERE u.id=$1 AND u.user_id=$2 AND u.deleted_at IS NULL
+                """, connection, tx))
+            {
+                source.Parameters.AddWithValue(updateId);
+                source.Parameters.AddWithValue(userId);
+                await using var reader = await source.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    if (!reader.IsDBNull(0)) observation = new(reader.GetGuid(0), reader.GetFieldValue<DateOnly>(1));
+                    update = ObservationEnrichment.Read(reader, 2);
+                }
+            }
+
+            var unavailable = new List<string>();
+            if (update is null) unavailable.Add("observation_update");
+            if (observation is null) unavailable.Add("market_observation");
+            var decisions = new List<ReviewContextActionDecisionResponse>();
+            if (update is not null)
+            {
+                var grouped = new Dictionary<Guid, (ActionDecisionResponse Decision, List<TradeEvidenceResponse> Trades)>();
+                await using var evidence = new NpgsqlCommand("""
+                    SELECT d.id,d.observation_update_id,d.expectation_id,d.intent,d.reason,d.recorded_at,d.execution_review,d.updated_at,
+                           t.id,t.action_decision_id,t.symbol,t.side,t.quantity,t.price,t.currency,t.executed_at,t.note,t.created_at,t.updated_at
+                    FROM journal.action_decisions d
+                    LEFT JOIN journal.trades t
+                      ON t.action_decision_id=d.id AND t.user_id=d.user_id AND t.deleted_at IS NULL
+                    WHERE d.observation_update_id=$1 AND d.user_id=$2 AND d.deleted_at IS NULL
+                    ORDER BY d.recorded_at,d.id,t.executed_at,t.id
+                    """, connection, tx);
+                evidence.Parameters.AddWithValue(updateId);
+                evidence.Parameters.AddWithValue(userId);
+                await using var reader = await evidence.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var decisionId = reader.GetGuid(0);
+                    if (!grouped.TryGetValue(decisionId, out var context))
+                    {
+                        context = (ActionDecisionEndpoints.ReadDecision(reader), []);
+                        grouped.Add(decisionId, context);
+                    }
+                    if (!reader.IsDBNull(8)) context.Trades.Add(ActionDecisionEndpoints.ReadTrade(reader, 8));
+                }
+                decisions.AddRange(grouped.Values.Select(item => new ReviewContextActionDecisionResponse(item.Decision, item.Trades)));
+            }
+            else
+            {
+                unavailable.Add("action_decisions");
+                unavailable.Add("trades");
+            }
+
+            await tx.CommitAsync();
+            return Results.Ok(new ExpectationReviewContextResponse(
+                id, updateId,
+                unavailable.Count == 0 ? ReviewContextAvailability.available : ReviewContextAvailability.partial,
+                unavailable, observation, update, decisions));
+        }).Produces<ExpectationReviewContextResponse>(200).ProducesProblem(401).ProducesProblem(404);
+
         journal.MapDelete("/expectations/{id:guid}/review", async (Guid id, HttpRequest request, NpgsqlDataSource db) =>
         {
             if (!JournalAccess.TryUser(request, out var userId)) return Results.Unauthorized();
             await using var connection = await db.OpenConnectionAsync();
             await using var tx = await connection.BeginTransactionAsync();
+            await using (var confirmed = new NpgsqlCommand("""
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM journal.confirmed_pattern_evidence e
+                  JOIN journal.expectation_reviews r ON r.id=e.review_id AND r.user_id=e.user_id
+                  WHERE r.expectation_id=$1 AND r.user_id=$2
+                )
+                """, connection, tx))
+            {
+                confirmed.Parameters.AddWithValue(id);
+                confirmed.Parameters.AddWithValue(userId);
+                if ((bool)(await confirmed.ExecuteScalarAsync())!)
+                    return Results.Problem("confirmed_pattern_evidence_in_use", statusCode: 409);
+            }
             await using (var labels = new NpgsqlCommand("""
                 DELETE FROM journal.expectation_review_labels l USING journal.expectation_reviews r
                 WHERE l.review_id=r.id AND r.expectation_id=$1 AND r.user_id=$2
@@ -128,7 +234,7 @@ static class ExpectationReviewEndpoints
             if (await command.ExecuteNonQueryAsync() == 0) return Results.Problem("not_found", statusCode: 404);
             await tx.CommitAsync();
             return Results.NoContent();
-        }).Produces(204).ProducesProblem(401).ProducesProblem(404);
+        }).Produces(204).ProducesProblem(401).ProducesProblem(404).ProducesProblem(409);
 
         journal.MapPut("/expectations/{id:guid}/review", async (Guid id, ExpectationReviewWrite input, HttpRequest request, NpgsqlDataSource db, TimeProvider timeProvider) =>
         {

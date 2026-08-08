@@ -22,6 +22,7 @@ import { SectionError, useCockpit } from '../../shell'
 import { cx, formatLongDate } from '../../format'
 import { accountDateTimeLocalToUtc, accountLocalHour, formatTimezoneLabel, utcToAccountDateTimeLocal } from '../../features/accountTime'
 import { useI18n } from '../../i18n'
+import { DisciplineContext } from '../../features/disciplines/DisciplineContext'
 import { ActionDecisionPanel } from './ActionDecisionPanel'
 import { ExpectationReviewForm } from './ExpectationReviewForm'
 import {
@@ -402,6 +403,7 @@ export function TodayPage() {
           </div>}
           {expectationUpdateId === update.id ? <div className="stack">
             {expectationHonestyReminder ? <p className="form-hint" role="note">{t('today.expectations.honestyReminder')}</p> : null}
+            <DisciplineContext />
             <Field label={t('today.expectations.expectedBehavior')}><TextArea value={expectedBehavior} onChange={event => setExpectedBehavior(event.target.value)} /></Field>
             <Field label={t('today.expectations.invalidation')}><TextArea value={invalidationCondition} onChange={event => setInvalidationCondition(event.target.value)} /></Field>
             <Field label={t('today.expectations.confidence')}><SelectBox value={expectationConfidence} onChange={event => setExpectationConfidence(event.target.value as ExpectationConfidence)}>

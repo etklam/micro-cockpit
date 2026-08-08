@@ -35,10 +35,12 @@ export type ComparisonExpectationResponse = { "id": string; "expectedBehavior": 
 export type ComparisonObservationResponse = { "journalDay": string; "update": ObservationUpdateResponse; "expectations": Array<ComparisonExpectationResponse> }
 export type ComparisonOwnerResponse = { "ownerId": string; "ownerType": ComparisonOwnerType; "availability": ComparisonAvailability; "observations": Array<ComparisonObservationResponse> }
 export type ComparisonOwnerType = "human" | "agent"
+export type ConfirmedPatternCreate = { "kind": ReasoningLabelKind; "key": string }
+export type ConfirmedPatternResponse = { "id": string; "kind": ReasoningLabelKind; "key": string; "name": string; "system": boolean; "isConfirmed": boolean; "firstConfirmedAt": string; "confirmedAt": string; "unconfirmedAt": null | string; "updatedAt": string }
 export type DailyCloseEvidenceResponse = { "tradingDate": string; "rawClose": number; "adjustedClose": number; "provider": string; "publishedAt": string }
 export type DailyCloseStatus = "available" | "unavailable" | "unsupported"
-export type DisciplinePrincipleCreate = { "content": string }
-export type DisciplinePrincipleResponse = { "id": string; "content": string; "status": DisciplinePrincipleStatus; "selectedForToday": boolean; "createdAt": string; "updatedAt": string }
+export type DisciplinePrincipleCreate = { "content": string; "confirmedPatternId"?: null | string }
+export type DisciplinePrincipleResponse = { "id": string; "content": string; "status": DisciplinePrincipleStatus; "selectedForToday": boolean; "confirmedPatternId": null | string; "confirmedPatternLabel": null | string; "createdAt": string; "updatedAt": string }
 export type DisciplinePrincipleStatus = "active" | "disabled" | "archived"
 export type DisciplinePrincipleUpdate = { "content": string; "status": DisciplinePrincipleStatus }
 export type EdgeProblemDetails = { "code": string; "title": string; "status": number; "detail": string; "correlationId": string }
@@ -49,6 +51,7 @@ export type ExpectationEditResponse = { "id": string; "observationUpdateId": str
 export type ExpectationOutcome = "confirmed" | "partially_confirmed" | "invalidated" | "indeterminate"
 export type ExpectationReadiness = "active" | "ready_for_review" | "reviewed"
 export type ExpectationResponse = { "id": string; "observationUpdateId": string; "marketObservationId": string; "journalDay": string; "expectedBehavior": string; "deadline": string; "invalidationCondition": string; "confidence": ExpectationConfidence; "market": string; "invalidatedAt": null | string; "readiness": ExpectationReadiness; "deadlineElapsed": boolean; "createdAt": string; "updatedAt": string }
+export type ExpectationReviewContextResponse = { "expectationId": string; "observationUpdateId": string; "availability": ReviewContextAvailability; "unavailableContext": Array<string>; "marketObservation": null | ReviewContextObservationResponse; "observationUpdate": null | ObservationUpdateResponse; "actionDecisions": Array<ReviewContextActionDecisionResponse> }
 export type ExpectationReviewResponse = { "id": string; "expectationId": string; "outcome": ExpectationOutcome; "reasoningQuality": ReasoningQuality; "explanation": null | string; "labels": Array<ReasoningLabelResponse>; "createdAt": string; "updatedAt": string }
 export type ExpectationReviewWrite = { "outcome": ExpectationOutcome; "reasoningQuality": ReasoningQuality; "explanation": null | string; "systemIssueKeys"?: null | Array<string>; "systemStrengthKeys"?: null | Array<string>; "customLabelIds"?: null | Array<string> }
 export type ExpectationWrite = { "expectedBehavior": string; "deadline": null | string; "invalidationCondition": string; "confidence": ExpectationConfidence; "market": string; "deadlinePreset"?: null | ExpectationDeadlinePreset }
@@ -70,9 +73,13 @@ export type ObservationUpdateEditResponse = { "id": string; "content": string; "
 export type ObservationUpdateResponse = { "id": string; "content": string; "recordedAt": string; "updatedAt": string; "signal": null | string; "interpretation": null | string; "mentalState": null | string; "tags": Array<string>; "primarySubject": null | ObservationSubjectResponse; "relatedSubjects": Array<ObservationSubjectResponse>; "evidence": null | ObservationEvidenceResponse }
 export type ObservationUpdateWrite = { "content": string; "signal"?: null | string; "interpretation"?: null | string; "mentalState"?: null | string; "tags"?: null | Array<string>; "primarySubject"?: null | ObservationSubjectWrite; "relatedSubjects"?: null | Array<ObservationSubjectWrite>; "evidence"?: null | ObservationEvidenceWrite; "sourceLabel"?: null | string }
 export type OwnerComparisonResponse = { "human": ComparisonOwnerResponse; "agent": ComparisonOwnerResponse; "difference": ComparisonDifferenceResponse }
-export type PatternEvidenceResponse = { "expectationId": string; "url": string }
-export type PatternLabelResponse = { "kind": ReasoningLabelKind; "key": string; "name": string; "system": boolean; "count": number | string; "denominator": number | string; "evidence": Array<PatternEvidenceResponse> }
+export type PatternEvidenceResponse = { "expectationId": string; "reviewId": string; "journalDay": string; "subject": string; "expectedBehavior": string; "outcome": ExpectationOutcome; "reasoningQuality": ReasoningQuality; "observationExcerpt": string; "reviewExplanation": null | string; "reviewedAt": string; "url": string }
+export type PatternLabelResponse = { "kind": ReasoningLabelKind; "key": string; "name": string; "system": boolean; "count": number | string; "denominator": number | string; "confirmedPatternId": null | string; "patternIsConfirmed": boolean; "firstSeen": null | string; "mostRecent": null | string; "evidence": Array<PatternEvidenceResponse>; "trend": PatternTrendResponse }
 export type PatternReviewResponse = { "from": string; "to": string; "reviewedExpectationCount": number | string; "labels": Array<PatternLabelResponse> }
+export type PatternTrendBucketResponse = { "from": string; "to": string; "occurrenceCount": number | string; "reviewedExpectationCount": number | string; "evidence": Array<PatternEvidenceResponse> }
+export type PatternTrendDirection = "higher" | "lower" | "same" | null
+export type PatternTrendResponse = { "status": PatternTrendStatus; "direction": null | PatternTrendDirection; "current": PatternTrendBucketResponse; "previous": null | PatternTrendBucketResponse }
+export type PatternTrendStatus = "supported" | "insufficient_evidence"
 export type PositionSizing = { "accountValue": number; "riskPercent": number; "entryPrice": number; "stopPrice": number }
 export type PositionSizingResponse = { "quantity": number; "plannedLoss": number; "riskBudget": number; "positionValue": number; "perUnitRisk": number }
 export type PresetWrite = { "name": string; "toolType": string; "inputs": JsonElement; "currency": null | string }
@@ -90,6 +97,9 @@ export type ReasoningLabelWrite = { "kind": ReasoningLabelKind; "name": string }
 export type ReasoningQuality = "sound" | "mixed" | "weak"
 export type RegisterRequest = { "email": string; "password": string; "displayName": string; "timezone": string; "baseCurrency": string }
 export type RegisterResponse = { "id": string; "email": string; "displayName": string; "timezone": string; "baseCurrency": string }
+export type ReviewContextActionDecisionResponse = { "decision": ActionDecisionResponse; "trades": Array<TradeEvidenceResponse> }
+export type ReviewContextAvailability = "available" | "partial"
+export type ReviewContextObservationResponse = { "id": string; "journalDay": string }
 export type RiskReward = { "entryPrice": number; "stopPrice": number; "targetPrice": number }
 export type RiskRewardResponse = { "ratio": number; "riskPerUnit": number; "rewardPerUnit": number; "breakevenWinRate": number }
 export type SavedCalculationWrite = { "toolType": string; "inputs": JsonElement; "currency": string; "symbol": null | string; "note": null | string }
@@ -100,8 +110,8 @@ export type TradeEvidenceWrite = { "symbol": string; "side": TradeSide; "quantit
 export type TradeSide = "buy" | "sell"
 export type UserSettingsResponse = { "email": string; "displayName": string; "timezone": string; "journalDayRollover": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string; "updatedAt": string }
 export type UserSettingsWrite = { "displayName": string; "timezone": string; "journalDayRollover": string; "baseCurrency": string; "appearance": string; "locale": string; "accentTheme": string }
-export type WatchlistItemResponse = { "instrumentId": string; "note": null | string; "createdAt": string; "updatedAt": string }
 export type WatchlistCreateWrite = { "note": string }
+export type WatchlistItemResponse = { "instrumentId": string; "note": null | string; "createdAt": string; "updatedAt": string }
 export type WatchlistNoteWrite = { "note": null | string }
 
 export type RequestOptions = { baseUrl?: string; token?: string | null; refresh?: () => Promise<string | null>; onUnauthorized?: () => void }
@@ -165,6 +175,7 @@ export const postApiAppExpectationsIdInvalidate = (id: string, extra?: RequestIn
 export const getApiAppExpectationsIdReview = (id: string, extra?: RequestInit) => request<ExpectationReviewResponse>(`/api/app/expectations/${encodeURIComponent(String(id))}/review`, { method: "GET", ...extra })
 export const putApiAppExpectationsIdReview = (id: string, body: ExpectationReviewWrite, extra?: RequestInit) => request<ExpectationReviewResponse>(`/api/app/expectations/${encodeURIComponent(String(id))}/review`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const deleteApiAppExpectationsIdReview = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/expectations/${encodeURIComponent(String(id))}/review`, { method: "DELETE", ...extra })
+export const getApiAppExpectationsIdReviewContext = (id: string, extra?: RequestInit) => request<ExpectationReviewContextResponse>(`/api/app/expectations/${encodeURIComponent(String(id))}/review-context`, { method: "GET", ...extra })
 export const getApiAppReasoningLabels = (extra?: RequestInit) => request<CollectionResponseOfReasoningLabelResponse>("/api/app/reasoning-labels", { method: "GET", ...extra })
 export const postApiAppReasoningLabels = (body: ReasoningLabelWrite, extra?: RequestInit) => request<ReasoningLabelResponse>("/api/app/reasoning-labels", { method: "POST", body: JSON.stringify(body), ...extra })
 export const putApiAppReasoningLabelsId = (id: string, body: ReasoningLabelWrite, extra?: RequestInit) => request<ReasoningLabelResponse>(`/api/app/reasoning-labels/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
@@ -179,10 +190,12 @@ export const postApiAppActionDecisionsDecisionIdTrades = (decisionId: string, bo
 export const putApiAppActionDecisionsDecisionIdTradesId = (decisionId: string, id: string, body: TradeEvidenceWrite, extra?: RequestInit) => request<TradeEvidenceResponse>(`/api/app/action-decisions/${encodeURIComponent(String(decisionId))}/trades/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const deleteApiAppActionDecisionsDecisionIdTradesId = (decisionId: string, id: string, extra?: RequestInit) => request<unknown>(`/api/app/action-decisions/${encodeURIComponent(String(decisionId))}/trades/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const getApiAppWatchlist = (extra?: RequestInit) => request<CollectionResponseOfWatchlistItemResponse>("/api/app/watchlist", { method: "GET", ...extra })
-export const postApiAppWatchlistInstrumentId = (instrumentId: string, body: WatchlistCreateWrite, extra?: RequestInit) => request<WatchlistItemResponse>(`/api/app/watchlist/${encodeURIComponent(String(instrumentId))}`, { method: "POST", body: JSON.stringify(body), ...extra })
+export const postApiAppWatchlistInstrumentId = (instrumentId: string, body: null | WatchlistCreateWrite, extra?: RequestInit) => request<WatchlistItemResponse>(`/api/app/watchlist/${encodeURIComponent(String(instrumentId))}`, { method: "POST", body: JSON.stringify(body), ...extra })
 export const deleteApiAppWatchlistInstrumentId = (instrumentId: string, extra?: RequestInit) => request<unknown>(`/api/app/watchlist/${encodeURIComponent(String(instrumentId))}`, { method: "DELETE", ...extra })
 export const putApiAppWatchlistInstrumentIdNote = (instrumentId: string, body: WatchlistNoteWrite, extra?: RequestInit) => request<WatchlistItemResponse>(`/api/app/watchlist/${encodeURIComponent(String(instrumentId))}/note`, { method: "PUT", body: JSON.stringify(body), ...extra })
 export const getApiAppPatternReview = (query: { "range": string; "from"?: string; "to"?: string }, extra?: RequestInit) => request<PatternReviewResponse>("/api/app/pattern-review" + withQuery(query), { method: "GET", ...extra })
+export const postApiAppConfirmedPatterns = (body: ConfirmedPatternCreate, extra?: RequestInit) => request<ConfirmedPatternResponse>("/api/app/confirmed-patterns", { method: "POST", body: JSON.stringify(body), ...extra })
+export const deleteApiAppConfirmedPatternsId = (id: string, extra?: RequestInit) => request<unknown>(`/api/app/confirmed-patterns/${encodeURIComponent(String(id))}`, { method: "DELETE", ...extra })
 export const getApiAppComparison = (query: { "agentUserId": string; "from": string; "to": string; "subjectType"?: string; "subject"?: string; "instrumentId"?: string }, extra?: RequestInit) => request<OwnerComparisonResponse>("/api/app/comparison" + withQuery(query), { method: "GET", ...extra })
 export const getApiAppDisciplinePrinciples = (extra?: RequestInit) => request<CollectionResponseOfDisciplinePrincipleResponse>("/api/app/discipline-principles", { method: "GET", ...extra })
 export const postApiAppDisciplinePrinciples = (body: DisciplinePrincipleCreate, extra?: RequestInit) => request<DisciplinePrincipleResponse>("/api/app/discipline-principles", { method: "POST", body: JSON.stringify(body), ...extra })

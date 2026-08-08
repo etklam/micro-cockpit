@@ -9,6 +9,7 @@ import {
 import { Button, Field, SelectBox, TextArea } from '../../ui'
 import { useI18n } from '../../i18n'
 import { TradeEvidenceForm, TradeEvidenceList } from './TradeEvidence'
+import { DisciplineContext } from '../../features/disciplines/DisciplineContext'
 
 export function ActionDecisionPanel({ updateId, expectations }: { updateId: string; expectations: Expectation[] }) {
   const { t } = useI18n()
@@ -48,6 +49,7 @@ export function ActionDecisionPanel({ updateId, expectations }: { updateId: stri
     </div>
     {editing ? <div className="stack">
       {honestyReminder ? <p className="form-hint" role="note">{t('today.decisions.honestyReminder')}</p> : null}
+      <DisciplineContext />
       <Field label={t('today.decisions.intent')}><SelectBox value={intent} onChange={event => setIntent(event.target.value as ActionDecisionIntent)}>
         <option value="trade">{t('today.decisions.intent.trade')}</option>
         <option value="continue_observing">{t('today.decisions.intent.continueObserving')}</option>

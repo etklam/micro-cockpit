@@ -1360,6 +1360,9 @@
           },
           "404": {
             "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
           }
         },
         "security": [
@@ -1368,6 +1371,48 @@
           }
         ],
         "operationId": "delete_api_app_expectations_id_review"
+      }
+    },
+    "/api/app/expectations/{id}/review-context": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpectationReviewContextResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "get_api_app_expectations_id_review_context"
       }
     },
     "/api/app/reasoning-labels": {
@@ -1520,6 +1565,9 @@
             "$ref": "#/components/responses/Problem"
           },
           "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
             "$ref": "#/components/responses/Problem"
           }
         },
@@ -1997,11 +2045,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/WatchlistCreateWrite"
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WatchlistCreateWrite"
+                  }
+                ]
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -2016,6 +2070,9 @@
           },
           "204": {
             "description": "No Content"
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
           },
           "401": {
             "$ref": "#/components/responses/Problem"
@@ -2180,6 +2237,85 @@
         "operationId": "get_api_app_pattern_review"
       }
     },
+    "/api/app/confirmed-patterns": {
+      "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmedPatternCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmedPatternResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "post_api_app_confirmed_patterns"
+      }
+    },
+    "/api/app/confirmed-patterns/{id}": {
+      "delete": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "delete_api_app_confirmed_patterns_id"
+      }
+    },
     "/api/app/comparison": {
       "get": {
         "tags": [
@@ -2318,6 +2454,9 @@
             "$ref": "#/components/responses/Problem"
           },
           "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
             "$ref": "#/components/responses/Problem"
           }
         },
@@ -4312,6 +4451,76 @@
           "agent"
         ]
       },
+      "ConfirmedPatternCreate": {
+        "required": [
+          "kind",
+          "key"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ReasoningLabelKind"
+          },
+          "key": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfirmedPatternResponse": {
+        "required": [
+          "id",
+          "kind",
+          "key",
+          "name",
+          "system",
+          "isConfirmed",
+          "firstConfirmedAt",
+          "confirmedAt",
+          "unconfirmedAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ReasoningLabelKind"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "system": {
+            "type": "boolean"
+          },
+          "isConfirmed": {
+            "type": "boolean"
+          },
+          "firstConfirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "unconfirmedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "DailyCloseEvidenceResponse": {
         "required": [
           "tradingDate",
@@ -4367,6 +4576,13 @@
         "properties": {
           "content": {
             "type": "string"
+          },
+          "confirmedPatternId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -4376,6 +4592,8 @@
           "content",
           "status",
           "selectedForToday",
+          "confirmedPatternId",
+          "confirmedPatternLabel",
           "createdAt",
           "updatedAt"
         ],
@@ -4393,6 +4611,19 @@
           },
           "selectedForToday": {
             "type": "boolean"
+          },
+          "confirmedPatternId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "confirmedPatternLabel": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "createdAt": {
             "type": "string",
@@ -4639,6 +4870,63 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ExpectationReviewContextResponse": {
+        "required": [
+          "expectationId",
+          "observationUpdateId",
+          "availability",
+          "unavailableContext",
+          "marketObservation",
+          "observationUpdate",
+          "actionDecisions"
+        ],
+        "type": "object",
+        "properties": {
+          "expectationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observationUpdateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/ReviewContextAvailability"
+          },
+          "unavailableContext": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "marketObservation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewContextObservationResponse"
+              }
+            ]
+          },
+          "observationUpdate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ObservationUpdateResponse"
+              }
+            ]
+          },
+          "actionDecisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewContextActionDecisionResponse"
+            }
           }
         }
       },
@@ -5407,6 +5695,15 @@
       "PatternEvidenceResponse": {
         "required": [
           "expectationId",
+          "reviewId",
+          "journalDay",
+          "subject",
+          "expectedBehavior",
+          "outcome",
+          "reasoningQuality",
+          "observationExcerpt",
+          "reviewExplanation",
+          "reviewedAt",
           "url"
         ],
         "type": "object",
@@ -5414,6 +5711,39 @@
           "expectationId": {
             "type": "string",
             "format": "uuid"
+          },
+          "reviewId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "journalDay": {
+            "type": "string",
+            "format": "date"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "expectedBehavior": {
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ExpectationOutcome"
+          },
+          "reasoningQuality": {
+            "$ref": "#/components/schemas/ReasoningQuality"
+          },
+          "observationExcerpt": {
+            "type": "string"
+          },
+          "reviewExplanation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time"
           },
           "url": {
             "type": "string"
@@ -5428,7 +5758,12 @@
           "system",
           "count",
           "denominator",
-          "evidence"
+          "confirmedPatternId",
+          "patternIsConfirmed",
+          "firstSeen",
+          "mostRecent",
+          "evidence",
+          "trend"
         ],
         "type": "object",
         "properties": {
@@ -5460,11 +5795,38 @@
             ],
             "format": "int32"
           },
+          "confirmedPatternId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "patternIsConfirmed": {
+            "type": "boolean"
+          },
+          "firstSeen": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "mostRecent": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
           "evidence": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PatternEvidenceResponse"
             }
+          },
+          "trend": {
+            "$ref": "#/components/schemas/PatternTrendResponse"
           }
         }
       },
@@ -5500,6 +5862,99 @@
             }
           }
         }
+      },
+      "PatternTrendBucketResponse": {
+        "required": [
+          "from",
+          "to",
+          "occurrenceCount",
+          "reviewedExpectationCount",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "occurrenceCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "reviewedExpectationCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PatternEvidenceResponse"
+            }
+          }
+        }
+      },
+      "PatternTrendDirection": {
+        "enum": [
+          "higher",
+          "lower",
+          "same",
+          null
+        ]
+      },
+      "PatternTrendResponse": {
+        "required": [
+          "status",
+          "direction",
+          "current",
+          "previous"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/PatternTrendStatus"
+          },
+          "direction": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PatternTrendDirection"
+              }
+            ]
+          },
+          "current": {
+            "$ref": "#/components/schemas/PatternTrendBucketResponse"
+          },
+          "previous": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PatternTrendBucketResponse"
+              }
+            ]
+          }
+        }
+      },
+      "PatternTrendStatus": {
+        "enum": [
+          "supported",
+          "insufficient_evidence"
+        ]
       },
       "PositionSizing": {
         "required": [
@@ -6062,6 +6517,47 @@
           }
         }
       },
+      "ReviewContextActionDecisionResponse": {
+        "required": [
+          "decision",
+          "trades"
+        ],
+        "type": "object",
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/ActionDecisionResponse"
+          },
+          "trades": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeEvidenceResponse"
+            }
+          }
+        }
+      },
+      "ReviewContextAvailability": {
+        "enum": [
+          "available",
+          "partial"
+        ]
+      },
+      "ReviewContextObservationResponse": {
+        "required": [
+          "id",
+          "journalDay"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "journalDay": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
       "RiskReward": {
         "required": [
           "entryPrice",
@@ -6412,6 +6908,17 @@
           }
         }
       },
+      "WatchlistCreateWrite": {
+        "required": [
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          }
+        }
+      },
       "WatchlistItemResponse": {
         "required": [
           "instrumentId",
@@ -6438,17 +6945,6 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
-          }
-        }
-      },
-      "WatchlistCreateWrite": {
-        "required": [
-          "note"
-        ],
-        "type": "object",
-        "properties": {
-          "note": {
-            "type": "string"
           }
         }
       },

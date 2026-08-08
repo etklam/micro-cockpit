@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import type { Expectation, ExpectationReviewWrite, ReasoningLabelKind } from '../../features/api'
+import type { Expectation, ExpectationReviewContext, ExpectationReviewWrite, ReasoningLabelKind } from '../../features/api'
 import {
-  useCreateDisciplineMutation,
   useCreateReasoningLabelMutation,
+  useExpectationReviewContextQuery,
   useExpectationReviewQuery,
   useReasoningLabelsQuery,
   useSaveExpectationReviewMutation,
@@ -15,24 +15,46 @@ type ExpectationSelfReviewFormProps = {
   onClose: () => void
 }
 
+function RetainedDecisionContext({ decisions }: { decisions: ExpectationReviewContext['actionDecisions'] }) {
+  const { t, format } = useI18n()
+  if (!decisions.length) return null
+  return <div className="review-context__retained-block">
+    <h4>{t('today.decisions.title')}</h4>
+    {decisions.map(({ decision, trades }) => <article key={decision.id}>
+      <p><strong>{{
+        trade: t('today.decisions.intent.trade'),
+        continue_observing: t('today.decisions.intent.continueObserving'),
+        avoid_trade: t('today.decisions.intent.avoidTrade'),
+      }[decision.intent]}</strong> · <time dateTime={decision.recordedAt}>{format.dateTime(decision.recordedAt)}</time></p>
+      <p>{decision.reason}</p>
+      {decision.executionReview ? <p>{t('today.decisions.execution')}: {{
+        followed: t('today.decisions.execution.followed'),
+        partially_followed: t('today.decisions.execution.partiallyFollowed'),
+        deviated: t('today.decisions.execution.deviated'),
+      }[decision.executionReview]}</p> : null}
+      {trades.length ? <ul className="review-context__trades">{trades.map(trade => <li key={trade.id}>{t('today.decisions.tradeSummary', {
+        side: trade.side, quantity: trade.quantity, symbol: trade.symbol, price: trade.price, currency: trade.currency,
+      })}</li>)}</ul> : null}
+    </article>)}
+  </div>
+}
+
 export function ExpectationSelfReviewForm({ expectation, onClose }: ExpectationSelfReviewFormProps) {
   const { t, format } = useI18n()
   const existing = useExpectationReviewQuery(expectation.id)
+  const context = useExpectationReviewContextQuery(expectation.id)
   const labels = useReasoningLabelsQuery()
   const save = useSaveExpectationReviewMutation(expectation.id)
   const createLabel = useCreateReasoningLabelMutation()
-  const createPrinciple = useCreateDisciplineMutation()
   const [outcome, setOutcome] = useState<ExpectationReviewWrite['outcome']>('confirmed')
   const [quality, setQuality] = useState<ExpectationReviewWrite['reasoningQuality']>('sound')
   const [explanation, setExplanation] = useState('')
   const [selected, setSelected] = useState<string[]>([])
   const [customKind, setCustomKind] = useState<ReasoningLabelKind>('issue')
   const [customName, setCustomName] = useState('')
-  const [principle, setPrinciple] = useState('')
   const [reviewSaved, setReviewSaved] = useState(false)
-  const [principleSaved, setPrincipleSaved] = useState(false)
   const [formError, setFormError] = useState('')
-  const [principleError, setPrincipleError] = useState('')
+  const retainedUpdate = context.data?.observationUpdate
 
   useEffect(() => {
     if (!existing.data) return
@@ -44,17 +66,6 @@ export function ExpectationSelfReviewForm({ expectation, onClose }: ExpectationS
 
   const needsExplanation = outcome === 'partially_confirmed' || outcome === 'indeterminate'
   const toggle = (key: string) => setSelected(current => current.includes(key) ? current.filter(item => item !== key) : [...current, key])
-
-  async function savePrinciple() {
-    if (!principle.trim()) return
-    setPrincipleError('')
-    try {
-      await createPrinciple.mutateAsync(principle.trim())
-      setPrincipleSaved(true)
-    } catch {
-      setPrincipleError(t('review.selfReview.principleError'))
-    }
-  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -74,7 +85,6 @@ export function ExpectationSelfReviewForm({ expectation, onClose }: ExpectationS
         customLabelIds: chosen.filter(label => !label.isSystem).map(label => label.id!).filter(Boolean),
       })
       setReviewSaved(true)
-      if (principle.trim() && !principleSaved) await savePrinciple()
     } catch {
       setFormError(t('review.selfReview.saveError'))
     }
@@ -116,6 +126,16 @@ export function ExpectationSelfReviewForm({ expectation, onClose }: ExpectationS
         <div><dt>{t('review.relationship')}</dt><dd><time dateTime={expectation.journalDay}>{format.date(expectation.journalDay)}</time></dd></div>
         <div><dt>{t('review.created')}</dt><dd><time dateTime={expectation.createdAt}>{format.dateTime(expectation.createdAt)}</time></dd></div>
       </dl>
+      {retainedUpdate ? <div className="review-context__retained-block">
+        <h4>{t('review.selfReview.observation')}</h4>
+        <p>{retainedUpdate.content}</p>
+        {retainedUpdate.signal ? <p><strong>{t('today.observations.signal')}:</strong> {retainedUpdate.signal}</p> : null}
+        {retainedUpdate.interpretation ? <p><strong>{t('today.observations.interpretation')}:</strong> {retainedUpdate.interpretation}</p> : null}
+        {retainedUpdate.evidence ? <p><strong>{t('review.selfReview.supportingEvidence')}:</strong> <a href={retainedUpdate.evidence.url} target="_blank" rel="noreferrer">{retainedUpdate.evidence.title || retainedUpdate.evidence.url}</a>{retainedUpdate.evidence.quote ? <> · {retainedUpdate.evidence.quote}</> : null}</p> : null}
+      </div> : context.isLoading ? <p className="form-hint" role="status">{t('review.selfReview.loadingContext')}</p> : null}
+      {context.isError ? <p className="form-error" role="alert">{t('review.selfReview.contextLoadError')}</p> : null}
+      {context.data?.availability === 'partial' ? <p className="review-context__limitation" role="status">{t('review.selfReview.partialContext')}</p> : null}
+      <RetainedDecisionContext decisions={context.data?.actionDecisions ?? []} />
       <p className="review-context__limitation">{t('review.selfReview.snapshotLimitation')}</p>
     </section>
 
@@ -140,6 +160,7 @@ export function ExpectationSelfReviewForm({ expectation, onClose }: ExpectationS
           </SelectBox>
         </Field>
       </div>
+      <p className="form-hint">{t('review.selfReview.outcomeQualitySeparation')}</p>
       <Field label={`${t('today.review.explanation')}${needsExplanation ? '' : ` (${t('common.optional')})`}`}>
         <TextArea value={explanation} onChange={event => { setExplanation(event.target.value); setFormError('') }} disabled={reviewSaved} aria-invalid={!!formError && needsExplanation && !explanation.trim()} />
       </Field>
@@ -170,18 +191,10 @@ export function ExpectationSelfReviewForm({ expectation, onClose }: ExpectationS
         </div>
       </div>
 
-      <div className="review-self-review__principle">
-        <Field label={t('review.selfReview.principleOptional')} hint={t('review.selfReview.principleHint')}>
-          <TextInput value={principle} onChange={event => { setPrinciple(event.target.value); setPrincipleError('') }} disabled={reviewSaved} />
-        </Field>
-        {principleError ? <p className="form-error" role="alert">{principleError}</p> : null}
-        {principleError ? <Button variant="ghost" size="sm" onClick={() => { void savePrinciple() }} loading={createPrinciple.isPending}>{t('review.selfReview.retryPrinciple')}</Button> : null}
-      </div>
-
       {formError && !needsExplanation ? <p className="form-error" role="alert">{formError}</p> : null}
-      {reviewSaved ? <p className="review-self-review__success" role="status">{principle && !principleSaved ? t('review.selfReview.reviewSavedPrinciplePending') : t('review.selfReview.savedHint')}</p> : null}
+      {reviewSaved ? <p className="review-self-review__success" role="status">{t('review.selfReview.savedHint')}</p> : null}
       <div className="form-actions">
-        <Button variant="primary" type="submit" loading={save.isPending || createPrinciple.isPending} disabled={reviewSaved}>{t('common.save')}</Button>
+        <Button variant="primary" type="submit" loading={save.isPending} disabled={reviewSaved}>{t('common.save')}</Button>
         <Button variant="ghost" type="button" onClick={onClose}>{reviewSaved ? t('review.selfReview.backToQueue') : t('common.cancel')}</Button>
       </div>
     </form>

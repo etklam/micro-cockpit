@@ -1,0 +1,23 @@
+.discipline-context {
+  border-left: 2px solid var(--primary-line);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.discipline-context summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.discipline-context p {
+  margin: var(--sp-2) 0;
+}
+
+.discipline-context ul {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  padding-left: var(--sp-4);
+}

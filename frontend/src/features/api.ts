@@ -15,6 +15,8 @@ export function useIdempotencyKey() {
 export type Discipline = G.DisciplinePrincipleResponse
 export type DisciplinePrincipleStatus = G.DisciplinePrincipleStatus
 export type PatternReview = G.PatternReviewResponse
+export type PatternLabel = G.PatternLabelResponse
+export type ConfirmedPattern = G.ConfirmedPatternResponse
 export type OwnerComparison = G.OwnerComparisonResponse
 export type WatchlistItem = G.WatchlistItemResponse
 export type MarketObservation = G.MarketObservationResponse
@@ -25,6 +27,7 @@ export type ExpectationConfidence = G.ExpectationConfidence
 export type ExpectationDeadlinePreset = NonNullable<G.ExpectationDeadlinePreset>
 export type ExpectationReview = G.ExpectationReviewResponse
 export type ExpectationReviewWrite = G.ExpectationReviewWrite
+export type ExpectationReviewContext = G.ExpectationReviewContextResponse
 export type ReasoningLabel = G.ReasoningLabelResponse
 export type ReasoningLabelKind = G.ReasoningLabelKind
 export type ActionDecision = G.ActionDecisionResponse
@@ -90,6 +93,8 @@ export async function getExpectationReview(id: string): Promise<ExpectationRevie
 }
 export const saveExpectationReview = (id: string, body: ExpectationReviewWrite) =>
   G.putApiAppExpectationsIdReview(id, body)
+export const getExpectationReviewContext = (id: string) =>
+  G.getApiAppExpectationsIdReviewContext(id)
 
 export const getReasoningLabels = async () => (await G.getApiAppReasoningLabels()).items
 export const createReasoningLabel = (kind: ReasoningLabelKind, name: string) =>
@@ -109,7 +114,8 @@ export const createTradeEvidence = (decisionId: string, body: TradeEvidenceWrite
 export const getInstrumentDirectory = async () => (await G.getApiAppMarketSymbols()).items
 export const getCalendar = (year: number, month: number) => G.getApiAppCalendar({ year, month })
 export const getDisciplines = () => G.getApiAppDisciplinePrinciples()
-export const createDiscipline = (content: string) => G.postApiAppDisciplinePrinciples({ content })
+export const createDiscipline = (content: string, confirmedPatternId?: string) =>
+  G.postApiAppDisciplinePrinciples({ content, confirmedPatternId: confirmedPatternId ?? null })
 export const updateDiscipline = (id: string, content: string, status: DisciplinePrincipleStatus) =>
   G.putApiAppDisciplinePrinciplesId(id, { content, status })
 export const selectDiscipline = (id: string) => G.postApiAppDisciplinePrinciplesIdSelect(id)
@@ -123,6 +129,10 @@ export async function getTodayDiscipline(): Promise<Discipline | null> {
 }
 export const getPatternReview = (range: 'weekly' | 'monthly' | 'custom', from?: string, to?: string) =>
   G.getApiAppPatternReview({ range, from, to })
+export const confirmPattern = (kind: G.ReasoningLabelKind, key: string) =>
+  G.postApiAppConfirmedPatterns({ kind, key })
+export const unconfirmPattern = (id: string) =>
+  G.deleteApiAppConfirmedPatternsId(id)
 export type ComparisonQuery = Parameters<typeof G.getApiAppComparison>[0]
 export const getComparison = (query: ComparisonQuery) => G.getApiAppComparison(query)
 

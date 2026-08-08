@@ -163,6 +163,28 @@
   font-size: var(--fs-xs);
 }
 
+.review-context__retained-block {
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--primary-line);
+}
+
+.review-context__retained-block h4,
+.review-context__retained-block p {
+  margin: 0;
+}
+
+.review-context__retained-block article {
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.review-context__trades {
+  margin: 0;
+  padding-left: var(--sp-4);
+}
+
 .review-context__expectation {
   margin: 0;
   font-family: var(--font-serif);
@@ -267,11 +289,100 @@
   margin-top: var(--sp-4);
 }
 
+.pattern-list,
+.pattern-evidence ol {
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pattern-item {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.pattern-item > p,
+.pattern-item h3,
+.pattern-item__principle p,
+.pattern-evidence p,
+.pattern-evidence blockquote {
+  margin: 0;
+}
+
+.pattern-item__header,
+.pattern-evidence__heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+
+.pattern-item__header > div {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.pattern-item__header > strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.pattern-item__dates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+  margin: 0;
+}
+
+.pattern-item__dates dt {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.pattern-item__dates dd {
+  margin: 2px 0 0;
+  font-size: var(--fs-sm);
+}
+
+.pattern-item__principle,
+.pattern-evidence {
+  display: grid;
+  gap: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--hairline);
+}
+
+.pattern-evidence summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.pattern-evidence li {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.pattern-evidence blockquote {
+  padding-left: var(--sp-3);
+  border-left: 2px solid var(--primary-line);
+  color: var(--muted);
+}
+
 @media (max-width: 760px) {
   .review-queue__header,
   .review-self-review__header,
   .review-queue__item-header,
-  .review-context__heading {
+  .review-context__heading,
+  .pattern-item__header,
+  .pattern-evidence__heading {
     flex-direction: column;
     align-items: flex-start;
   }

@@ -13,6 +13,7 @@ export const queryKeys = {
   todayObservation: ['market-observations', 'today'] as const,
   expectations: ['expectations'] as const,
   expectationReview: (id: string) => ['expectations', id, 'review'] as const,
+  expectationReviewContext: (id: string) => ['expectations', id, 'review-context'] as const,
   reasoningLabels: ['reasoning-labels'] as const,
   actionDecisions: (updateId: string) => ['action-decisions', updateId] as const,
   tradeEvidence: (decisionId: string) => ['action-decisions', decisionId, 'trades'] as const,
@@ -39,6 +40,8 @@ export const useTodayObservationQuery = () =>
 export const useExpectationsQuery = () => useQuery({ queryKey: queryKeys.expectations, queryFn: api.getExpectations })
 export const useExpectationReviewQuery = (id: string, enabled = true) =>
   useQuery({ queryKey: queryKeys.expectationReview(id), queryFn: () => api.getExpectationReview(id), enabled: !!id && enabled })
+export const useExpectationReviewContextQuery = (id: string) =>
+  useQuery({ queryKey: queryKeys.expectationReviewContext(id), queryFn: () => api.getExpectationReviewContext(id), enabled: !!id })
 export const useReasoningLabelsQuery = () =>
   useQuery({ queryKey: queryKeys.reasoningLabels, queryFn: api.getReasoningLabels })
 export const useActionDecisionsQuery = (updateId: string) =>
@@ -111,6 +114,7 @@ export function useSaveExpectationReviewMutation(id: string) {
       await Promise.all([
         client.invalidateQueries({ queryKey: queryKeys.expectationReview(id) }),
         client.invalidateQueries({ queryKey: queryKeys.expectations }),
+        client.invalidateQueries({ queryKey: ['pattern-review'] }),
         invalidateCalendar(client),
       ])
     },
@@ -216,8 +220,18 @@ export function useUpdateObservationMutation() {
   })
 }
 
+export const useConfirmPatternMutation = () =>
+  useInvalidatingMutation(
+    ({ kind, key }: { kind: api.ReasoningLabelKind; key: string }) => api.confirmPattern(kind, key),
+    [['pattern-review']],
+  )
+export const useUnconfirmPatternMutation = () =>
+  useInvalidatingMutation(api.unconfirmPattern, [['pattern-review']])
 export const useCreateDisciplineMutation = () =>
-  useInvalidatingMutation(api.createDiscipline, [queryKeys.disciplines, queryKeys.todayDiscipline])
+  useInvalidatingMutation(
+    ({ content, confirmedPatternId }: { content: string; confirmedPatternId?: string }) => api.createDiscipline(content, confirmedPatternId),
+    [queryKeys.disciplines, queryKeys.todayDiscipline],
+  )
 export const useUpdateDisciplineMutation = () => useInvalidatingMutation(
   ({ id, content, status }: { id: string; content: string; status: api.DisciplinePrincipleStatus }) =>
     api.updateDiscipline(id, content, status),

@@ -21,7 +21,6 @@ All Market Observation tickets `01`–`16` are completed.
 The disposable E2E Compose project and its volumes were removed after the run.
 The pre-existing local `micro-cockpit` stack was not changed.
 
-Known dependency warning: `Microsoft.OpenApi 2.0.0` reports
-`GHSA-v5pm-xwqc-g5wc`. This is an upstream package warning and did not affect
-the verification outcome; upgrading it should be handled as a separate
-dependency ticket because it may change generated contracts.
+Dependency follow-up (2026-08-09): the OpenAPI-producing services now pin
+`Microsoft.OpenApi 2.7.5`, the patched 2.x release for
+`GHSA-v5pm-xwqc-g5wc`. Runtime contract generation remains compatible.

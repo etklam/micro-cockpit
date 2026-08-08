@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { BrowserRouter } from 'react-router-dom'
@@ -318,6 +318,15 @@ test('Review defaults to pending self-review without loading an Agent', async ()
       updatedAt: '2026-07-15T09:00:00Z',
     }] })),
     http.get(`/api/app/expectations/${expectationId}/review`, () => new HttpResponse(null, { status: 404 })),
+    http.get(`/api/app/expectations/${expectationId}/review-context`, () => HttpResponse.json({
+      expectationId,
+      observationUpdateId: '88888888-8888-8888-8888-888888888888',
+      availability: 'partial',
+      unavailableContext: ['observation_update'],
+      marketObservation: { id: '77777777-7777-7777-7777-777777777777', journalDay: '2026-07-15' },
+      observationUpdate: null,
+      actionDecisions: [],
+    })),
     http.get('/api/app/reasoning-labels', () => HttpResponse.json({ items: [] })),
     http.put(`/api/app/expectations/${expectationId}/review`, async ({ request }) => {
       reviewBody = await request.json() as Record<string, unknown>
@@ -334,9 +343,11 @@ test('Review defaults to pending self-review without loading an Agent', async ()
   expect(agentCalls).toBe(0)
 
   await userEvent.click(screen.getByRole('button', { name: 'Start review' }))
+  expect(new URLSearchParams(window.location.search).get('expectationId')).toBe(expectationId)
   expect(await screen.findByRole('heading', { name: 'Guided self-review' })).toBeInTheDocument()
   expect(screen.getByText('Original Expectation context')).toBeInTheDocument()
-  expect(screen.getByText('Breadth closes below support.')).toBeInTheDocument()
+  const context = screen.getByRole('heading', { name: 'Original Expectation context' }).closest('section')!
+  expect(within(context).getByText('Breadth closes below support.')).toBeInTheDocument()
 
   const outcome = screen.getByRole('combobox', { name: 'Outcome' })
   expect(screen.getByRole('option', { name: 'Confirmed' })).toBeInTheDocument()
@@ -353,6 +364,8 @@ test('Review defaults to pending self-review without loading an Agent', async ()
   await waitFor(() => expect(reviewBody).toMatchObject({ outcome: 'partially_confirmed', reasoningQuality: 'sound', explanation: 'The condition was only partly met.' }))
   expect(await screen.findByText('Your self-review is saved. It is now the completed record; optional comparison remains separate.')).toBeInTheDocument()
   expect(agentCalls).toBe(0)
+  await userEvent.click(screen.getByRole('button', { name: 'Back to review queue' }))
+  expect(new URLSearchParams(window.location.search).has('expectationId')).toBe(false)
 })
 
 test.each([

@@ -215,6 +215,16 @@
       "id": "0043",
       "filename": "0043_identity_user_simplified_locale.sql",
       "sha256": "b209944d28a1fd9da7ce5c5eaeb0736f2259def79e94df401a61f87c40a267ed"
+    },
+    {
+      "id": "0044",
+      "filename": "0044_confirmed_patterns.sql",
+      "sha256": "d600027db43603ac2be81c772b52292f577f2438c7dc44efd4282e84b8029e74"
+    },
+    {
+      "id": "0045",
+      "filename": "0045_confirmed_pattern_lifecycle.sql",
+      "sha256": "f4da57696192bde855533866ec9a9e22be0ee2dee30c0d3250a19a23e2801a61"
     }
   ]
 }

@@ -1601,6 +1601,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1702,6 +1712,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1778,6 +1798,61 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/expectations/{id}/review-context": {
+      "get": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpectationReviewContextResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2492,11 +2567,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/WatchlistCreateWrite"
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WatchlistCreateWrite"
+                  }
+                ]
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -2511,6 +2592,16 @@
           },
           "204": {
             "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -2741,6 +2832,118 @@
         ]
       }
     },
+    "/internal/confirmed-patterns": {
+      "post": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmedPatternCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmedPatternResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/confirmed-patterns/{id}": {
+      "delete": {
+        "tags": [
+          "TradeDiary.Journal"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/internal/discipline-principles": {
       "get": {
         "tags": [
@@ -2811,6 +3014,16 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3214,6 +3427,9 @@
           "actionDecisions",
           "trades",
           "watchlistItems",
+          "confirmedPatterns",
+          "confirmedPatternEvidence",
+          "confirmedPatternStateEvents",
           "disciplinePrinciples",
           "accessGrants",
           "accessGrantRecords"
@@ -3245,6 +3461,15 @@
             "$ref": "#/components/schemas/JsonElement"
           },
           "watchlistItems": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "confirmedPatterns": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "confirmedPatternEvidence": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "confirmedPatternStateEvents": {
             "$ref": "#/components/schemas/JsonElement"
           },
           "disciplinePrinciples": {
@@ -3670,6 +3895,76 @@
           "agent"
         ]
       },
+      "ConfirmedPatternCreate": {
+        "required": [
+          "kind",
+          "key"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ReasoningLabelKind"
+          },
+          "key": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfirmedPatternResponse": {
+        "required": [
+          "id",
+          "kind",
+          "key",
+          "name",
+          "system",
+          "isConfirmed",
+          "firstConfirmedAt",
+          "confirmedAt",
+          "unconfirmedAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ReasoningLabelKind"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "system": {
+            "type": "boolean"
+          },
+          "isConfirmed": {
+            "type": "boolean"
+          },
+          "firstConfirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "unconfirmedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "DailyCloseEvidenceResponse": {
         "required": [
           "tradingDate",
@@ -3725,6 +4020,13 @@
         "properties": {
           "content": {
             "type": "string"
+          },
+          "confirmedPatternId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -3734,6 +4036,8 @@
           "content",
           "status",
           "selectedForToday",
+          "confirmedPatternId",
+          "confirmedPatternLabel",
           "createdAt",
           "updatedAt"
         ],
@@ -3751,6 +4055,19 @@
           },
           "selectedForToday": {
             "type": "boolean"
+          },
+          "confirmedPatternId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "confirmedPatternLabel": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "createdAt": {
             "type": "string",
@@ -3970,6 +4287,63 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ExpectationReviewContextResponse": {
+        "required": [
+          "expectationId",
+          "observationUpdateId",
+          "availability",
+          "unavailableContext",
+          "marketObservation",
+          "observationUpdate",
+          "actionDecisions"
+        ],
+        "type": "object",
+        "properties": {
+          "expectationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observationUpdateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/ReviewContextAvailability"
+          },
+          "unavailableContext": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "marketObservation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewContextObservationResponse"
+              }
+            ]
+          },
+          "observationUpdate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ObservationUpdateResponse"
+              }
+            ]
+          },
+          "actionDecisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewContextActionDecisionResponse"
+            }
           }
         }
       },
@@ -4759,6 +5133,15 @@
       "PatternEvidenceResponse": {
         "required": [
           "expectationId",
+          "reviewId",
+          "journalDay",
+          "subject",
+          "expectedBehavior",
+          "outcome",
+          "reasoningQuality",
+          "observationExcerpt",
+          "reviewExplanation",
+          "reviewedAt",
           "url"
         ],
         "type": "object",
@@ -4766,6 +5149,39 @@
           "expectationId": {
             "type": "string",
             "format": "uuid"
+          },
+          "reviewId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "journalDay": {
+            "type": "string",
+            "format": "date"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "expectedBehavior": {
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ExpectationOutcome"
+          },
+          "reasoningQuality": {
+            "$ref": "#/components/schemas/ReasoningQuality"
+          },
+          "observationExcerpt": {
+            "type": "string"
+          },
+          "reviewExplanation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time"
           },
           "url": {
             "type": "string"
@@ -4780,7 +5196,12 @@
           "system",
           "count",
           "denominator",
-          "evidence"
+          "confirmedPatternId",
+          "patternIsConfirmed",
+          "firstSeen",
+          "mostRecent",
+          "evidence",
+          "trend"
         ],
         "type": "object",
         "properties": {
@@ -4812,11 +5233,38 @@
             ],
             "format": "int32"
           },
+          "confirmedPatternId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "patternIsConfirmed": {
+            "type": "boolean"
+          },
+          "firstSeen": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "mostRecent": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
           "evidence": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PatternEvidenceResponse"
             }
+          },
+          "trend": {
+            "$ref": "#/components/schemas/PatternTrendResponse"
           }
         }
       },
@@ -4852,6 +5300,99 @@
             }
           }
         }
+      },
+      "PatternTrendBucketResponse": {
+        "required": [
+          "from",
+          "to",
+          "occurrenceCount",
+          "reviewedExpectationCount",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "occurrenceCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "reviewedExpectationCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PatternEvidenceResponse"
+            }
+          }
+        }
+      },
+      "PatternTrendDirection": {
+        "enum": [
+          "higher",
+          "lower",
+          "same",
+          null
+        ]
+      },
+      "PatternTrendResponse": {
+        "required": [
+          "status",
+          "direction",
+          "current",
+          "previous"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/PatternTrendStatus"
+          },
+          "direction": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PatternTrendDirection"
+              }
+            ]
+          },
+          "current": {
+            "$ref": "#/components/schemas/PatternTrendBucketResponse"
+          },
+          "previous": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PatternTrendBucketResponse"
+              }
+            ]
+          }
+        }
+      },
+      "PatternTrendStatus": {
+        "enum": [
+          "supported",
+          "insufficient_evidence"
+        ]
       },
       "ProblemDetails": {
         "type": "object",
@@ -5004,6 +5545,47 @@
           "mixed",
           "weak"
         ]
+      },
+      "ReviewContextActionDecisionResponse": {
+        "required": [
+          "decision",
+          "trades"
+        ],
+        "type": "object",
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/ActionDecisionResponse"
+          },
+          "trades": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeEvidenceResponse"
+            }
+          }
+        }
+      },
+      "ReviewContextAvailability": {
+        "enum": [
+          "available",
+          "partial"
+        ]
+      },
+      "ReviewContextObservationResponse": {
+        "required": [
+          "id",
+          "journalDay"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "journalDay": {
+            "type": "string",
+            "format": "date"
+          }
+        }
       },
       "TrackedInstrumentResponse": {
         "required": [
@@ -5168,6 +5750,17 @@
           "sell"
         ]
       },
+      "WatchlistCreateWrite": {
+        "required": [
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          }
+        }
+      },
       "WatchlistItemResponse": {
         "required": [
           "instrumentId",
@@ -5194,17 +5787,6 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
-          }
-        }
-      },
-      "WatchlistCreateWrite": {
-        "required": [
-          "note"
-        ],
-        "type": "object",
-        "properties": {
-          "note": {
-            "type": "string"
           }
         }
       },

@@ -172,6 +172,7 @@ public sealed class AccessGrantApiTests
         Assert.Equal(HttpStatusCode.Gone, expired.StatusCode);
         Assert.Contains("cursor_expired_fresh_sync_required", await expired.Content.ReadAsStringAsync());
 
+        await fixture.SeedUnconfirmedPattern(owner);
         using var exportResponse = await human.GetAsync("/internal/account-export");
         Assert.True(exportResponse.IsSuccessStatusCode, await exportResponse.Content.ReadAsStringAsync());
         var export = await exportResponse.Content.ReadFromJsonAsync<JsonElement>();
@@ -179,6 +180,10 @@ public sealed class AccessGrantApiTests
         Assert.Contains("initial ongoing", export.GetRawText());
         Assert.DoesNotContain("erase this closure", export.GetRawText());
         Assert.DoesNotContain("private other owner", export.GetRawText());
+        Assert.Contains(export.GetProperty("confirmedPatterns").EnumerateArray(), pattern =>
+            !pattern.GetProperty("is_confirmed").GetBoolean() && pattern.GetProperty("unconfirmed_at").ValueKind == JsonValueKind.String);
+        Assert.Equal(new[] { "confirmed", "unconfirmed" }, export.GetProperty("confirmedPatternStateEvents")
+            .EnumerateArray().Select(item => item.GetProperty("state").GetString()).ToArray());
         using var deletionResponse = await human.DeleteAsync("/internal/account-data");
         Assert.True(deletionResponse.StatusCode == HttpStatusCode.NoContent, await deletionResponse.Content.ReadAsStringAsync());
         Assert.True(await fixture.OwnedContentIsAbsent(owner, fixedAgent, ongoingAgent));
@@ -227,6 +232,7 @@ public sealed class AccessGrantApiTests
                 "0030_expectation_reviews.sql", "0031_action_decisions_trades.sql", "0032_watchlist.sql",
                 "0033_pattern_review_discipline_principles.sql", "0036_agent_access_grants.sql",
                 "0037_incremental_record_changes.sql", "0042_observation_search_indexes.sql",
+                "0044_confirmed_patterns.sql", "0045_confirmed_pattern_lifecycle.sql",
             })
                 await new NpgsqlCommand(await File.ReadAllTextAsync(Path.Combine(root, "platform/postgres/migrations", file)), setup).ExecuteNonQueryAsync();
 
@@ -359,6 +365,26 @@ public sealed class AccessGrantApiTests
             return (string?)await command.ExecuteScalarAsync();
         }
 
+        internal async Task SeedUnconfirmedPattern(Guid ownerId)
+        {
+            var id = Guid.NewGuid();
+            await using var insert = db.CreateCommand("""
+                INSERT INTO journal.confirmed_patterns(id,user_id,kind,label_key,label_name,is_system)
+                VALUES($1,$2,'issue','insufficient_evidence','Insufficient evidence',true)
+                """);
+            insert.Parameters.AddWithValue(id);
+            insert.Parameters.AddWithValue(ownerId);
+            await insert.ExecuteNonQueryAsync();
+            await using var update = db.CreateCommand("""
+                UPDATE journal.confirmed_patterns
+                SET is_confirmed=false,unconfirmed_at=now(),updated_at=now()
+                WHERE id=$1 AND user_id=$2
+                """);
+            update.Parameters.AddWithValue(id);
+            update.Parameters.AddWithValue(ownerId);
+            await update.ExecuteNonQueryAsync();
+        }
+
         internal async Task<bool> OwnedContentIsAbsent(params Guid[] ownerIds)
         {
             await using var command = db.CreateCommand("""
@@ -369,6 +395,8 @@ public sealed class AccessGrantApiTests
                     AND NOT EXISTS (SELECT 1 FROM journal.expectation_reviews WHERE user_id=ANY($1))
                     AND NOT EXISTS (SELECT 1 FROM journal.action_decisions WHERE user_id=ANY($1))
                     AND NOT EXISTS (SELECT 1 FROM journal.trades WHERE user_id=ANY($1))
+                    AND NOT EXISTS (SELECT 1 FROM journal.confirmed_patterns WHERE user_id=ANY($1))
+                    AND NOT EXISTS (SELECT 1 FROM journal.confirmed_pattern_state_events WHERE user_id=ANY($1))
                     AND NOT EXISTS (SELECT 1 FROM journal.agent_access_grants WHERE owner_user_id=ANY($1) OR agent_user_id=ANY($1))
                 """);
             command.Parameters.AddWithValue(ownerIds);

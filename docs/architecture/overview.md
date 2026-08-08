@@ -22,4 +22,5 @@ Identity owns accounts, sessions, Agent Users, and one active API token per Agen
 
 Only the migrator applies schema changes. Runtime roles have DML on owned schemas, no DDL, and no access to the migration ledger. Cross-service reads use HTTP or published market views.
 
-Known dependency note: .NET builds currently warn about `Microsoft.OpenApi 2.0.0` advisory `GHSA-v5pm-xwqc-g5wc`.
+The OpenAPI-producing services explicitly pin `Microsoft.OpenApi 2.7.5` so
+NuGet cannot fall back to the vulnerable `2.0.0` transitive minimum.

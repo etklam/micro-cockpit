@@ -28,6 +28,9 @@ static class AccountDataEndpoints
                 await Rows(connection, "SELECT * FROM journal.action_decisions WHERE user_id=ANY($1) ORDER BY recorded_at,id", ownerIds),
                 await Rows(connection, "SELECT * FROM journal.trades WHERE user_id=ANY($1) ORDER BY executed_at,id", ownerIds),
                 await Rows(connection, "SELECT * FROM journal.watchlist_items WHERE user_id=ANY($1) ORDER BY created_at,instrument_id", ownerIds),
+                await Rows(connection, "SELECT * FROM journal.confirmed_patterns WHERE user_id=ANY($1) ORDER BY created_at,id", ownerIds),
+                await Rows(connection, "SELECT * FROM journal.confirmed_pattern_evidence WHERE user_id=ANY($1) ORDER BY confirmed_pattern_id,review_id", ownerIds),
+                await Rows(connection, "SELECT * FROM journal.confirmed_pattern_state_events WHERE user_id=ANY($1) ORDER BY occurred_at,id", ownerIds),
                 await Rows(connection, "SELECT * FROM journal.discipline_principles WHERE user_id=ANY($1) ORDER BY created_at,id", ownerIds),
                 await Rows(connection, "SELECT * FROM journal.agent_access_grants WHERE owner_user_id=ANY($1) ORDER BY created_at,id", ownerIds),
                 await Rows(connection, """
@@ -49,6 +52,8 @@ static class AccountDataEndpoints
             foreach (var sql in new[]
             {
                 "DELETE FROM journal.agent_access_grants WHERE owner_user_id=ANY($1) OR agent_user_id=ANY($1)",
+                "DELETE FROM journal.discipline_principles WHERE user_id=ANY($1)",
+                "DELETE FROM journal.confirmed_patterns WHERE user_id=ANY($1)",
                 "DELETE FROM journal.expectation_review_labels l USING journal.expectation_reviews r WHERE l.review_id=r.id AND r.user_id=ANY($1)",
                 "DELETE FROM journal.expectation_reviews WHERE user_id=ANY($1)",
                 "DELETE FROM journal.trades WHERE user_id=ANY($1)",
@@ -56,9 +61,8 @@ static class AccountDataEndpoints
                 "DELETE FROM journal.expectations WHERE user_id=ANY($1)",
                 "DELETE FROM journal.observation_updates WHERE user_id=ANY($1)",
                 "DELETE FROM journal.market_observations WHERE user_id=ANY($1)",
-                "DELETE FROM journal.reasoning_labels WHERE user_id=ANY($1)",
                 "DELETE FROM journal.watchlist_items WHERE user_id=ANY($1)",
-                "DELETE FROM journal.discipline_principles WHERE user_id=ANY($1)",
+                "DELETE FROM journal.reasoning_labels WHERE user_id=ANY($1)",
                 "DELETE FROM journal.idempotency_keys WHERE user_id=ANY($1)",
             })
             {
@@ -108,6 +112,9 @@ record AccountJournalExport(
     JsonElement ActionDecisions,
     JsonElement Trades,
     JsonElement WatchlistItems,
+    JsonElement ConfirmedPatterns,
+    JsonElement ConfirmedPatternEvidence,
+    JsonElement ConfirmedPatternStateEvents,
     JsonElement DisciplinePrinciples,
     JsonElement AccessGrants,
     JsonElement AccessGrantRecords);
